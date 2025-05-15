@@ -1,0 +1,23 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+
+# Virtual environments (if you make one)
+venv/
+env/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# System files
+.DS_Store
+
+# Output / debug
+*.log
+*.tmp
+
+# Test artifacts
+user_solution.py
+
