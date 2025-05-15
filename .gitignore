@@ -25,6 +25,10 @@ user_solution.py
 __pycache__/
 *.py[cod]
 *.class
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
 # C extensions
 *.so
