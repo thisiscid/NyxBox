@@ -1,0 +1,21 @@
+{
+  "name": "three-sum",
+  "difficulty": "medium",
+  "description": "Given an array and a target number, return the indices of the first triplet of numbers that add up to the target. Return as a list of three indices.",
+  "function_name": "three_sum",
+  "type": "function",
+  "tests": [
+    {
+      "input": [[1, 4, 10, -3], 14],
+      "expected_output": [1, 2]
+    },
+    {
+      "input": [[2, 7, 11, 15], 9],
+      "expected_output": [0, 1]
+    },
+    {
+      "input": [[3, 2, 4], 6],
+      "expected_output": [1, 2]
+    }
+  ]
+}
