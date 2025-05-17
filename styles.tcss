@@ -1,0 +1,62 @@
+/* filepath: /Users/losdos/coding projects/coding-and-vending/styles.tcss */
+
+/* Main app styling */
+VendingMachine {
+  background: #222222;
+  color: #ffffff;
+  layout: vertical;
+  align: center middle;
+  padding: 2;
+}
+
+/* Header styling */
+Header {
+  dock: top;
+  height: 3;
+  text-style: bold;
+}
+
+/* Footer styling */
+Footer {
+  dock: bottom;
+}
+
+/* Challenge view styling */
+#challengeview {
+  width: 70%;
+  padding: 0;
+  margin: 15;
+  align: left middle;
+}
+
+/* Text area for solution writing */
+/* TextArea {
+  width: 90%;
+  height: 60%;
+  background: #333333;
+  color: #00ff00;
+  border: tall #006400;
+  margin: 1; 
+} */
+
+/* Container for button groups */
+#buttons {
+  width: 50%;
+  height: auto;
+  align: center middle;
+  margin: 1;
+}
+
+/* Styling for buttons */
+Button {
+  width: 20;
+  height: 3;
+  margin: 1 2;
+  background: #006400;
+  color: #ffffff;
+  border: tall #008800;
+}
+
+Button:hover {
+  background: #008800;
+}

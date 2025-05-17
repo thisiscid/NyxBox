@@ -1,20 +1,32 @@
 import os, random
 import json
+import sys
+import time
 from plugins import challenge_view, challenge_loader
+from textual.screen import Screen
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header, Static, TextArea, Label, Button
+from textual.containers import *
 
 class VendAnimation(Static):
     pass
+
 class VendingMachine(App):
-    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("q", "")]
+    CSS_PATH = "./styles.tcss"
+    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution")]
     
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
+        with Horizontal():
+            self.challenge_widget = self.chall_view()
+            self.challenge_widget.id = "challengeview"
+            yield self.challenge_widget
+            with Vertical():
+                yield Button("Price: $0.00")
+                yield Button("Search for item", variant="primary")
+                yield Button.success("Vend item")
         yield Header()
         yield Footer()
-        self.challenge_widget = self.chall_view()
-        yield self.challenge_widget
 
     def chall_view(self):
         """Return the challenge view widget."""
@@ -22,9 +34,16 @@ class VendingMachine(App):
     
     def action_vend_challenge(self) -> None:
         """Output a challenge"""
+        self.has_vended=True
         challenge = challenge_loader.vend_random_chall()
         # Update the challenge view with the new challenge
         self.challenge_widget.update_chall(challenge)
+    def action_edit_solution(self) -> None:
+        """Allow the user to edit the challenge."""
+        if self.has_vended:
+            pass
+            
+        
 
 if __name__ == "__main__":
     app = VendingMachine()
@@ -50,9 +69,9 @@ if __name__ == "__main__":
 #    local_scope={}
 #    exec(user_code, {"__builtins__": __builtins__}, local_scope)	
 #    pass
-if __name__ == "__main__":
-    app=VendingMachine()
-    app.run()
+#if __name__ == "__main__":
+    #app=VendingMachine()
+    #app.run()
     
 
 

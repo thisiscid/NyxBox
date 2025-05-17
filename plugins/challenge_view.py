@@ -2,7 +2,8 @@ from textual.widgets import Static
 import plugins.challenge_loader as chall_load
 class UserChallView(Static):
     def on_mount(self):
-        self.update("No user profile loaded.")
+        self.styles.align_horizontal = "center"
+        self.update("You stare down the vending machine. \n Why don't you try pressing 'v'?")
 
     def update_chall(self, chall: dict):
         # Format the profile info
