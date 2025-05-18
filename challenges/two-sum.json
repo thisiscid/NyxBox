@@ -4,6 +4,7 @@
   "description": "Given an array and a target number, return the indices of the first pair of numbers that add up to the target. Return as a list of two indices.",
   "function_name": "two_sum",
   "type": "function",
+  "inputs": ["arr", "target"],
   "tests": [
     {
       "input": [[1, 4, 10, -3], 14],

@@ -16,6 +16,16 @@ class VendingMachine(App):
     CSS_PATH = "./styles.tcss"
     BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution")]
     
+    #Define some consts so we don't have to do this every time we want to show or hide a widget
+    BUTTON_PANEL_ID = "button_panel"
+    CHALLENGE_VIEW_ID = "challengeview"
+    EDITOR_ID = "editor"
+
+    def on_mount(self) -> None:
+        """Initialize variables to be used later and other stuff"""
+        self.editor_opened = False
+        self.has_vended = False
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         with Horizontal():
@@ -25,30 +35,44 @@ class VendingMachine(App):
             with Vertical(id="button_panel"):
                 yield Label("Price (in brownie points):")
                 yield Digits("0.00")
-                yield Button.warning("Search for item")
+                yield Button.warning("Search for item", id="search_button")
                 yield Button.success("Vend item", id="vend_button")
+                yield Button.success("Begin coding!", id="edit_button")
         yield Header()
         yield Footer()
-
+    
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "vend_button":
             self.action_vend_challenge()
+        elif event.button.id == "edit_button":
+            self.action_edit_solution()
 
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
         editor_instance = Editor()
-        if hasattr(self, 'current_challenge'):
-            
-            editor_instance.load_challenge(self.current_challenge)
-            self.mount(editor_instance)
+        if not self.editor_opened:
+            if hasattr(self, 'current_challenge'):
+                self.editor_opened=True
+                editor_instance.load_challenge(self.current_challenge)
+                editor_instance.id = "editor"
+                self.mount(editor_instance)
+                self.get_widget_by_id('button_panel').display = False
+            else:
+                self.notify(
+                    title="Theres no challenge...",
+                    message="[b]Please vend a challenge before trying to open the editor![/b]",
+                    severity="warning",
+                    timeout=5,
+                    markup=True
+                )
         else:
             self.notify(
-                title="Theres no challenge...",
-                message="[b]Please vend a challenge before trying to open the editor![/b]",
-                severity="warning",
-                timeout=5,
-                markup=True
-            )
+                    title="Really?",
+                    message="[b]Can't open editor twice! Quit first![/b]",
+                    severity="error",
+                    timeout=5,
+                    markup=True
+                )
 
         
         
@@ -63,7 +87,14 @@ class VendingMachine(App):
         self.current_challenge=challenge
         # Update the challenge view with the new challenge
         self.challenge_widget.update_chall(challenge)
-            
+        # Show edit button after vending
+        #btn = self.query_one("#edit_button")
+        #self.log(f"[DEBUG] Before: edit_button display={btn.display} visible={btn.visible}")    
+        #btn.display = True
+        #btn.visible = True
+        #self.log(f"[DEBUG] After: edit_button display={btn.display} visible={btn.visible}")
+        # this doesn't work </3
+         
         
 
 if __name__ == "__main__":

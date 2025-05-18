@@ -4,7 +4,7 @@
   "description": "Given an array and a target number, return the indices of the first triplet of numbers that add up to the target. Return as a list of three indices.",
   "function_name": "three_sum",
   "type": "function",
-  "inputs": ["target",""],
+  "inputs": ["arr","target"],
   "tests": [
     {
       "input": [[1, 4, 2, 10, -3], 15],

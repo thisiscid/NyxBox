@@ -53,3 +53,7 @@ Button {
   height: 3;
   margin: 1 2;
 }
+
+.remove {
+    display: none;
+}
