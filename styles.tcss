@@ -52,11 +52,4 @@ Button {
   width: 20;
   height: 3;
   margin: 1 2;
-  background: #006400;
-  color: #ffffff;
-  border: tall #008800;
-}
-
-Button:hover {
-  background: #008800;
 }

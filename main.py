@@ -3,10 +3,11 @@ import json
 import sys
 import time
 from plugins import challenge_view, challenge_loader
+from plugins.editor_tools import Editor
 from textual.screen import Screen
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Static, TextArea, Label, Button
-from textual.containers import *
+from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits
+from textual.containers import Horizontal, Vertical
 
 class VendAnimation(Static):
     pass
@@ -21,13 +22,36 @@ class VendingMachine(App):
             self.challenge_widget = self.chall_view()
             self.challenge_widget.id = "challengeview"
             yield self.challenge_widget
-            with Vertical():
-                yield Button("Price: $0.00")
-                yield Button("Search for item", variant="primary")
-                yield Button.success("Vend item")
+            with Vertical(id="button_panel"):
+                yield Label("Price (in brownie points):")
+                yield Digits("0.00")
+                yield Button.warning("Search for item")
+                yield Button.success("Vend item", id="vend_button")
         yield Header()
         yield Footer()
 
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "vend_button":
+            self.action_vend_challenge()
+
+    def action_edit_solution(self) -> None:
+        """Allows user to edit a challenge, loads instance then displays"""
+        editor_instance = Editor()
+        if hasattr(self, 'current_challenge'):
+            
+            editor_instance.load_challenge(self.current_challenge)
+            self.mount(editor_instance)
+        else:
+            self.notify(
+                title="Theres no challenge...",
+                message="[b]Please vend a challenge before trying to open the editor![/b]",
+                severity="warning",
+                timeout=5,
+                markup=True
+            )
+
+        
+        
     def chall_view(self):
         """Return the challenge view widget."""
         return challenge_view.UserChallView()
@@ -36,12 +60,9 @@ class VendingMachine(App):
         """Output a challenge"""
         self.has_vended=True
         challenge = challenge_loader.vend_random_chall()
+        self.current_challenge=challenge
         # Update the challenge view with the new challenge
         self.challenge_widget.update_chall(challenge)
-    def action_edit_solution(self) -> None:
-        """Allow the user to edit the challenge."""
-        if self.has_vended:
-            pass
             
         
 

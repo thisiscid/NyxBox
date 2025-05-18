@@ -18,7 +18,9 @@ def list_all_chall_detailed():
          with open(os.path.join("challenges", chall), 'r') as file:
            ret.append(json.load(file))
     return ret
-if __name__ == "__main__":
-     print(list_all_chall())
-     print(vend_random_chall())
-     print(list_all_chall_detailed())
+
+def return_tests(challenge):
+    with open(os.path.join("challenges", challenge+".json"), 'r') as file:
+        file=json.load(file)
+        return file["tests"]
+
