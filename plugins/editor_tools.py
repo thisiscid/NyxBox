@@ -2,6 +2,7 @@ from textual.widgets import TextArea, Static, Button, Label
 from textual.containers import Vertical, Horizontal
 from textual.app import ComposeResult
 import json
+
 class Editor(Static):
     
     def compose(self) -> ComposeResult:
@@ -14,11 +15,40 @@ class Editor(Static):
         with Horizontal():
             yield TextArea(self.template_code, language="python", tab_behavior='indent')
             with Vertical():
-                yield Button("Save Code", variant='warning')
-                yield Button("Run Code", variant='primary')
-                yield Button("Submit Code", variant='success')
+                yield Button("Save Code", id="save_button", variant='warning')
+                yield Button("Run Code", id="run_button", variant='primary')
+                yield Button("Submit Code", id="submit_button", variant='success')
+                yield Button("Reset Code", id="reset_button", variant='error')
+                yield Button("Quit Editor", id="quit_button", variant = 'error')
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "save_button":
+                self.action_save_code()
+            case "quit_button":
+                self.action_quit_editor()
+            case "reset_button":
+                self.action_reset_editor()
+            case "submit_button":
+                self.action_submit_solution()
+            case "run_button":
+                self.action_run_code
+    def action_quit_editor(self):
+        """Handle quitting the editor
+        - Hide the editor
+        - Show the main app screen
+        """
+        """self.get_widget_by_id('button_panel').display = True
+        self.remove()"""
+
+    def action_save_code(self):
+        """Handle saving the code
+        - Get the current code from the editor
+        - Save it to a file or variable
+        """
+        # Assuming you have a method to get the current code
+        with open(f'{self.chall_name}.py', 'w') as f:
+            f.write(self.get_solution_code())
         
-    
     def on_mount(self):
         """Initialize editor state when it's first created"""
         pass
@@ -29,6 +59,8 @@ class Editor(Static):
         - Generate template code
         - Update the editor content
         """
+        self.chall_name = challenge['name']
+        self.challenge = challenge
         if 'inputs' in challenge and isinstance(challenge['inputs'], list):
             # Filter out empty strings and generate parameter string
             params = [p for p in challenge['inputs'] if p]
@@ -45,23 +77,23 @@ class Editor(Static):
 
 """
         self.template_code=py_template
-        return py_template
+        return self.template_code
     
     def get_solution_code(self):
         """Return the current code from the editor"""
-        pass
+        return self.query_one(TextArea).text
     
-    def run_code(self):
+    def action_run_code(self):
         """Execute the current code and show results"""
         pass
     
-    def submit_solution(self):
+    def action_submit_solution(self):
         """Submit solution for evaluation against test cases"""
         pass
     
-    def reset_editor(self):
+    def action_reset_editor(self):
         """Reset the editor to initial state or template"""
-        pass
+        
     
     # Consider adding these helper methods:
     # - _generate_template()

@@ -25,8 +25,8 @@ Footer {
 #challengeview {
   width: 70%;
   padding: 0;
-  margin: 15;
-  align: left middle;
+  margin: 2;
+  align: center middle;
 }
 
 /* Text area for solution writing */
@@ -40,7 +40,7 @@ Footer {
 } */
 
 /* Container for button groups */
-#buttons {
+#button_panel {
   width: 50%;
   height: auto;
   align: center middle;

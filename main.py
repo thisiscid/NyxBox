@@ -28,19 +28,21 @@ class VendingMachine(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
+        yield Header()
+        yield Footer()
         with Horizontal():
             self.challenge_widget = self.chall_view()
             self.challenge_widget.id = "challengeview"
             yield self.challenge_widget
-            with Vertical(id="button_panel"):
+            with Vertical(id="button_panel"): # THIS DOESN'T EVEN SHOW UP ANYMORE WHYY????
                 yield Label("Price (in brownie points):")
                 yield Digits("0.00")
                 yield Button.warning("Search for item", id="search_button")
                 yield Button.success("Vend item", id="vend_button")
-                yield Button.success("Begin coding!", id="edit_button")
-        yield Header()
-        yield Footer()
-    
+                button_edit = Button.success("Begin coding!", id="edit_button")
+                button_edit.display = False
+                yield button_edit
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "vend_button":
             self.action_vend_challenge()
@@ -88,12 +90,9 @@ class VendingMachine(App):
         # Update the challenge view with the new challenge
         self.challenge_widget.update_chall(challenge)
         # Show edit button after vending
-        #btn = self.query_one("#edit_button")
-        #self.log(f"[DEBUG] Before: edit_button display={btn.display} visible={btn.visible}")    
-        #btn.display = True
-        #btn.visible = True
-        #self.log(f"[DEBUG] After: edit_button display={btn.display} visible={btn.visible}")
-        # this doesn't work </3
+        btn = self.query_one("#edit_button")
+        btn.display = True # IT WORKS!!!! :D
+
          
         
 
