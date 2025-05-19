@@ -1,10 +1,7 @@
-/* filepath: /Users/losdos/coding projects/coding-and-vending/styles.tcss */
-
 /* Main app styling */
 VendingMachine {
   background: #222222;
   color: #ffffff;
-  layout: vertical;
   align: center middle;
   padding: 2;
 }
@@ -35,7 +32,7 @@ Footer {
   height: 60%;
   background: #333333;
   color: #00ff00;
-  border: tall #006400;
+  border: tall;
   margin: 1; 
 } */
 
@@ -57,3 +54,28 @@ Button {
 .remove {
     display: none;
 }
+
+ModalScreen {
+  align: center middle
+}
+#quit_screen {
+  width: auto;
+  height: auto;
+  content-align: center middle;
+  border: tall #3b82f6
+} 
+
+#quit_screen Label {
+  width: 100%;
+  content-align: center middle;
+}
+#quit_buttons {
+  width: auto;
+  height: auto;
+  align: center middle
+}
+
+#exit_screen {
+  align: center middle;
+  content-align: center middle
+} 

@@ -1,7 +1,29 @@
 from textual.widgets import TextArea, Static, Button, Label
+
 from textual.containers import Vertical, Horizontal
 from textual.app import ComposeResult
+from textual.message import Message
 import json
+from textual.screen import Screen, ModalScreen
+
+class EditorClosed(Message):
+    pass
+
+class EditorClosePrompt(ModalScreen):
+    def compose(self) -> ComposeResult:
+        with Vertical(id="quit_screen"):
+            yield Label("Exit back to the vending machine?", id="quit_text")
+            with Horizontal(id="quit_buttons"):
+                yield Button.success("Yes", id="yes_editor_button")
+                yield Button.error("No", id="no_editor_button")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "yes_editor_button":
+                self.app.pop_screen()
+                self.app.post_message(EditorClosed())
+            case "no_editor_button":
+                self.app.pop_screen() 
 
 class Editor(Static):
     
@@ -15,22 +37,22 @@ class Editor(Static):
         with Horizontal():
             yield TextArea(self.template_code, language="python", tab_behavior='indent')
             with Vertical():
-                yield Button("Save Code", id="save_button", variant='warning')
-                yield Button("Run Code", id="run_button", variant='primary')
-                yield Button("Submit Code", id="submit_button", variant='success')
-                yield Button("Reset Code", id="reset_button", variant='error')
-                yield Button("Quit Editor", id="quit_button", variant = 'error')
+                yield Button("Save Code", id="save_edit_button", variant='warning')
+                yield Button("Run Code", id="run_edit_button", variant='primary')
+                yield Button("Submit Code", id="submit_edit_button", variant='success')
+                yield Button("Reset Code", id="reset_edit_button", variant='error')
+                yield Button("Quit Editor", id="quit_edit_button", variant = 'error')
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
-            case "save_button":
+            case "save_edit_button":
                 self.action_save_code()
-            case "quit_button":
-                self.action_quit_editor()
-            case "reset_button":
+            case "quit_edit_button":
+                self.app.push_screen(EditorClosePrompt())
+            case "reset_edit_button":
                 self.action_reset_editor()
-            case "submit_button":
+            case "submit_edit_button":
                 self.action_submit_solution()
-            case "run_button":
+            case "run_edit_button":
                 self.action_run_code
     def action_quit_editor(self):
         """Handle quitting the editor

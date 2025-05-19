@@ -3,14 +3,30 @@ import json
 import sys
 import time
 from plugins import challenge_view, challenge_loader
-from plugins.editor_tools import Editor
-from textual.screen import Screen
+from plugins.editor_tools import Editor, EditorClosed
+from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits
 from textual.containers import Horizontal, Vertical
-
+from textual.message import Message
 class VendAnimation(Static):
     pass
+
+class ConfirmExit(ModalScreen):
+    def compose(self) -> ComposeResult:
+        with Vertical(id="quit_screen"):
+            yield Label("Are you sure you want to quit?", id="quit_text")
+            with Horizontal(id="quit_buttons"):
+                yield Button.success("Yes", id="yes_button")
+                yield Button.error("No", id="no_button")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "yes_button":
+                self.app.exit()
+            case "no_button":
+                self.app.pop_screen()
+
 
 class VendingMachine(App):
     CSS_PATH = "./styles.tcss"
@@ -34,7 +50,7 @@ class VendingMachine(App):
             self.challenge_widget = self.chall_view()
             self.challenge_widget.id = "challengeview"
             yield self.challenge_widget
-            with Vertical(id="button_panel"): # THIS DOESN'T EVEN SHOW UP ANYMORE WHYY????
+            with Vertical(id="button_panel"):
                 yield Label("Price (in brownie points):")
                 yield Digits("0.00")
                 yield Button.warning("Search for item", id="search_button")
@@ -42,12 +58,26 @@ class VendingMachine(App):
                 button_edit = Button.success("Begin coding!", id="edit_button")
                 button_edit.display = False
                 yield button_edit
-
+                yield Button.error("Quit", id="quit_button")
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "vend_button":
-            self.action_vend_challenge()
-        elif event.button.id == "edit_button":
-            self.action_edit_solution()
+        match event.button.id:
+            case "quit_button":
+                self.push_screen(ConfirmExit())
+            case "search_button":
+                pass
+            case "vend_button":
+                self.action_vend_challenge()
+            case "edit_button":
+                self.action_edit_solution()
+
+    def on_editor_closed(self, message: EditorClosed) -> None:
+        # Example: remove the editor and show the button panel again
+        editor = self.query_one("#editor")
+        if editor:
+            editor.remove()
+        self.get_widget_by_id('button_panel').display = True
+        self.editor_opened = False
+        
 
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
