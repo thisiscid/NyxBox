@@ -1,13 +1,15 @@
 import os
 import json
 import io, contextlib # Used to redirect STDIN & STDOUT for output
-from textual.widgets import TextArea, Static, Button, Label, SelectionList
+from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select
 from textual.containers import Vertical, Horizontal
 from textual.app import ComposeResult
 from textual.message import Message
 from textual.screen import Screen, ModalScreen
 from textual import on
 from plugins.challenge_view import UserChallView
+
+SUPPORTED_LANGUAGES = ["Python", "JavaScript", "Java", "C", "C++"]
 class EditorClosed(Message):
     pass
 
@@ -22,6 +24,7 @@ class UserCodeError(Exception):
     pass
 
 class EditorClosePrompt(ModalScreen):
+    
     def compose(self) -> ComposeResult:
         with Vertical(id="quit_screen"):
             yield Label("Exit back to the vending machine?", id="quit_text")
@@ -36,19 +39,28 @@ class EditorClosePrompt(ModalScreen):
                 self.app.post_message(EditorClosed())
             case "no_editor_button":
                 self.app.pop_screen() 
+
 class SelectLanguage(ModalScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.translucent = True  # Make the modal translucent
+        self.background_color = "#000000"  # Set a black background with alpha
     def compose(self) -> ComposeResult:
-        yield SelectionList[str](  
-            ("Python", "py", True),
-            ("JavaScript", "js"),
-            ("Java", "java"),
-            ("C", "c"),
-            ("C++", "cpp")
-        )
-        with Horizontal():
-            yield Button.success("Quit editor", id="quit_lang_select")
-            yield Button.success("Confirm selection", id="confim_lang_select")
-    
+        with Vertical():
+            yield Label("Select a language to write in:")
+            yield Select([
+                    ("Python", "py"),
+                    ("Javascript", "js"),
+                    ("Java", "js"),
+                    ("C", "c"),
+                    ("C++", "cpp"),
+                ],
+                value="py",
+                id="language_select")
+            with Horizontal():
+                yield Button.success("Quit editor", id="quit_lang_select")
+                yield Button.success("Confirm selection", id="confirm_lang_select")
+
     @on(Button.Pressed, "#quit_lang_select")
     def quit_language_selection(self) -> None:
         self.app.pop_screen()
@@ -56,9 +68,33 @@ class SelectLanguage(ModalScreen):
     
     @on(Button.Pressed, "#confirm_lang_select")
     def post_message_selection(self) -> None:
-        selected = self.query_one(SelectionList).selected
-        if selected:
-            self.app.post_message(LanguageSelected(selected[0]))
+        selected = self.query_one(Select).value
+        if isinstance(selected, str):
+            self.app.post_message(LanguageSelected(selected))
+            
+# class SelectLanguage(ModalScreen):
+#     def compose(self) -> ComposeResult:
+#         yield SelectionList[str](  
+#             ("Python", "py", True),
+#             ("JavaScript", "js"),
+#             ("Java", "java"),
+#             ("C", "c"),
+#             ("C++", "cpp"),
+#         )
+#         with Horizontal():
+#             yield Button.success("Quit editor", id="quit_lang_select")
+#             yield Button.success("Confirm selection", id="confim_lang_select")
+    
+#     @on(Button.Pressed, "#quit_lang_select")
+#     def quit_language_selection(self) -> None:
+#         self.app.pop_screen()
+#         self.app.post_message(EditorClosed())
+    
+#     @on(Button.Pressed, "#confirm_lang_select")
+#     def post_message_selection(self) -> None:
+#         selected = self.query_one(SelectionList).selected
+#         if selected:
+#             self.app.post_message(LanguageSelected(selected[0]))
     
 
 class Editor(Screen):
@@ -114,7 +150,11 @@ class Editor(Screen):
     def on_mount(self):
         """Initialize editor state when it's first created"""
         self.CHALLENGE_FOLDER="./vendncode/challenge_solutions"
-    
+        self.call_later(self.show_language_modal)
+
+    def show_language_modal(self):
+        self.app.push_screen(SelectLanguage())
+
     def load_challenge(self, challenge):
         """Handle loading a challenge into the editor
         - Extract function name and parameters
