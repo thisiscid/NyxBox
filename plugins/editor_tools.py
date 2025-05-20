@@ -1,11 +1,12 @@
 import os
 import json
 import io, contextlib # Used to redirect STDIN & STDOUT for output
-from textual.widgets import TextArea, Static, Button, Label
+from textual.widgets import TextArea, Static, Button, Label, SelectionList
 from textual.containers import Vertical, Horizontal
 from textual.app import ComposeResult
 from textual.message import Message
 from textual.screen import Screen, ModalScreen
+from textual import on
 from plugins.challenge_view import UserChallView
 class EditorClosed(Message):
     pass
@@ -35,9 +36,31 @@ class EditorClosePrompt(ModalScreen):
                 self.app.post_message(EditorClosed())
             case "no_editor_button":
                 self.app.pop_screen() 
-#class SelectLanguage(ModalScreen):
-    #def compose(self) -> ComposeResult:
-        #yield 
+class SelectLanguage(ModalScreen):
+    def compose(self) -> ComposeResult:
+        yield SelectionList[str](  
+            ("Python", "py", True),
+            ("JavaScript", "js"),
+            ("Java", "java"),
+            ("C", "c"),
+            ("C++", "cpp")
+        )
+        with Horizontal():
+            yield Button.success("Quit editor", id="quit_lang_select")
+            yield Button.success("Confirm selection", id="confim_lang_select")
+    
+    @on(Button.Pressed, "#quit_lang_select")
+    def quit_language_selection(self) -> None:
+        self.app.pop_screen()
+        self.app.post_message(EditorClosed())
+    
+    @on(Button.Pressed, "#confirm_lang_select")
+    def post_message_selection(self) -> None:
+        selected = self.query_one(SelectionList).selected
+        if selected:
+            self.app.post_message(LanguageSelected(selected[0]))
+    
+
 class Editor(Screen):
     BINDINGS = [
         ("ctrl+s", "save_code", "Save"),
@@ -90,7 +113,7 @@ class Editor(Screen):
         
     def on_mount(self):
         """Initialize editor state when it's first created"""
-        self.CHALLENGE_FOLDER="./vendncode/challenges"
+        self.CHALLENGE_FOLDER="./vendncode/challenge_solutions"
     
     def load_challenge(self, challenge):
         """Handle loading a challenge into the editor
