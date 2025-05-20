@@ -30,7 +30,7 @@ class ConfirmExit(ModalScreen):
 
 class VendingMachine(App):
     CSS_PATH = "./styles.tcss"
-    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution")]
+    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution"), ("ctrl+q", "quit_app", "Quit app")]
     
     #Define some consts so we don't have to do this every time we want to show or hide a widget
     BUTTON_PANEL_ID = "button_panel"
@@ -62,7 +62,7 @@ class VendingMachine(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "quit_button":
-                self.push_screen(ConfirmExit())
+                self.action_quit_app()
             case "search_button":
                 pass
             case "vend_button":
@@ -71,13 +71,12 @@ class VendingMachine(App):
                 self.action_edit_solution()
 
     def on_editor_closed(self, message: EditorClosed) -> None:
-        # Example: remove the editor and show the button panel again
-        editor = self.query_one("#editor")
-        if editor:
-            editor.remove()
+        self.pop_screen()
         self.get_widget_by_id('button_panel').display = True
         self.editor_opened = False
         
+    def action_quit_app(self) -> None:
+        self.push_screen(ConfirmExit())
 
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
@@ -87,8 +86,8 @@ class VendingMachine(App):
                 self.editor_opened=True
                 editor_instance.load_challenge(self.current_challenge)
                 editor_instance.id = "editor"
-                self.mount(editor_instance)
-                self.get_widget_by_id('button_panel').display = False
+                self.push_screen(editor_instance)
+                #self.get_widget_by_id('button_panel').display = False
             else:
                 self.notify(
                     title="Theres no challenge...",
@@ -114,9 +113,10 @@ class VendingMachine(App):
     
     def action_vend_challenge(self) -> None:
         """Output a challenge"""
-        self.has_vended=True
+        self.has_vended = True
         challenge = challenge_loader.vend_random_chall()
-        self.current_challenge=challenge
+        self.challenge = challenge
+        self.current_challenge = challenge  # Set current_challenge attribute
         # Update the challenge view with the new challenge
         self.challenge_widget.update_chall(challenge)
         # Show edit button after vending
