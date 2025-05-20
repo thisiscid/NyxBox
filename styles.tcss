@@ -56,7 +56,9 @@ Button {
 }
 
 ModalScreen {
-  align: center middle
+  align: center middle;
+  content-align: center middle;
+  background: rgba(0, 0, 0, 0.5); /* semi-transparent */
 }
 #quit_screen {
   width: auto;
@@ -79,3 +81,21 @@ ModalScreen {
   align: center middle;
   content-align: center middle
 } 
+
+#language_select_box {
+  width: 60;           /* increase width */
+  min-width: 40;       /* optional: ensures it's not too narrow */
+  max-width: 80;       /* optional: prevents it from being too wide */
+  min-height: 8;       /* decrease min-height */
+  max-height: 14;      /* optional: prevents it from being too tall */
+  align: center middle;
+  content-align: center middle;
+  border: tall #3b82f6;
+  background: #222; /* solid box */
+  padding: 2;
+}
+
+#language_select_buttons {
+  content-align: center middle; 
+  align: center middle
+}

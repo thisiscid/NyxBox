@@ -10,6 +10,7 @@ from textual import on
 from plugins.challenge_view import UserChallView
 
 SUPPORTED_LANGUAGES = ["Python", "JavaScript", "Java", "C", "C++"]
+
 class EditorClosed(Message):
     pass
 
@@ -41,12 +42,8 @@ class EditorClosePrompt(ModalScreen):
                 self.app.pop_screen() 
 
 class SelectLanguage(ModalScreen):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.translucent = True  # Make the modal translucent
-        self.background_color = "#000000"  # Set a black background with alpha
     def compose(self) -> ComposeResult:
-        with Vertical():
+        with Vertical(id="language_select_box"):
             yield Label("Select a language to write in:")
             yield Select([
                     ("Python", "py"),
@@ -57,7 +54,7 @@ class SelectLanguage(ModalScreen):
                 ],
                 value="py",
                 id="language_select")
-            with Horizontal():
+            with Horizontal(id="language_select_buttons"):
                 yield Button.success("Quit editor", id="quit_lang_select")
                 yield Button.success("Confirm selection", id="confirm_lang_select")
 
