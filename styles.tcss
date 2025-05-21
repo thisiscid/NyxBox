@@ -69,7 +69,8 @@ ModalScreen {
 }
 #quit_screen {
   width: auto;
-  height: auto;
+  min-height: 4;
+  max-height: 8;
   content-align: center middle;
   border: tall #3b82f6
 } 
@@ -80,8 +81,15 @@ ModalScreen {
 }
 #quit_buttons {
   width: auto;
-  height: auto;
+  min-height: 2;
+  max-height: 6;
   align: center middle
+}
+#quit_buttons Button {
+  width: auto;
+  height: auto;
+  align: center middle; 
+  margin: 1 2
 }
 
 #exit_screen {
@@ -112,14 +120,16 @@ ModalScreen {
   margin-top: 0;
   margin-bottom: -5;
   padding: 0;
+  padding-bottom: 5
   /* gap: 0*/
 }
 
 TestResultsWidget {
   content-align: center middle; 
   align: center middle;         
-  width: 50;                  
-  height: 13;                   
+  width: 90;                  
+  min-height: 8;
+  max-height: 18;
   border: round dodgerblue;     
   margin-top: -1;                
 }

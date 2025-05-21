@@ -10,6 +10,9 @@ from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
+
+DAEMON_USER="[#B3507D][bold]nyu[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
+
 class VendAnimation(Static):
     pass
 

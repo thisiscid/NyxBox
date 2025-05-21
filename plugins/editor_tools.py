@@ -12,15 +12,16 @@ from plugins.challenge_view import UserChallView
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
 # 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
-# 3. In TestResultsWidget.update_content():
+# 3. List of messages to pick out of for DAEMON!
+# 4. In TestResultsWidget.update_content():
 #    - Separate results into passed/failed
 #    - Render them in "Passed Tests" and "Failed Tests" TabPane
-# 4. Optional polish:
+# 5. Optional polish:
 #    - Improve result formatting (centralize string styling)
 #    - Wire up Submit Code and Reset Code logic
-#    - Create ASCII startup screen for daemon flavor
+#    - Create ASCII startup screen for daemon flavor (List of messages to pick out of!)
 # ================================
-
+DAEMON_USER="[#B3507D][bold](u)nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
     def __init__(self):
@@ -31,32 +32,42 @@ class TestResultsWidget(Widget):
         self.styles.align_horizontal = "center"
 
     def compose(self) -> ComposeResult:
+        """TODO: List of messages to pick out of """
         with TabbedContent(id="results_tabs"):
-            with TabPane("Challenge", id="challenge_tab_pane"):
-                yield Static("Loading challenge details...", id="challenge_content_static")
+            with TabPane("Challenge", id="challenge_tab_pane"): #Remember: random list!
+                yield Static(f"{DAEMON_USER} Working on getting your challenge...", id="challenge_content_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
-                yield Static("No test results yet.", id="all_tests_content_static")
+                yield Static(f"{DAEMON_USER} Run it first, ya dummy.", id="all_tests_content_static")
             with TabPane("Passed Tests", id="passed_tests_tab_pane"):
-                yield Static("No passed tests yet.", id="passed_tests_content_static")
+                yield Static(f"No passed tests yet.", id="passed_tests_content_static")
             with TabPane("Failed Tests", id="failed_tests_tab_pane"):
-                yield Static("No failed tests yet.", id="failed_tests_content_static")  
+                yield Static(f"No failed tests yet.", id="failed_tests_content_static")  
  
     def update_content(self, chall, results=None):
         """Update widgets with latest run"""
         self.all_results = results
         challenge_static = self.query_one("#challenge_content_static", Static)
         if chall:
+            example_test = chall.get('tests', [{}])[0]
+            example_input = example_test.get('input', [])
+            example_expected = example_test.get('expected_output', '???')
             formatted_challenge = (
+                f"{DAEMON_USER} Here's your challenge. Entertain me.\n"
                 f"Name: {chall.get('name', 'N/A')}\n"
                 f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
                 f"Description: {chall.get('description', 'N/A')}"
+                f"Sample input: {str(example_input)} \n"
+                f"Expected: {str(example_expected)}"
             )
             challenge_static.update(formatted_challenge)
         else:
-            challenge_static.update("Challenge data is not loaded yet.")
+            challenge_static.update(f"{DAEMON_USER} I couldn't find the data? I don't think that's intended...")
         all_tests_static = self.query_one("#all_tests_content_static", Static)
+        passed_tests_static = self.query_one("#passed_tests_content_static", Static)
+        failed_tests_static = self.query_one("#failed_tests_content_static", Static)
         if results:
             all_tests_static.update("\n\n".join(results))
+        self.refresh()
 
 
 class EditorClosed(Message):
@@ -202,10 +213,9 @@ class Editor(Screen):
         - Update the editor content
         """
         if not self.challenge:
-            # Optionally, show a warning or just return
                 self.notify(
                         title="Where'd it go!?",
-                        message="[b]Could not load challenge! Something went wrong, open an issue![/b]",
+                        message="[b]Could not load challenge! Something is terribly wrong, open an issue![/b]",
                         severity="error",
                         timeout=5,
                         markup=True
@@ -258,6 +268,7 @@ class Editor(Screen):
             self.textarea.text = template
             self.textarea.refresh()
             self.refresh()
+            self.all_view.update_content(self.challenge, None)
         except Exception as e:
             print("Failed to update TextArea:", e)
         # textarea = self.query_one("#edit_text", TextArea)
@@ -280,7 +291,7 @@ class Editor(Screen):
             return {"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
         try:
             user_func = namespace[self.challenge['function_name']]
-            for test_case in self.challenge['test']:
+            for test_case in self.challenge['tests']:
                 try:
                     result = user_func(*test_case["input"])
                     if result != test_case['expected_output']:
@@ -297,11 +308,11 @@ class Editor(Screen):
         formatted_results=[]
         for result in all_results:
             if result['error']:
-                formatted_results.append(f"🚫[red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+                formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
             elif not result['passed']:
-                formatted_results.append(f"🚨[red][bold]Must've input the code wrong. [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+                formatted_results.append(f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
             elif result['passed']:
-                formatted_results.append(f"✅[green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+                formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
             else:
                 formatted_results.append("🚫[red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
         self.all_view.update_content(self.challenge, formatted_results)
