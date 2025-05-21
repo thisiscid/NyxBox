@@ -40,13 +40,14 @@ class TestResultsWidget(Static):
                 f"Name: {chall.get('name', 'N/A')}\n"
                 f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
                 f"Description: {chall.get('description', 'N/A')}")
+                yield Static(formatted)
 
             with TabPane("All Tests"):
                 yield Static("\n\n".join([r for r in results]))
             with TabPane("Passed Tests"):
-                pass
+                yield Static("\n\n".join([r for r in results if r[0] == "✅"]))
             with TabPane("Failed Tests"):
-                pass
+                yield Static("\n\n".join([r for r in results if r[0] != "✅"]))
 
 
 class EditorClosed(Message):
