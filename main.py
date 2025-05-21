@@ -3,7 +3,8 @@ import json
 import sys
 import time
 from plugins import challenge_view, challenge_loader
-from plugins.editor_tools import Editor, EditorClosed
+from plugins.editor_tools import Editor, EditorClosed, LanguageSelected
+from textual import on
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits
@@ -80,13 +81,15 @@ class VendingMachine(App):
 
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
-        editor_instance = Editor()
+        self.editor_instance = Editor()
         if not self.editor_opened:
             if hasattr(self, 'current_challenge'):
                 self.editor_opened=True
-                editor_instance.load_challenge(self.current_challenge)
-                editor_instance.id = "editor"
-                self.push_screen(editor_instance)
+                #editor_instance.load_challenge(self.current_challenge)
+                self.editor_instance.get_and_update_chall(self.current_challenge)
+                self.editor_instance.id = "editor"
+                #editor_instance.challenge_view.update_chall(self.current_challenge)
+                self.push_screen(self.editor_instance)
                 #self.get_widget_by_id('button_panel').display = False
             else:
                 self.notify(
@@ -105,7 +108,13 @@ class VendingMachine(App):
                     markup=True
                 )
 
-        
+    @on(LanguageSelected)
+    def handle_language_selection(self, message: LanguageSelected):
+        print(f"Language selected: {message.language}")
+        # Get the editor screen
+        if self.editor_instance:
+            # Update the editor with the selected language
+            self.editor_instance.load_challenge(message)
         
     def chall_view(self):
         """Return the challenge view widget."""

@@ -1,7 +1,7 @@
 import os
 import json
 import io, contextlib # Used to redirect STDIN & STDOUT for output
-from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select
+from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select, TabbedContent, TabPane
 from textual.containers import Vertical, Horizontal
 from textual.app import ComposeResult
 from textual.message import Message
@@ -9,9 +9,37 @@ from textual.screen import Screen, ModalScreen
 from textual import on
 from plugins.challenge_view import UserChallView
 
-SUPPORTED_LANGUAGES = ["Python", "JavaScript", "Java", "C", "C++"]
+class TestResultsWidget(Static):
+    """Custom widget to implement tabbed view of chall + tests"""
+    def __init__(self):
+        super().__init__()
+        self.results = []
+    
+    def on_mount(self):
+        self.styles.align_horizontal = "center"
+        self.update("Run your code to see test results")
+        
+    def update_content(self, chall, results):
+        """Update widgets with latest run"""
+        self.all_results = results
+        self.remove_children()
+        with TabbedContent():
+            with TabPane("Challenge"):
+                formatted=(
+                f"Name: {chall.get('name', 'N/A')}\n"
+                f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
+                f"Description: {chall.get('description', 'N/A')}")
+
+            with TabPane("All Tests"):
+                yield Static("\n\n".join([r for r in results]))
+            with TabPane("Passed Tests"):
+                pass
+            with TabPane("Failed Tests"):
+                pass
+
 
 class EditorClosed(Message):
+    """Message passed when user has closed editor"""
     pass
 
 class LanguageSelected(Message):
@@ -55,19 +83,20 @@ class SelectLanguage(ModalScreen):
                 value="py",
                 id="language_select")
             with Horizontal(id="language_select_buttons"):
-                yield Button.success("Quit editor", id="quit_lang_select")
+                yield Button.error("Quit editor", id="quit_lang_select")
                 yield Button.success("Confirm selection", id="confirm_lang_select")
 
     @on(Button.Pressed, "#quit_lang_select")
     def quit_language_selection(self) -> None:
-        self.app.pop_screen()
         self.app.post_message(EditorClosed())
+        self.app.pop_screen()
     
     @on(Button.Pressed, "#confirm_lang_select")
     def post_message_selection(self) -> None:
         selected = self.query_one(Select).value
         if isinstance(selected, str):
             self.app.post_message(LanguageSelected(selected))
+            self.app.pop_screen()
             
 # class SelectLanguage(ModalScreen):
 #     def compose(self) -> ComposeResult:
@@ -95,6 +124,7 @@ class SelectLanguage(ModalScreen):
     
 
 class Editor(Screen):
+
     BINDINGS = [
         ("ctrl+s", "save_code", "Save"),
         ("ctrl+r", "run_code", "Run"),
@@ -108,15 +138,15 @@ class Editor(Screen):
         - Status indicators
         """
         with Horizontal():
-            yield TextArea(self.template_code, language="python", tab_behavior='indent')
+            yield TextArea(language="python", tab_behavior='indent', id="edit_text")
             with Vertical():
                 yield Button("Save Code", id="save_edit_button", variant='warning')
                 yield Button("Run Code", id="run_edit_button", variant='primary')
                 yield Button("Submit Code", id="submit_edit_button", variant='success')
                 yield Button("Reset Code", id="reset_edit_button", variant='error')
                 yield Button("Quit Editor", id="quit_edit_button", variant = 'error')
-                self.challenge_view = UserChallView()  # <--- store reference
-                yield self.challenge_view
+                self.all_view = TestResultsWidget()  # <--- store reference
+                yield self.all_view
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "save_edit_button":
@@ -149,21 +179,35 @@ class Editor(Screen):
         self.CHALLENGE_FOLDER="./vendncode/challenge_solutions"
         self.call_later(self.show_language_modal)
 
+
     def show_language_modal(self):
         self.app.push_screen(SelectLanguage())
 
-    def load_challenge(self, challenge):
+    def get_and_update_chall(self, challenge):
+        self.challenge=challenge
+
+    @on(LanguageSelected)
+    def load_challenge(self, event: LanguageSelected):
         """Handle loading a challenge into the editor
         - Extract function name and parameters
         - Generate template code
         - Update the editor content
         """
-        self.chall_name = challenge['name']
-        self.challenge = challenge
+        if not self.challenge:
+        # Optionally, show a warning or just return
+            self.notify(
+                    title="Where'd it go!?",
+                    message="[b]Could not load challenge! Something went wrong, open an issue![/b]",
+                    severity="error",
+                    timeout=5,
+                    markup=True
+                ) 
+            return
+        self.chall_name = self.challenge['name']
         #self.challenge_view.update_chall(challenge)
-        if 'inputs' in challenge and isinstance(challenge['inputs'], list):
+        if 'inputs' in self.challenge and isinstance(self.challenge['inputs'], list):
             # Filter out empty strings and generate parameter string
-            params = [p for p in challenge['inputs'] if p]
+            params = [p for p in self.challenge['inputs'] if p]
             if params:
                 param_str = ", ".join(params)
             else:
@@ -173,11 +217,24 @@ class Editor(Screen):
             # Fallback to default parameters if no inputs defined
             param_str = ""
         
-        py_template=f"""def {challenge['function_name']}({param_str}): \n \t
+        py_template=f"""def {self.challenge['function_name']}({param_str}):
+    # Your code here. 
+    # Don't print(), return instead! 
+    # Tests will FAIL if you print.
+    pass
 
 """
-        self.template_code=py_template
-        return self.template_code
+        try:
+            textarea = self.query_one("#edit_text", TextArea)
+            textarea.text = py_template
+            textarea.refresh()
+            self.refresh()
+            print(f"TextArea updated successfully. Text:{textarea.text}")
+        except Exception as e:
+            print("Failed to update TextArea:", e)
+        # textarea = self.query_one("#edit_text", TextArea)
+        # textarea.text = py_template
+        # textarea.refresh()
     
     def get_solution_code(self):
         """Return the current code from the editor"""
@@ -186,7 +243,7 @@ class Editor(Screen):
     def action_run_code(self):
         """Execute the current code and show results"""
         code = self.query_one(TextArea).text
-        test_cases=self.challenge["tests"]
+        #test_cases=self.challenge["tests"]
         namespace={}
         all_results=[]
         try:
@@ -209,7 +266,18 @@ class Editor(Screen):
                     all_results.append({"input":test_case["input"], "output":None, "expected":test_case["expected_output"], "passed":False, "error":str(e)})
         except Exception as e:
             all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
-        return all_results
+        formatted_results=[]
+        for result in all_results:
+            if result['error']:
+                formatted_results.append(f"🚫[red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+            elif not result['passed']:
+                formatted_results.append(f"🚨[red][bold]Must've input the code wrong. [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+            elif result['passed']:
+                formatted_results.append(f"✅[green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+            else:
+                formatted_results.append("🚫[red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+
+
         
     
     def action_submit_solution(self):

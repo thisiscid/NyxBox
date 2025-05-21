@@ -14,3 +14,7 @@ class UserChallView(Static):
             f"Description: {chall.get('description', 'N/A')}"
         )
         self.update(formatted)
+    
+    def custom_message(self, msg: str):
+        # Print custom message when required (check editor_tools.py)
+        self.update(msg)
