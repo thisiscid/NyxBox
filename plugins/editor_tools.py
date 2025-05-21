@@ -28,26 +28,35 @@ class TestResultsWidget(Static):
     
     def on_mount(self):
         self.styles.align_horizontal = "center"
-        self.update("Run your code to see test results")
-        
-    def update_content(self, chall, results):
+
+    def compose(self) -> ComposeResult:
+        pass   
+    def update_content(self, chall, results=None):
         """Update widgets with latest run"""
         self.all_results = results
         self.remove_children()
-        with TabbedContent():
+        if chall is None:
+            self.update("Challenge data is not loaded yet.")
+            return
+        tabs=TabbedContent()
+        with tabs:
             with TabPane("Challenge"):
                 formatted=(
                 f"Name: {chall.get('name', 'N/A')}\n"
                 f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
                 f"Description: {chall.get('description', 'N/A')}")
                 yield Static(formatted)
-
-            with TabPane("All Tests"):
-                yield Static("\n\n".join([r for r in results]))
-            with TabPane("Passed Tests"):
-                yield Static("\n\n".join([r for r in results if r[0] == "✅"]))
-            with TabPane("Failed Tests"):
-                yield Static("\n\n".join([r for r in results if r[0] != "✅"]))
+            if results:
+                with TabPane("All Tests"):
+                    yield Static("\n\n".join([r for r in results]))
+                with TabPane("Passed Tests"):
+                    yield Static("\n\n".join([r for r in results if r[0] == "✅"]))
+                with TabPane("Failed Tests"):
+                    yield Static("\n\n".join([r for r in results if r[0] != "✅"]))
+            else:
+                with TabPane("All Tests"):
+                    yield Static("Y'know you gotta run it first right?")
+        self.update(tabs)
 
 
 class EditorClosed(Message):
@@ -88,7 +97,7 @@ class SelectLanguage(ModalScreen):
             yield Select([
                     ("Python", "py"),
                     ("Javascript", "js"),
-                    ("Java", "js"),
+                    ("Java", "java"),
                     ("C", "c"),
                     ("C++", "cpp"),
                 ],
@@ -109,30 +118,6 @@ class SelectLanguage(ModalScreen):
         if isinstance(selected, str):
             self.app.post_message(LanguageSelected(selected))
             self.app.pop_screen()
-            
-# class SelectLanguage(ModalScreen):
-#     def compose(self) -> ComposeResult:
-#         yield SelectionList[str](  
-#             ("Python", "py", True),
-#             ("JavaScript", "js"),
-#             ("Java", "java"),
-#             ("C", "c"),
-#             ("C++", "cpp"),
-#         )
-#         with Horizontal():
-#             yield Button.success("Quit editor", id="quit_lang_select")
-#             yield Button.success("Confirm selection", id="confim_lang_select")
-    
-#     @on(Button.Pressed, "#quit_lang_select")
-#     def quit_language_selection(self) -> None:
-#         self.app.pop_screen()
-#         self.app.post_message(EditorClosed())
-    
-#     @on(Button.Pressed, "#confirm_lang_select")
-#     def post_message_selection(self) -> None:
-#         selected = self.query_one(SelectionList).selected
-#         if selected:
-#             self.app.post_message(LanguageSelected(selected[0]))
     
 
 class Editor(Screen):
@@ -149,16 +134,28 @@ class Editor(Screen):
         - Run/Submit buttons
         - Status indicators
         """
-        with Horizontal():
-            yield TextArea(language="python", tab_behavior='indent', id="edit_text")
-            with Vertical():
-                yield Button("Save Code", id="save_edit_button", variant='warning')
-                yield Button("Run Code", id="run_edit_button", variant='primary')
-                yield Button("Submit Code", id="submit_edit_button", variant='success')
-                yield Button("Reset Code", id="reset_edit_button", variant='error')
-                yield Button("Quit Editor", id="quit_edit_button", variant = 'error')
-                self.all_view = TestResultsWidget()  # <--- store reference
-                yield self.all_view
+        with Vertical():
+            self.textarea=TextArea(id="edit_text")
+            self.textarea = self.textarea.code_editor()
+            yield self.textarea
+            with Vertical(id = "editor_buttons"):
+                h1 = Horizontal()
+                h1.styles.margin = (0, 0)  # Remove all margins
+                h1.styles.padding = (0, 0)
+                with h1:
+                    yield Button("Save Code", id="save_edit_button", variant='warning')
+                    yield Button("Run Code", id="run_edit_button", variant='primary')
+                    yield Button("Submit Code", id="submit_edit_button", variant='success')
+                h2 = Horizontal()
+                h2.styles.margin = (0, 0)  # Remove all margins
+                h2.styles.padding = (0, 0)
+                with h2:
+                    yield Button("Reset Code", id="reset_edit_button", variant='error')
+                    yield Button("Quit Editor", id="quit_edit_button", variant = 'error')
+            self.all_view = TestResultsWidget()
+            yield self.all_view
+            self.all_view.id = "test_results_widget"
+            self.all_view.update_content(self.challenge)
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "save_edit_button":
@@ -171,6 +168,9 @@ class Editor(Screen):
                 self.action_submit_solution()
             case "run_edit_button":
                 self.action_run_code()
+    def on_ready(self):
+        self.all_view.update_content(self.challenge)
+
     def action_quit_editor(self):
         self.app.push_screen(EditorClosePrompt())
 
@@ -206,17 +206,17 @@ class Editor(Screen):
         - Update the editor content
         """
         if not self.challenge:
-        # Optionally, show a warning or just return
-            self.notify(
-                    title="Where'd it go!?",
-                    message="[b]Could not load challenge! Something went wrong, open an issue![/b]",
-                    severity="error",
-                    timeout=5,
-                    markup=True
-                ) 
-            return
+            # Optionally, show a warning or just return
+                self.notify(
+                        title="Where'd it go!?",
+                        message="[b]Could not load challenge! Something went wrong, open an issue![/b]",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    ) 
+                return
         self.chall_name = self.challenge['name']
-        #self.challenge_view.update_chall(challenge)
+            #self.challenge_view.update_chall(challenge)
         if 'inputs' in self.challenge and isinstance(self.challenge['inputs'], list):
             # Filter out empty strings and generate parameter string
             params = [p for p in self.challenge['inputs'] if p]
@@ -228,20 +228,40 @@ class Editor(Screen):
         else:
             # Fallback to default parameters if no inputs defined
             param_str = ""
-        
-        py_template=f"""def {self.challenge['function_name']}({param_str}):
+        template = "" 
+        match event.language:
+            case 'py':   
+                template=f"""def {self.challenge['function_name']}({param_str}):
     # Your code here. 
     # Don't print(), return instead! 
     # Tests will FAIL if you print.
     pass
 
-"""
+        """
+                self.textarea.language = 'python'
+            case 'js':
+                template=f"""function {self.challenge['function_name']}({param_str}) {{
+    // Your code here.
+    // Don't use console.log(), return the result instead!
+    // Tests will FAIL if you print.
+    return null;
+}}"""
+                self.textarea.language = 'javascript'
+            case 'java':
+                template = f"""public class Solution {{
+    public static Object {self.challenge['function_name']}({param_str}) {{
+        // Your code here.
+        // Don't use System.out.println(), return the result instead!
+        // Tests will FAIL if you print.
+        return null;
+    }}
+}}
+            """
+                self.textarea.language = 'java'
         try:
-            textarea = self.query_one("#edit_text", TextArea)
-            textarea.text = py_template
-            textarea.refresh()
+            self.textarea.text = template
+            self.textarea.refresh()
             self.refresh()
-            print(f"TextArea updated successfully. Text:{textarea.text}")
         except Exception as e:
             print("Failed to update TextArea:", e)
         # textarea = self.query_one("#edit_text", TextArea)
@@ -288,6 +308,7 @@ class Editor(Screen):
                 formatted_results.append(f"✅[green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
             else:
                 formatted_results.append("🚫[red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+        self.all_view.update_content(self.challenge, formatted_results)
 
 
         

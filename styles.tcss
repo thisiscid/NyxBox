@@ -17,7 +17,10 @@ Header {
 Footer {
   dock: bottom;
 }
-
+Vertical {
+  margin: 0 0;
+  padding: 0 0
+}
 /* Challenge view styling */
 #challengeview {
   width: 70%;
@@ -48,13 +51,17 @@ Footer {
 Button {
   width: 20;
   height: 3;
-  margin: 1 2;
+  margin: 0 2;
 }
 
 .remove {
     display: none;
 }
-
+Horizontal {
+  align: center middle;
+  content-align: center middle;
+  margin: 0 0
+}
 ModalScreen {
   align: center middle;
   content-align: center middle;
@@ -97,5 +104,18 @@ ModalScreen {
 
 #language_select_buttons {
   content-align: center middle; 
+  align: center middle
+}
+#editor_buttons {
+  align: center top;
+  content-align: center middle;
+  margin-top: 0;
+  margin-bottom: -5;
+  padding: 0;
+  /* gap: 0*/
+}
+
+TestResultsWidget {
+  content-align: center middle;
   align: center middle
 }
