@@ -8,6 +8,17 @@ from textual.message import Message
 from textual.screen import Screen, ModalScreen
 from textual import on
 from plugins.challenge_view import UserChallView
+# TODO:
+# 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
+# 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
+# 3. In TestResultsWidget.update_content():
+#    - Separate results into passed/failed
+#    - Render them in "Passed Tests" and "Failed Tests" TabPane
+# 4. Optional polish:
+#    - Improve result formatting (centralize string styling)
+#    - Wire up Submit Code and Reset Code logic
+#    - Create ASCII startup screen for daemon flavor
+# ================================
 
 class TestResultsWidget(Static):
     """Custom widget to implement tabbed view of chall + tests"""
