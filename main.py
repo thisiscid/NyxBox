@@ -3,7 +3,7 @@ import json
 import sys
 import time
 from plugins import challenge_view, challenge_loader
-from plugins.editor_tools import Editor, EditorClosed, LanguageSelected
+from plugins.editor_tools import Editor, EditorClosed, LanguageSelected, TestResultsWidget
 from textual import on
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
@@ -82,11 +82,11 @@ class VendingMachine(App):
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
         self.editor_instance = Editor()
+        self.editor_instance.get_and_update_chall(self.current_challenge)
         if not self.editor_opened:
             if hasattr(self, 'current_challenge'):
                 self.editor_opened=True
                 #editor_instance.load_challenge(self.current_challenge)
-                self.editor_instance.get_and_update_chall(self.current_challenge)
                 self.editor_instance.id = "editor"
                 #editor_instance.challenge_view.update_chall(self.current_challenge)
                 self.push_screen(self.editor_instance)

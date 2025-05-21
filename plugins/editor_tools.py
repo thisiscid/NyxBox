@@ -7,6 +7,7 @@ from textual.app import ComposeResult
 from textual.message import Message
 from textual.screen import Screen, ModalScreen
 from textual import on
+from textual.widget import Widget
 from plugins.challenge_view import UserChallView
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
@@ -20,7 +21,7 @@ from plugins.challenge_view import UserChallView
 #    - Create ASCII startup screen for daemon flavor
 # ================================
 
-class TestResultsWidget(Static):
+class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
     def __init__(self):
         super().__init__()
@@ -30,33 +31,32 @@ class TestResultsWidget(Static):
         self.styles.align_horizontal = "center"
 
     def compose(self) -> ComposeResult:
-        pass   
+        with TabbedContent(id="results_tabs"):
+            with TabPane("Challenge", id="challenge_tab_pane"):
+                yield Static("Loading challenge details...", id="challenge_content_static")
+            with TabPane("All Tests", id="all_tests_tab_pane"):
+                yield Static("No test results yet.", id="all_tests_content_static")
+            with TabPane("Passed Tests", id="passed_tests_tab_pane"):
+                yield Static("No passed tests yet.", id="passed_tests_content_static")
+            with TabPane("Failed Tests", id="failed_tests_tab_pane"):
+                yield Static("No failed tests yet.", id="failed_tests_content_static")  
+ 
     def update_content(self, chall, results=None):
         """Update widgets with latest run"""
         self.all_results = results
-        self.remove_children()
-        if chall is None:
-            self.update("Challenge data is not loaded yet.")
-            return
-        tabs=TabbedContent()
-        with tabs:
-            with TabPane("Challenge"):
-                formatted=(
+        challenge_static = self.query_one("#challenge_content_static", Static)
+        if chall:
+            formatted_challenge = (
                 f"Name: {chall.get('name', 'N/A')}\n"
                 f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
-                f"Description: {chall.get('description', 'N/A')}")
-                yield Static(formatted)
-            if results:
-                with TabPane("All Tests"):
-                    yield Static("\n\n".join([r for r in results]))
-                with TabPane("Passed Tests"):
-                    yield Static("\n\n".join([r for r in results if r[0] == "✅"]))
-                with TabPane("Failed Tests"):
-                    yield Static("\n\n".join([r for r in results if r[0] != "✅"]))
-            else:
-                with TabPane("All Tests"):
-                    yield Static("Y'know you gotta run it first right?")
-        self.update(tabs)
+                f"Description: {chall.get('description', 'N/A')}"
+            )
+            challenge_static.update(formatted_challenge)
+        else:
+            challenge_static.update("Challenge data is not loaded yet.")
+        all_tests_static = self.query_one("#all_tests_content_static", Static)
+        if results:
+            all_tests_static.update("\n\n".join(results))
 
 
 class EditorClosed(Message):
@@ -139,6 +139,10 @@ class Editor(Screen):
             self.textarea = self.textarea.code_editor()
             yield self.textarea
             with Vertical(id = "editor_buttons"):
+                self.all_view = TestResultsWidget()
+                with Horizontal():
+                    yield self.all_view
+                self.all_view.id = "test_results_widget"
                 h1 = Horizontal()
                 h1.styles.margin = (0, 0)  # Remove all margins
                 h1.styles.padding = (0, 0)
@@ -146,16 +150,8 @@ class Editor(Screen):
                     yield Button("Save Code", id="save_edit_button", variant='warning')
                     yield Button("Run Code", id="run_edit_button", variant='primary')
                     yield Button("Submit Code", id="submit_edit_button", variant='success')
-                h2 = Horizontal()
-                h2.styles.margin = (0, 0)  # Remove all margins
-                h2.styles.padding = (0, 0)
-                with h2:
                     yield Button("Reset Code", id="reset_edit_button", variant='error')
                     yield Button("Quit Editor", id="quit_edit_button", variant = 'error')
-            self.all_view = TestResultsWidget()
-            yield self.all_view
-            self.all_view.id = "test_results_widget"
-            self.all_view.update_content(self.challenge)
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "save_edit_button":

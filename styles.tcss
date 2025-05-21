@@ -116,6 +116,11 @@ ModalScreen {
 }
 
 TestResultsWidget {
-  content-align: center middle;
-  align: center middle
+  content-align: center middle; 
+  align: center middle;         
+  width: 50;                  
+  height: 13;                   
+  border: round dodgerblue;     
+  margin-top: -1;                
 }
+
