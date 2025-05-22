@@ -5,6 +5,8 @@ import random
 import subprocess
 import tempfile
 import asyncio
+from pathlib import Path
+from tree_sitter_languages import get_language
 from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select, TabbedContent, TabPane, Header, Footer
 from textual.containers import Vertical, Horizontal, ScrollableContainer
 from textual.app import ComposeResult
@@ -14,6 +16,7 @@ from textual import on
 from textual.widget import Widget
 from plugins.challenge_view import UserChallView
 from textual.markup import escape
+
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
 # 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
@@ -309,6 +312,9 @@ class Editor(Screen):
 }}"""
                 self.textarea.language = 'javascript'
             case 'java':
+                example_test = self.challenge.get('tests', [{}])[0]
+                output_type = example_test.get('expected_output', [])
+                
                 template = f"""public class Solution {{
     public static Object {self.challenge['function_name']}({param_str}) {{
         // Your code here.
@@ -319,6 +325,80 @@ class Editor(Screen):
 }}
             """
                 self.textarea.language = 'java'
+            case 'cpp':
+                example_test = self.challenge.get('tests', [{}])[0]
+                inputs = example_test.get("input", [])
+                expected_output = example_test.get("expected_output", None)
+                def infer_cpp_type(value):
+                    """Infer C++ type from a Python value."""
+                    if isinstance(value, bool):
+                        return "bool" 
+                    if isinstance(value, int):
+                        return "int"
+                    elif isinstance(value, dict):
+                        if not value:
+                            return "map<string, int>"  # Default for empty dict
+                        key_type = infer_cpp_type(next(iter(value.keys())))
+                        val_type = infer_cpp_type(next(iter(value.values())))
+                        return f"map<{key_type}, {val_type}>"
+                    elif isinstance(value, float):
+                        return "double"
+                    elif isinstance(value, str):
+                        return "string"
+                    elif isinstance(value, list):
+                        # Check if the list is empty
+                        if not value:
+                            return "vector<int>"
+                        
+                        # Check if all elements are same type
+                        first_type = type(value[0])
+                        if all(isinstance(x, first_type) for x in value):
+                            element_type = infer_cpp_type(value[0])
+                        else:
+                            # Mixed types - use most general type or auto
+                            return "vector<auto>"  # This isn't valid C++ but signals a type issue
+                        
+                        return f"vector<{element_type}>"
+                    else:
+                        return "auto"  # Fallback for unknown types
+                def default_return_value(cpp_type):
+                    """Provide a default return value for a given C++ type."""
+                    if cpp_type == "bool":
+                        return "false"
+                    elif cpp_type == "int":
+                        return "0"
+                    elif cpp_type == "double":
+                        return "0.0"
+                    elif cpp_type == "string":
+                        return "\"\""
+                    elif cpp_type.startswith("vector"):
+                        return "{}"
+                    elif cpp_type.startswith("map<"):
+                        return "{}"
+                    else:
+                        return "0"  # Fallback for unknown types
+                param_types = [infer_cpp_type(param) for param in inputs]
+                param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
+                return_type = infer_cpp_type(expected_output)
+
+                template = f"""
+#include <iostream>
+#include <vector>
+#include <string>
+#include <map>
+#include <unordered_map>  
+#include <algorithm>
+using namespace std;
+//Feel free to add any extra libraries you may need!
+
+{return_type} {self.challenge['function_name']}({param_str}) {{
+    // Your code here.
+    // Do NOT use cout/printf, return the result instead!
+    // Tests will FAIL if you print.
+    return {default_return_value(return_type)};
+}}
+"""
+                self.textarea.language ='cpp'
         try:
             self.template=template
             self.textarea.text = template
@@ -335,7 +415,7 @@ class Editor(Screen):
         """Return the current code from the editor"""
         return self.query_one(TextArea).text
     
-    async def action_run_code(self):
+    async def action_run_code(self) -> None:
         """Execute the current code and show results"""
         #TODO: There is a bunch of static nyu text, change it to rotate!
         code = self.query_one(TextArea).text
@@ -377,6 +457,13 @@ class Editor(Screen):
                         formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
                     else:
                         formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+                    self.notify(
+                    title="Hey mortal...I finished running your code!",
+                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                    severity="information",
+                    timeout=3,
+                    markup=True
+                    )
                 self.all_view.update_content(self.challenge, formatted_results)
             case 'js':
                 for test_case in self.challenge['tests']:
@@ -440,8 +527,16 @@ try {{
                         formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
                     else:
                         formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+                self.notify(
+                    title="Hey mortal...I finished running your code!",
+                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                    severity="information",
+                    timeout=3,
+                    markup=True
+                )
                 self.all_view.update_content(self.challenge, formatted_results)
-
+            case 'cpp':
+                pass # TODO: Implement cpp, hopefully map most logic -> C later
 
 
         

@@ -1,0 +1,11 @@
+# Core TUI framework
+textual>=3.2.0 # I'm running on textual 3.2.0, this MAY work but I cannot guarentee it for lower versions.
+
+# Most requirements will be what I am running locally, may vary since I have a mac
+# Syntax highlighting
+tree-sitter>=0.24.0
+tree-sitter-languages>=1.10.2
+
+# Optional dependencies
+rich>=13.9.4       # Pretty printing (used by Textual but good to specify)
+typing-extensions>=4.12.2  # For advanced type annotations
