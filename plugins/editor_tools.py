@@ -16,7 +16,7 @@ from textual import on
 from textual.widget import Widget
 from plugins.challenge_view import UserChallView
 from textual.markup import escape
-
+from plugins.code_runners.cpp_runner import run_cpp_code
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
 # 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
@@ -192,7 +192,10 @@ class Editor(Screen):
         ("ctrl+s", "save_code", "Save"),
         ("ctrl+r", "run_code", "Run"),
         ("ctrl+q", "quit_editor", "Quit Editor"),
+        ("v", "", ""),
+        ("e", "", "")
     ]
+    
     def compose(self) -> ComposeResult:
         """Define the editor layout here
         Consider including:
@@ -204,21 +207,28 @@ class Editor(Screen):
             self.textarea=TextArea(id="edit_text")
             self.textarea = self.textarea.code_editor()
             yield self.textarea
-            with Vertical(id = "editor_buttons"):
+            with Vertical(id = "editor_interface"):
                 self.all_view = TestResultsWidget()
                 with Horizontal():
                     yield self.all_view
                 self.all_view.id = "test_results_widget"
                 h1 = Horizontal()
+                h1.id = "editor_buttons"
                 h1.styles.margin = (0, 0)  # Remove all margins
                 h1.styles.padding = (0, 0)
                 with h1:
                     yield Button("Save Code", id="save_edit_button", variant='warning')
                     yield Button("Run Code", id="run_edit_button", variant='primary')
                     yield Button("Submit Code", id="submit_edit_button", variant='success')
+                h2 = Horizontal()
+                h2.id = "editor_buttons2"
+                h2.styles.margin = (0, 0)  # Remove all margins
+                h2.styles.padding = (0, 0)
+                with h2:
                     yield Button("Reset Code", id="reset_edit_button", variant='error')
                     yield Button("Quit Editor", id="quit_edit_button", variant = 'error')
                 yield Footer()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "save_edit_button":
@@ -418,6 +428,8 @@ using namespace std;
     async def action_run_code(self) -> None:
         """Execute the current code and show results"""
         #TODO: There is a bunch of static nyu text, change it to rotate!
+        #Python and JS are in this file because they're easy to implement and not that long.
+        #Since C++, C, and Java are compiled, we will need to fix it later.
         code = self.query_one(TextArea).text
         #test_cases=self.challenge["tests"]
         namespace={}
@@ -430,11 +442,20 @@ using namespace std;
                 except Exception as e:
                     result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
                     formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? Hey, I've never seen that error![/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+                    self.notify(
+                    title="Hey mortal...I finished running your code!",
+                    message=f"{DAEMON_USER} I don't think your code works though... check the 'All Tests' or failed tests tab...",
+                    severity="error",
+                    timeout=3,
+                    markup=True
+                    )
                     self.all_view.update_content(self.challenge, formatted_results)
                     return
                 try:
                     user_func = namespace[self.challenge['function_name']]
                     for test_case in self.challenge['tests']:
+                        if test_case.get("hidden", False):
+                            continue
                         try:
                             result = user_func(*test_case["input"])
                             if result != test_case['expected_output']:
@@ -457,7 +478,7 @@ using namespace std;
                         formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
                     else:
                         formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
-                    self.notify(
+                self.notify(
                     title="Hey mortal...I finished running your code!",
                     message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
                     severity="information",
@@ -467,6 +488,8 @@ using namespace std;
                 self.all_view.update_content(self.challenge, formatted_results)
             case 'js':
                 for test_case in self.challenge['tests']:
+                    if test_case.get("hidden", False):
+                        continue
                     args = ", ".join(json.dumps(arg) for arg in test_case["input"])
                     wrapped_code = f"""
 // --- USER CODE START ---
@@ -494,13 +517,18 @@ try {{
 
                         stdout, stderr = await proc.communicate()
                         if proc.returncode != 0:
-                            all_results.append({
-                                "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
-                                "output": None,
-                                "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
-                                "passed": False,
-                                "error": stderr.decode().strip()
-                            })
+                            # formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+                            # all_results.append({
+                            #     "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                            #     "output": None,
+                            #     "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                            #     "passed": False,
+                            #     "error": stderr.decode().strip()
+                            # })
+                            formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {TestResultsWidget.escape_brackets(str(test_case["input"]))} \n Error: {stderr.decode().strip()}")
+                            self.all_view.update_content(self.challenge, formatted_results)
+                            return
+
                         else:
                             result = json.loads(stdout.decode().strip())
                             all_results.append({

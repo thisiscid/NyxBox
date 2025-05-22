@@ -116,9 +116,21 @@ ModalScreen {
   align: center middle
 }
 #editor_buttons {
+  height: 3;
   align: center top;
   content-align: center middle;
   margin-top: 0;
+  margin-bottom: 0;
+  padding: 0;
+  padding-bottom: 0
+  /* gap: 0*/
+}
+
+#editor_buttons2 {
+  height: 3;
+  align: center top;
+  content-align: center middle;
+  margin-top: 1;
   margin-bottom: -5;
   padding: 0;
   padding-bottom: 5
