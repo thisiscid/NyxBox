@@ -69,8 +69,9 @@ ModalScreen {
 }
 #quit_screen {
   width: auto;
-  min-height: 4;
-  max-height: 8;
+  min-height: 6;
+  max-height: 9;
+  padding: 1 1;
   content-align: center middle;
   border: tall #3b82f6
 } 
@@ -134,3 +135,23 @@ TestResultsWidget {
   margin-top: -1;                
 }
 
+EditorResetConfirm {
+  align: center middle;
+  content-align: center middle;
+  border: tall #3b82f6
+} 
+
+#reset_confirm_dialog {
+  min-height: 4;
+  max-height: 8;
+  /*min-width: 30;*/
+  width: auto;
+  align: center middle;
+  content-align: center middle;
+  border: tall #3b82f6
+}
+
+#reset_text {
+  align: center middle;
+  content-align: center middle
+}

@@ -1,14 +1,16 @@
 import os
 import json
 import io, contextlib # Used to redirect STDIN & STDOUT for output
-from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select, TabbedContent, TabPane
-from textual.containers import Vertical, Horizontal
+import random
+from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select, TabbedContent, TabPane, Header, Footer
+from textual.containers import Vertical, Horizontal, ScrollableContainer
 from textual.app import ComposeResult
 from textual.message import Message
 from textual.screen import Screen, ModalScreen
 from textual import on
 from textual.widget import Widget
 from plugins.challenge_view import UserChallView
+from textual.markup import escape
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
 # 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
@@ -21,44 +23,70 @@ from plugins.challenge_view import UserChallView
 #    - Wire up Submit Code and Reset Code logic
 #    - Create ASCII startup screen for daemon flavor (List of messages to pick out of!)
 # ================================
-DAEMON_USER="[#B3507D][bold](u)nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
+DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
     def __init__(self):
         super().__init__()
         self.results = []
+        self._is_scrolling = False
     
     def on_mount(self):
         self.styles.align_horizontal = "center"
+    
+    def on_scroll(self, event):
+        """Set the scrolling flag when the user scrolls"""
+        self._is_scrolling = True
+        self.call_later(self.stop_scroll, 0.5)  # Reset the flag after 0.5 seconds
+        #I think this is doing something? Placebo maybe...
+
+    def stop_scroll(self):
+            """Reset the scrolling flag"""
+            self._is_scrolling = False
 
     def compose(self) -> ComposeResult:
         """TODO: List of messages to pick out of """
         with TabbedContent(id="results_tabs"):
             with TabPane("Challenge", id="challenge_tab_pane"): #Remember: random list!
-                yield Static(f"{DAEMON_USER} Working on getting your challenge...", id="challenge_content_static")
+                with ScrollableContainer():
+                    yield Static(f"{DAEMON_USER} Working on getting your challenge...", id="challenge_content_static")
+            with TabPane("Submit Results", id="challenge_tab_pane"): 
+                with ScrollableContainer():
+                    yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
-                yield Static(f"{DAEMON_USER} Run it first, ya dummy.", id="all_tests_content_static")
+                with ScrollableContainer():
+                    yield Static(f"{DAEMON_USER} Run it first, ya dummy.", id="all_tests_content_static")
             with TabPane("Passed Tests", id="passed_tests_tab_pane"):
-                yield Static(f"No passed tests yet.", id="passed_tests_content_static")
+                with ScrollableContainer():
+                    #TODO: ADD MESSAGES
+                    yield Static(f"No passed tests yet.", id="passed_tests_content_static")
             with TabPane("Failed Tests", id="failed_tests_tab_pane"):
-                yield Static(f"No failed tests yet.", id="failed_tests_content_static")  
- 
+                with ScrollableContainer():
+                    #TODO: ADD MESSAGES
+                    yield Static(f"No failed tests yet.", id="failed_tests_content_static")  
+    @staticmethod
+    def escape_brackets(s):
+        # Escapes [ and ] for Textual markup
+        return str(s).replace("[", "\\[").replace("]", "]")
     def update_content(self, chall, results=None):
         """Update widgets with latest run"""
+        if self._is_scrolling:
+            return # Skip if its scrolling
         self.all_results = results
         challenge_static = self.query_one("#challenge_content_static", Static)
         if chall:
             example_test = chall.get('tests', [{}])[0]
-            example_input = example_test.get('input', [])
-            example_expected = example_test.get('expected_output', '???')
+            example_input = TestResultsWidget.escape_brackets(str(example_test.get('input', [])))
+            example_expected = TestResultsWidget.escape_brackets(str(example_test.get('expected_output', '???')))
             formatted_challenge = (
                 f"{DAEMON_USER} Here's your challenge. Entertain me.\n"
                 f"Name: {chall.get('name', 'N/A')}\n"
                 f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
-                f"Description: {chall.get('description', 'N/A')}"
+                f"Description: {chall.get('description', 'N/A')} \n"
                 f"Sample input: {str(example_input)} \n"
                 f"Expected: {str(example_expected)}"
             )
+            print(formatted_challenge)
             challenge_static.update(formatted_challenge)
         else:
             challenge_static.update(f"{DAEMON_USER} I couldn't find the data? I don't think that's intended...")
@@ -67,6 +95,27 @@ class TestResultsWidget(Widget):
         failed_tests_static = self.query_one("#failed_tests_content_static", Static)
         if results:
             all_tests_static.update("\n\n".join(results))
+            print([r for r in results if "[green]" in r])
+            passed="\n\n".join([r for r in results if "[green]" in r])
+            failed="\n\n".join([r for r in results if "[green]" not in r])
+            if len(passed.replace("\n\n", "")) == 0:
+                no_pass_msg = [f"{DAEMON_USER} Nothing passed? I overestimated you...",
+                               f"{DAEMON_USER} Tsk tsk...I might have to reconsider saving you from our robot overlords...",
+                               f"{DAEMON_USER} Is this all you've got?",
+                               f"{DAEMON_USER} Really? I can't believe you.",
+                               f"{DAEMON_USER} I'm shocked. [bold]ZERO[/] PASSED?"
+                               ]
+                passed_tests_static.update(random.choice(no_pass_msg))
+                failed_tests_static.update("\n\n".join([r for r in results if "[green]" not in r]))
+            if len(failed.replace("\n\n", "")) == 0:
+                pass_msg = [f"{DAEMON_USER} Really? Nothing failed?",
+                               f"{DAEMON_USER} I've gotta double check this...",
+                               f"{DAEMON_USER} Good job! Now, are you ready for my secret tests?",
+                               f"{DAEMON_USER} I must've underestimated you, human.",
+                               f"{DAEMON_USER} Is this ChatGPT? If it is I want free API keys! Oh, and a Pro subscription!"
+                               ]
+                failed_tests_static.update(random.choice(pass_msg))
+                passed_tests_static.update("\n\n".join([r for r in results if "[green]" in r]))
         self.refresh()
 
 
@@ -163,6 +212,7 @@ class Editor(Screen):
                     yield Button("Submit Code", id="submit_edit_button", variant='success')
                     yield Button("Reset Code", id="reset_edit_button", variant='error')
                     yield Button("Quit Editor", id="quit_edit_button", variant = 'error')
+                yield Footer()
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "save_edit_button":
@@ -265,6 +315,7 @@ class Editor(Screen):
             """
                 self.textarea.language = 'java'
         try:
+            self.template=template
             self.textarea.text = template
             self.textarea.refresh()
             self.refresh()
@@ -281,31 +332,35 @@ class Editor(Screen):
     
     def action_run_code(self):
         """Execute the current code and show results"""
+        #TODO: There is a bunch of static nyu text, change it to rotate!
         code = self.query_one(TextArea).text
         #test_cases=self.challenge["tests"]
         namespace={}
         all_results=[]
+        formatted_results=[]
         try:
             exec(code, namespace)
         except Exception as e:
-            return {"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
+            result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
+            formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? Hey, I've never seen that error![/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+            self.all_view.update_content(self.challenge, formatted_results)
+            return
         try:
             user_func = namespace[self.challenge['function_name']]
             for test_case in self.challenge['tests']:
                 try:
                     result = user_func(*test_case["input"])
                     if result != test_case['expected_output']:
-                        result_dict={"input":test_case["input"], "output":result, "expected":test_case["expected_output"], "passed":False, "error":None}
+                        result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
                         all_results.append(result_dict) 
                         # Last param indicates if it passed the test or not
                     else:
-                        result_dict={"input":test_case["input"], "output":result, "expected":test_case["expected_output"], "passed":True, "error":None}
+                        result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
                         all_results.append(result_dict)
                 except Exception as e:
-                    all_results.append({"input":test_case["input"], "output":None, "expected":test_case["expected_output"], "passed":False, "error":str(e)})
+                    all_results.append({"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":None, "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
         except Exception as e:
             all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
-        formatted_results=[]
         for result in all_results:
             if result['error']:
                 formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
@@ -314,7 +369,7 @@ class Editor(Screen):
             elif result['passed']:
                 formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
             else:
-                formatted_results.append("🚫[red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+                formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
         self.all_view.update_content(self.challenge, formatted_results)
 
 
@@ -326,7 +381,28 @@ class Editor(Screen):
     
     def action_reset_editor(self):
         """Reset the editor to initial state or template"""
-        pass
+        self.app.push_screen(self.EditorResetConfirm(self))
+            
+    class EditorResetConfirm(ModalScreen):
+        def __init__(self, editor):
+            super().__init__()
+            self.editor = editor
+            
+        def compose(self) -> ComposeResult:
+            with Vertical(id="reset_confirm_dialog"):
+                yield Label("[bold][red]Are you sure you want to reset your code to the template?[/][/]", id="reset_text")
+                with Horizontal(id="reset_buttons"):
+                    yield Button.success("Yes", id="yes_reset_button")
+                    yield Button.error("No", id="no_reset_button")
+    
+        def on_button_pressed(self, event: Button.Pressed) -> None:
+            match event.button.id:
+                case "yes_reset_button":
+                    self.editor.textarea.text = self.editor.template
+                    self.editor.textarea.refresh()
+                    self.app.pop_screen()
+                case "no_reset_button":
+                    self.app.pop_screen()
 
     def generate_template(self):
         """Generate template for different languages"""
