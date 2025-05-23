@@ -357,6 +357,32 @@ async def run_cpp_code(user_code, func_name, test_cases):
     """
     Run C++ code against test cases and return results.
     """
+    test_code = generate_test_code(func_name, test_cases)
+    program_template = f"""
+#include <iostream>
+#include <vector>
+#include <string>
+#include <map>
+#include <unordered_map>
+#include <algorithm>
+using namespace std;
+
+// ===== USER CODE START =====
+{user_code}
+// ===== USER CODE END =====
+
+int main() {{
+    bool all_passed = true;
+
+    // Run test cases
+{test_code}
+
+    // Final result
+    cout << (all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED") << endl;
+    return all_passed ? 0 : 1;
+}}
+"""
+
     # TODO: Generate a complete C++ program that includes the user's code and test functions
     
     # TODO: Write the program to a temporary file, compile it, run it, and capture output
@@ -378,7 +404,8 @@ def generate_test_code(func_name, test_cases):
     Generate C++ code that tests the user's function.
     """
     # TODO: Create a list to hold test code blocks
-    
+    for test in test_cases:
+        pass
     # TODO: For each test case:
     #   - Get input values and expected output
     #   - Create C++ variables for inputs with correct types
@@ -392,18 +419,63 @@ def python_to_cpp_value(value):
     """
     Convert Python values to C++ literals.
     """
-    # TODO: Handle different Python types:
-    #   - None → nullptr
-    #   - Booleans → true/false
-    #   - Numbers → direct conversion
-    #   - Strings → escaped C++ string literals
-    #   - Lists → C++ initializer lists
-    #   - Dictionaries → C++ map initializers
+    if value is None:
+        return "nullptr"
+    elif isinstance(value, bool):
+        if value:
+            return "true"
+        return "false"
+    elif isinstance(value, int):
+        return str(value)
+    elif isinstance(value, float):
+        return str(value)
+    elif isinstance(value, str):
+        escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+        return f'"{escaped}"'
+    elif isinstance(value, list):
+        elements = [python_to_cpp_value(item) for item in value]
+        return "{" + ", ".join(elements) + "}"
+    elif isinstance(value, dict):
+        pairs = ["{" + python_to_cpp_value(k) + ", " + python_to_cpp_value(v) + "}" 
+                 for k, v in value.items()]
+        return "{" + ", ".join(pairs) + "}"
+    else:
+        return "Warning: Unsupported type!"
+
 
 def infer_cpp_type(value):
     """
     Determine the appropriate C++ type for a Python value.
     """
+    if value is None:
+        return "nullptr"
+    elif isinstance(value, bool):
+        return "bool"
+    elif isinstance(value, int):
+        return "int"
+    elif isinstance(value, float):
+        return "double"
+    elif isinstance(value, str):
+        return "string"
+    elif isinstance(value, list):
+        if not value:
+            return "vector<int"
+        first_type = type(value[0])
+        if all(isinstance(item, first_type) for item in value):
+            element_type = infer_cpp_type(value[0])
+            return f"vector<{element_type}>"
+        else:
+            return "vector<auto>"  # Not valid C++ but indicates a type issue
+    elif isinstance(value, dict):
+        if not value:
+            return "map<string, int>"  # Default for empty dict
+        
+        key, val = next(iter(value.items()))
+        key_type = infer_cpp_type(key)
+        val_type = infer_cpp_type(val)
+        return f"map<{key_type}, {val_type}>"
+    else:
+        return "auto"
     # TODO: Determine C++ type based on Python type:
     #   - None → nullptr_t
     #   - bool → bool

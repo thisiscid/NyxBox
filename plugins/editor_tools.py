@@ -15,7 +15,6 @@ from textual.screen import Screen, ModalScreen
 from textual import on
 from textual.widget import Widget
 from plugins.challenge_view import UserChallView
-from textual.markup import escape
 from plugins.code_runners.cpp_runner import run_cpp_code
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
@@ -29,6 +28,7 @@ from plugins.code_runners.cpp_runner import run_cpp_code
 #    - Wire up Submit Code and Reset Code logic
 #    - Create ASCII startup screen for daemon flavor (List of messages to pick out of!)
 # ================================
+
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
@@ -113,6 +113,8 @@ class TestResultsWidget(Widget):
                                ]
                 passed_tests_static.update(random.choice(no_pass_msg))
                 failed_tests_static.update("\n\n".join([r for r in results if "[green]" not in r]))
+                self.refresh()
+                return
             if len(failed.replace("\n\n", "")) == 0:
                 pass_msg = [f"{DAEMON_USER} Really? Nothing failed?",
                                f"{DAEMON_USER} I've gotta double check this...",
@@ -122,6 +124,11 @@ class TestResultsWidget(Widget):
                                ]
                 failed_tests_static.update(random.choice(pass_msg))
                 passed_tests_static.update("\n\n".join([r for r in results if "[green]" in r]))
+                self.refresh()
+                return
+            failed_tests_static.update("\n\n".join([r for r in results if "[green]" not in r]))
+            passed_tests_static.update("\n\n".join([r for r in results if "[green]" in r]))
+
         self.refresh()
 
 
@@ -400,7 +407,7 @@ class Editor(Screen):
 #include <algorithm>
 using namespace std;
 //Feel free to add any extra libraries you may need!
-
+//There won't be any syntax highlighting, sorry, been trying to find a way to make it work.
 {return_type} {self.challenge['function_name']}({param_str}) {{
     // Your code here.
     // Do NOT use cout/printf, return the result instead!
@@ -408,7 +415,6 @@ using namespace std;
     return {default_return_value(return_type)};
 }}
 """
-                self.textarea.language ='cpp'
         try:
             self.template=template
             self.textarea.text = template
