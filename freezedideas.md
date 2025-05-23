@@ -5,9 +5,11 @@ Cool features. But please add them after you actually finish the core.
 ---
 ## Core
 - Fully working vend → solve → verdict loop
-- Python runner complete
-- JavaScript (Node.js subprocess) basic support
+- Python runner complete (Done)
+- JavaScript (Node.js subprocess) basic support (Done)
 - Java (wrapper + subprocess) basic support
+- C (wrapper + subprocess) basic support
+- C++ (wrapper + subprocess) basic support (in progress)
 - UI tabs update properly
 ### Polished Experience:
 

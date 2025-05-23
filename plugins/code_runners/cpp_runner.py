@@ -353,16 +353,17 @@ import tempfile
 import asyncio
 import shutil
 
-async def run_cpp_code(user_code, func_name, test_cases):
+async def run_cpp_code(user_code, func_name, test_cases, standard):
     """
     Run C++ code against test cases and return results.
-    """
-
+    """    
     # TODO: Generate a complete C++ program that includes the user's code and test functions
-    
+    cpp_code = generate_cpp_program(user_code, func_name, test_cases)
+
     # TODO: Write the program to a temporary file, compile it, run it, and capture output
-    
+    results = await compile_and_run(cpp_code, test_cases, standard)
     # TODO: Return a list of dictionaries containing test results
+    return results
 
 def generate_cpp_program(user_code, func_name, test_cases):
     """
@@ -502,7 +503,7 @@ def infer_cpp_type(value):
     #   - list → vector<appropriate_type>
     #   - dict → map<key_type, value_type>
 
-async def compile_and_run(cpp_code, test_cases):
+async def compile_and_run(cpp_code, test_cases, standard):
     """
     Compile and run C++ code, then parse the results.
     """
@@ -523,7 +524,7 @@ async def compile_and_run(cpp_code, test_cases):
                 "error": "No compiler found."
             }]
     compiler_process = await asyncio.create_subprocess_exec(
-        compiler, '-std=c++11', tmp_cpp_file, '-o', executable, 
+        compiler, f'-std={standard}', tmp_cpp_file, '-o', executable, 
         stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
     )
     _, stderr = await compiler_process.communicate()
@@ -538,6 +539,7 @@ async def compile_and_run(cpp_code, test_cases):
                 "passed": False,
                 "error": stderr.decode('utf-8', errors='replace').strip()
             }]
+    
     # TODO: Run the compiled program with a timeout
     
     # TODO: Parse the output to determine which tests passed or failed

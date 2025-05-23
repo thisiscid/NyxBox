@@ -436,8 +436,10 @@ class Editor(Screen):
 #include <unordered_map>  
 #include <algorithm>
 using namespace std;
-//Feel free to add any extra libraries you may need!
-//There won't be any syntax highlighting, sorry, been trying to find a way to make it work.
+// DO NOT REMOVE THE ABOVE!
+// Add extra libraries if necessary.
+//  There won't be any syntax highlighting, sorry, been trying to find a way to make it work. :c
+
 {return_type} {self.challenge['function_name']}({param_str}) {{
     // Your code here.
     // Do NOT use cout/printf, return the result instead!
@@ -612,7 +614,71 @@ try {{
     def action_reset_editor(self):
         """Reset the editor to initial state or template"""
         self.app.push_screen(self.EditorResetConfirm(self))
-            
+
+    class CompilationStandardPopup(ModalScreen):
+        def __init__(self, language, editor):
+            super().__init__()
+            self.lang = language
+            self.editor = editor
+        def compose(self) -> ComposeResult:
+            with Vertical(id="compilation_dialog"):
+                yield Label(f"{DAEMON_USER} Choose your compiler!", id="choose_comp_text")
+                if self.lang == "cpp":
+                    yield Select([
+                    ("C++20", "c++20"),
+                    ("C++17", "c++17"),
+                    ("C++14", "c++14"),
+                    ("C++11", "c++11"),
+                    ],
+                    value="c++17",
+                    id="std_select")
+                elif self.lang == "c":
+                    yield Select([
+                    ("C23 [bold][red]Danger! May be unsupported![/][/]", "c23"),
+                    ("C17", "c17"),
+                    ("C11", "c11"),
+                    ("C99", "c99"),
+                    ("C90", "c90"),
+                    ],
+                    value="c11",
+                    id="std_select")
+                elif self.lang == "java":
+                    yield Select([
+                    ("Java 21 (LTS)", "21"),
+                    ("Java 17 (LTS)", "17"),
+                    ("Java 11 (LTS)", "11"),
+                    ("Java 8", "8"),
+                    ], 
+                    value="17", 
+                    id="std_select")
+                with Horizontal(id = "comp_type_select"):
+                    yield Button.success("Select", id="yes_comp")
+                    yield Button.error("Quit", id="no_comp")
+        @on(Button.Pressed, "#yes_comp")
+        def confirm_comp(self):
+            std_selection=self.query_one("#std_select", Select)
+            value=std_selection.value
+            if value:
+                if self.lang == "cpp":
+                    asyncio.create_task(self.editor.run_cpp_with_standard(value))
+                self.app.pop_screen()
+            else:
+                self.notify(
+                    title="Really?",
+                    message=f"{DAEMON_USER} Choose an option, stupid! How do you want me to compile if you won't tell me with what?",
+                    severity="error",
+                    timeout=3,
+                    markup=True
+                )
+                
+
+
+        @on(Button.Pressed, "#no_comp")
+        def stop_comp(self):
+            self.app.pop_screen()
+
+                    
+
     class EditorResetConfirm(ModalScreen):
         def __init__(self, editor):
             super().__init__()
