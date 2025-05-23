@@ -150,14 +150,11 @@ TestResultsWidget {
 EditorResetConfirm {
   align: center middle;
   content-align: center middle;
-  border: tall #3b82f6
 } 
 
 #reset_confirm_dialog {
-  min-height: 4;
-  max-height: 8;
-  /*min-width: 30;*/
-  width: auto;
+  height: 10;
+  width: 63;
   align: center middle;
   content-align: center middle;
   border: tall #3b82f6
@@ -165,5 +162,17 @@ EditorResetConfirm {
 
 #reset_text {
   align: center middle;
+  margin: 1
+}
+
+#reset_buttons {
+  align: center middle;
+  padding: 0;
   content-align: center middle
+}
+
+#test_result_notice {
+  align: center middle;
+  content-align: center middle;
+  margin: 1
 }

@@ -74,6 +74,37 @@ class TestResultsWidget(Widget):
     def escape_brackets(s):
         # Escapes [ and ] for Textual markup
         return str(s).replace("[", "\\[").replace("]", "]")
+    def reset_content(self):
+        # Called when template is reset in order to reset code results
+        if self._is_scrolling:
+            return # Skip if its scrolling
+        # challenge_static = self.query_one("#challenge_content_static", Static)
+        # if chall:
+        #     example_test = chall.get('tests', [{}])[0]
+        #     example_input = TestResultsWidget.escape_brackets(str(example_test.get('input', [])))
+        #     example_expected = TestResultsWidget.escape_brackets(str(example_test.get('expected_output', '???')))
+        #     formatted_challenge = (
+        #         f"{DAEMON_USER} Here's your challenge. Entertain me.\n"
+        #         f"Name: {chall.get('name', 'N/A')}\n"
+        #         f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
+        #         f"Description: {chall.get('description', 'N/A')} \n"
+        #         f"Sample input: {str(example_input)} \n"
+        #         f"Expected: {str(example_expected)}"
+        #     )
+        #     print(formatted_challenge)
+        #     challenge_static.update(formatted_challenge)
+        # else:
+        #     challenge_static.update(f"{DAEMON_USER} I couldn't find the data? I don't think that's intended...")
+        # I don't think we actually need to refresh the challenge on reset
+        all_tests_static = self.query_one("#all_tests_content_static", Static)
+        passed_tests_static = self.query_one("#passed_tests_content_static", Static)
+        failed_tests_static = self.query_one("#failed_tests_content_static", Static)
+        submit_results_static = self.query_one("#submit_static", Static)
+        all_tests_static.update(f"{DAEMON_USER} Run it first, ya dummy.")
+        failed_tests_static.update(f"{DAEMON_USER} You can't fail if you don't try, I guess?")
+        submit_results_static.update(f"{DAEMON_USER} Psst...you might want to click that submit button...")
+        passed_tests_static.update(f"{DAEMON_USER} You don't get a win unless you play in the game! /ref")
+
     def update_content(self, chall, results=None):
         """Update widgets with latest run"""
         if self._is_scrolling:
@@ -590,6 +621,7 @@ try {{
         def compose(self) -> ComposeResult:
             with Vertical(id="reset_confirm_dialog"):
                 yield Label("[bold][red]Are you sure you want to reset your code to the template?[/][/]", id="reset_text")
+                yield Label("This will also reset any current test results!", id = "test_result_notice")
                 with Horizontal(id="reset_buttons"):
                     yield Button.success("Yes", id="yes_reset_button")
                     yield Button.error("No", id="no_reset_button")
@@ -599,15 +631,7 @@ try {{
                 case "yes_reset_button":
                     self.editor.textarea.text = self.editor.template
                     self.editor.textarea.refresh()
+                    self.editor.all_view.reset_content()
                     self.app.pop_screen()
                 case "no_reset_button":
                     self.app.pop_screen()
-
-    def generate_template(self):
-        """Generate template for different languages"""
-        pass
-    
-    # Consider adding these helper methods:
-    # - _generate_template()
-    # - _handle_execution_result()
-    # - _display_feedback()

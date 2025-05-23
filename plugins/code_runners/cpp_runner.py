@@ -507,13 +507,37 @@ async def compile_and_run(cpp_code, test_cases):
     Compile and run C++ code, then parse the results.
     """
     # TODO: Create a temporary file for the C++ code
-    
+    results = []
+    with tempfile.NamedTemporaryFile(suffix='.cpp', delete=False) as tmp_file:
+        tmp_cpp_file = tmp_file.name
+        tmp_file.write(cpp_code.encode('utf-8'))
     # TODO: Find a C++ compiler (g++ or clang++)
-    
+    executable = tmp_cpp_file + ('.exe' if os.name == 'nt' else '')
+    compiler = shutil.which("g++") or shutil.which("clang++")
+    if not compiler:
+        return [{
+                "input": "Compiler check",
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": "No compiler found."
+            }]
+    compiler_process = await asyncio.create_subprocess_exec(
+        compiler, '-std=c++11', tmp_cpp_file, '-o', executable, 
+        stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
+    )
+    _, stderr = await compiler_process.communicate()
     # TODO: Compile the code with appropriate flags
-    
-    # TODO: Handle compilation errors
-    
+    if compiler_process.returncode != 0:
+        # Compiler reached error, return the error
+        # TODO: Handle compilation errors Done
+        return [{
+                "input": f"{compiler} -std=c++11 {tmp_cpp_file} -o {executable}",
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": stderr.decode('utf-8', errors='replace').strip()
+            }]
     # TODO: Run the compiled program with a timeout
     
     # TODO: Parse the output to determine which tests passed or failed

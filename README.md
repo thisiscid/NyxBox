@@ -2,7 +2,7 @@
 
 A Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and C (not yet...) Also, just who is Nyx?
 
-[![HackaTime badge](https://hackatime-badge.hackclub.com/U08SF8MVC82/coding-and-vending)]
+![HackaTime badge](https://hackatime-badge.hackclub.com/U08SF8MVC82/coding-and-vending)
 
 ---
 
@@ -36,7 +36,7 @@ Add new challenges in the form of a JSON in the challenges directory. Challenges
 
 ## Notes
 - Python 3.10+ recommended (The dev is running 3.12.1)
-- C++, C, and Java runners require system dependencies. If they error out, make sure you have those installed first.
+- C++, C, and Java runners require system dependencies. If they error out, make sure you have those installed first. (look above dummy)
 - Run in a terminal supporting Unicode and colors like [Ghostty](https://ghostty.org), [Alacritty](https://alacritty.org), or others.
 
 ## Credits
