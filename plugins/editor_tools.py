@@ -398,8 +398,7 @@ class Editor(Screen):
                 param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
                 return_type = infer_cpp_type(expected_output)
 
-                template = f"""
-#include <iostream>
+                template = f"""#include <iostream>
 #include <vector>
 #include <string>
 #include <map>

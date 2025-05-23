@@ -2,6 +2,7 @@ import os, random
 import json
 import sys
 import time
+import pathlib
 from plugins import challenge_view, challenge_loader
 from plugins.editor_tools import Editor, EditorClosed, LanguageSelected, TestResultsWidget
 from textual import on
@@ -68,7 +69,7 @@ class VendingMachine(App):
             case "quit_button":
                 self.action_quit_app()
             case "search_button":
-                pass
+                self.action_search_button()
             case "vend_button":
                 self.action_vend_challenge()
             case "edit_button":
@@ -82,6 +83,9 @@ class VendingMachine(App):
     def action_quit_app(self) -> None:
         self.push_screen(ConfirmExit())
 
+    def action_search_button(self) -> None:
+
+        pass
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
         self.editor_instance = Editor()
@@ -97,7 +101,7 @@ class VendingMachine(App):
             else:
                 self.notify(
                     title="Theres no challenge...",
-                    message="[b]Please vend a challenge before trying to open the editor![/b]",
+                    message=f"{DAEMON_USER} [b]Please vend a challenge before trying to open the editor![/b]",
                     severity="warning",
                     timeout=5,
                     markup=True
@@ -105,11 +109,12 @@ class VendingMachine(App):
         else:
             self.notify(
                     title="Really?",
-                    message="[b]Can't open editor twice! Quit first![/b]",
+                    message=f"{DAEMON_USER} [b]Can't open editor twice! Quit first! Also, something probably wen't wrong, open an issue![/b]",
                     severity="error",
                     timeout=5,
                     markup=True
                 )
+            # This was back when the editor buttons were still there. If this happens, something went terribly wrong.
 
     @on(LanguageSelected)
     def handle_language_selection(self, message: LanguageSelected):

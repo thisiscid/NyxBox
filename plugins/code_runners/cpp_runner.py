@@ -357,31 +357,6 @@ async def run_cpp_code(user_code, func_name, test_cases):
     """
     Run C++ code against test cases and return results.
     """
-    test_code = generate_test_code(func_name, test_cases)
-    program_template = f"""
-#include <iostream>
-#include <vector>
-#include <string>
-#include <map>
-#include <unordered_map>
-#include <algorithm>
-using namespace std;
-
-// ===== USER CODE START =====
-{user_code}
-// ===== USER CODE END =====
-
-int main() {{
-    bool all_passed = true;
-
-    // Run test cases
-{test_code}
-
-    // Final result
-    cout << (all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED") << endl;
-    return all_passed ? 0 : 1;
-}}
-"""
 
     # TODO: Generate a complete C++ program that includes the user's code and test functions
     
@@ -393,6 +368,7 @@ def generate_cpp_program(user_code, func_name, test_cases):
     """
     Generate a C++ program with test code.
     """
+    
     # TODO: Create test code for each test case
     
     # TODO: Make a program template with proper includes, user code section, and a main function
@@ -403,9 +379,26 @@ def generate_test_code(func_name, test_cases):
     """
     Generate C++ code that tests the user's function.
     """
+    test_code_blocks=[]
     # TODO: Create a list to hold test code blocks
-    for test in test_cases:
-        pass
+    for i, test in enumerate(test_cases):
+        if test.get("hidden", False):
+            continue
+        inputs = test.get('input', [])
+        expected = test.get('expected_output')
+        input_vars = []
+        input_args = []
+        for j, input_val in enumerate(inputs):
+            cpp_type = infer_cpp_type(input_val)
+            var_name = f"input_{i}_{j}"
+            cpp_value = python_to_cpp_value(input_val)
+            input_vars.append(f"    {cpp_type} {var_name} = {cpp_value};")
+            input_args.append(var_name)
+
+        expected_type = infer_cpp_type(expected)
+        expected_var = f"expected_{i}"
+        expected_value = python_to_cpp_value(expected)
+
     # TODO: For each test case:
     #   - Get input values and expected output
     #   - Create C++ variables for inputs with correct types
@@ -414,6 +407,30 @@ def generate_test_code(func_name, test_cases):
     #   - Print PASS/FAIL with appropriate information
     
     # TODO: Join all test blocks into a single string and return it
+        test_block = f"""
+    // Test case {i+1}
+    cout << "Test {i+1}: ";
+    try {{
+{chr(10).join(input_vars)}
+        {expected_type} {expected_var} = {expected_value};
+
+        // Call the function with test inputs
+        auto result = {func_name}({", ".join(input_args)});
+
+        // Compare result with expected output
+        if (result == {expected_var}) {{
+            cout << "PASS" << endl;
+        }} else {{
+            all_passed = false;
+            cout << "FAIL - Got: " << result << ", Expected: " << {expected_var} << endl;
+        }}
+    }} catch (exception& e) {{
+        all_passed = false;
+        cout << "ERROR - " << e.what() << endl;
+    }}"""
+        test_code_blocks.append(test_block)
+
+    return "\n".join(test_code_blocks)
 
 def python_to_cpp_value(value):
     """
@@ -459,7 +476,7 @@ def infer_cpp_type(value):
         return "string"
     elif isinstance(value, list):
         if not value:
-            return "vector<int"
+            return "vector<int>"
         first_type = type(value[0])
         if all(isinstance(item, first_type) for item in value):
             element_type = infer_cpp_type(value[0])
