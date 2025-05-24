@@ -507,43 +507,116 @@ async def compile_and_run(cpp_code, test_cases, standard):
     """
     Compile and run C++ code, then parse the results.
     """
-    # TODO: Create a temporary file for the C++ code
+    tmp_cpp_file = None
+    executable = None
     results = []
-    with tempfile.NamedTemporaryFile(suffix='.cpp', delete=False) as tmp_file:
-        tmp_cpp_file = tmp_file.name
-        tmp_file.write(cpp_code.encode('utf-8'))
-    # TODO: Find a C++ compiler (g++ or clang++)
-    executable = tmp_cpp_file + ('.exe' if os.name == 'nt' else '')
-    compiler = shutil.which("g++") or shutil.which("clang++")
-    if not compiler:
-        return [{
-                "input": "Compiler check",
-                "output": None,
-                "expected_output": None,
-                "passed": False,
-                "error": "No compiler found."
-            }]
-    compiler_process = await asyncio.create_subprocess_exec(
-        compiler, f'-std={standard}', tmp_cpp_file, '-o', executable, 
-        stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
-    )
-    _, stderr = await compiler_process.communicate()
-    # TODO: Compile the code with appropriate flags
-    if compiler_process.returncode != 0:
-        # Compiler reached error, return the error
-        # TODO: Handle compilation errors Done
-        return [{
-                "input": f"{compiler} -std=c++11 {tmp_cpp_file} -o {executable}",
-                "output": None,
-                "expected_output": None,
-                "passed": False,
-                "error": stderr.decode('utf-8', errors='replace').strip()
-            }]
     
-    # TODO: Run the compiled program with a timeout
-    
-    # TODO: Parse the output to determine which tests passed or failed
-    
-    # TODO: Format results as a list of dictionaries
-    
-    # TODO: Clean up temporary files
+    try:
+        # TODO: Create a temporary file for the C++ code
+        with tempfile.NamedTemporaryFile(suffix='.cpp', delete=False) as tmp_file:
+            tmp_cpp_file = tmp_file.name
+            tmp_file.write(cpp_code.encode('utf-8'))
+        # TODO: Find a C++ compiler (g++ or clang++)
+        executable = tmp_cpp_file + ('.exe' if os.name == 'nt' else '')
+        compiler = shutil.which("g++") or shutil.which("clang++")
+        if not compiler:
+            return [{
+                    "input": "Compiler check",
+                    "output": None,
+                    "expected_output": None,
+                    "passed": False,
+                    "error": "No compiler found."
+                }]
+        compiler_process = await asyncio.create_subprocess_exec(
+            compiler, f'-std={standard}', tmp_cpp_file, '-o', executable, 
+            stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
+        )
+        try:
+            _, stderr = await asyncio.wait_for(compiler_process.communicate(), timeout=20.0)
+            # TODO: Compile the code with appropriate flags
+            if compiler_process.returncode != 0:
+                # Compiler reached error, return the error
+                # TODO: Handle compilation errors Done
+                return [{
+                        "input": f"{compiler} -std={standard} {tmp_cpp_file} -o {executable}",
+                        "output": None,
+                        "expected_output": None,
+                        "passed": False,
+                        "error": stderr.decode('utf-8', errors='replace').strip()
+                    }]
+        except asyncio.TimeoutError:
+            return [{
+            "input": f"{compiler} -std={standard} {tmp_cpp_file} -o {executable}",
+            "output": None,
+            "expected_output": None,
+            "passed": False,
+            "error": "Execution timed out (20 seconds)"
+        }]
+
+        # TODO: Run the compiled program with a timeout
+        if os.name == 'nt':
+            process = await asyncio.create_subprocess_exec(
+            executable,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        else:
+            process = await asyncio.create_subprocess_exec(
+            executable, 
+            stdout = asyncio.subprocess.PIPE, 
+            stderr = asyncio.subprocess.PIPE
+            )
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=20.0)
+        except asyncio.TimeoutError:
+            return [{
+            "input": "Execution",
+            "output": None,
+            "expected_output": None,
+            "passed": False,
+            "error": "Execution timed out (20 seconds)"
+        }]
+
+        # TODO: Parse the output to determine which tests passed or failed
+        for test in stdout.decode('utf-8', errors='replace').splitlines():
+            if "Test " in test:
+                new1_test=test.split("Test ") # ["1: PASS"]
+                # ["Test ", "1: FAIL - Got: x Expected: y"]
+                test_index=int(new1_test[1].split(":")[0])-1
+                if "PASS" in test:
+                    results.append({"input": test_cases[test_index]["input"], 
+                                    "output": test_cases[test_index]['expected_output'], 
+                                    "expected_output": test_cases[test_index]['expected_output'],
+                                    "passed": True,
+                                    "error": None})
+                elif "FAIL" in test:
+                    actual_output = new1_test[1].split("FAIL - Got: ")[1]
+                    expected_output = new1_test[1].split("Expected: ")[1]
+                    results.append({"input": {test_cases[test_index]["input"]}, 
+                                    "output": actual_output, 
+                                    "expected_output": expected_output,
+                                    "passed": False,
+                                    "error": None})
+                elif "ERROR" in test:
+                    error1 = new1_test[1].split("ERROR - ")[1]
+                    results.append({"input": test_cases[test_index]["input"], 
+                                    "output": None, 
+                                    "expected_output": test_cases[test_index]['expected_output'],
+                                    "passed": False,
+                                    "error": error1})
+        # TODO: Format results as a list of dictionaries
+        
+        # TODO: Clean up temporary files
+    finally:
+        try:
+            if tmp_cpp_file is not None and os.path.exists(tmp_cpp_file):
+                os.unlink(tmp_cpp_file)
+            else:
+                return "File never generated"
+            if executable is not None and os.path.exists(executable):
+                os.unlink(executable)
+            else:
+                return "Executable never generated."
+        except Exception as e:
+            print(f"Error cleaning up temp files: {e}")
+    return results
