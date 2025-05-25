@@ -602,7 +602,8 @@ try {{
                 )
                 self.all_view.update_content(self.challenge, formatted_results)
             case 'cpp':
-                pass # TODO: Implement cpp, hopefully map most logic -> C later
+                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+
 
 
         
@@ -616,8 +617,13 @@ try {{
         self.app.push_screen(self.EditorResetConfirm(self))
 
     class CompilationStandardPopup(ModalScreen):
-        def __init__(self, language, editor):
+        def __init__(self, chall, user_code, func_name, test_cases, language, editor, testresultswidget):
             super().__init__()
+            self.chall = chall
+            self.code = user_code
+            self.func_name = func_name
+            self.tests=test_cases
+            self.all_view = testresultswidget
             self.lang = language
             self.editor = editor
         def compose(self) -> ComposeResult:
@@ -655,17 +661,20 @@ try {{
                     yield Button.success("Select", id="yes_comp")
                     yield Button.error("Quit", id="no_comp")
         @on(Button.Pressed, "#yes_comp")
-        def confirm_comp(self):
+        async def confirm_comp(self):
             std_selection=self.query_one("#std_select", Select)
             value=std_selection.value
             if value:
                 if self.lang == "cpp":
-                    asyncio.create_task(self.editor.run_cpp_with_standard(value))
+                    results = await run_cpp_code(self.code, self.func_name, self.tests, value)
+                    formatted_results = [format_result(result) for result in results]
+                    
+                    self.all_view.update_content(self.chall, formatted_results)
                 self.app.pop_screen()
             else:
                 self.notify(
                     title="Really?",
-                    message=f"{DAEMON_USER} Choose an option, stupid! How do you want me to compile if you won't tell me with what?",
+                    message=f"{DAEMON_USER} Choose an option, stupid! How do you want me to compile if you won't tell me how?",
                     severity="error",
                     timeout=3,
                     markup=True
@@ -701,3 +710,17 @@ try {{
                     self.app.pop_screen()
                 case "no_reset_button":
                     self.app.pop_screen()
+
+def format_result(result):
+    input_str = TestResultsWidget.escape_brackets(result.get("input"))
+    output_str = TestResultsWidget.escape_brackets(result.get("output"))
+    expected_str = TestResultsWidget.escape_brackets(result.get("expected_output"))
+    error_str = TestResultsWidget.escape_brackets(result.get("error"))
+    if result.get("error"):
+        return f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \nInput: {input_str} \nError: {error_str}"
+    elif not result.get("passed"):
+        return f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \nInput: {input_str} \nOutput: {output_str} \nExpected: {expected_str}"
+    elif result.get("passed"):
+        return f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \nInput: {input_str} \nOutput: {output_str} \nExpected: {expected_str}"
+    else:
+        return f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}"

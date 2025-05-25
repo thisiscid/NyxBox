@@ -371,11 +371,32 @@ def generate_cpp_program(user_code, func_name, test_cases):
     """
     
     # TODO: Create test code for each test case
-    
+    test_code = generate_test_code(func_name, test_cases)
     # TODO: Make a program template with proper includes, user code section, and a main function
-    
-    # TODO: Insert user code and test code into the template and return the complete program
+    program_template = """
+#include <iostream>
+#include <vector>
+#include <string>
+#include <map>
+#include <stdexcept>
+using namespace std;
 
+// ===== USER CODE START =====
+{user_code}
+// ===== USER CODE END =====
+
+int main() {{
+    bool all_passed = true;
+
+{test_code}
+
+    cout << (all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED") << endl;
+    return all_passed ? 0 : 1;
+}}
+"""
+    # TODO: Insert user code and test code into the template and return the complete program
+    ret = program_template.format(user_code=user_code, test_code=test_code)
+    return ret
 def generate_test_code(func_name, test_cases):
     """
     Generate C++ code that tests the user's function.
@@ -590,20 +611,14 @@ async def compile_and_run(cpp_code, test_cases, standard):
                                     "passed": True,
                                     "error": None})
                 elif "FAIL" in test:
-                    actual_output = new1_test[1].split("FAIL - Got: ")[1]
-                    expected_output = new1_test[1].split("Expected: ")[1]
-                    results.append({"input": {test_cases[test_index]["input"]}, 
+                    fail_str = new1_test[1].split("FAIL - Got: ")[1]
+                    actual_output, expected_output = fail_str.split(", Expected: ")
+                    results.append({"input": test_cases[test_index]["input"], 
                                     "output": actual_output, 
                                     "expected_output": expected_output,
                                     "passed": False,
                                     "error": None})
-                elif "ERROR" in test:
-                    error1 = new1_test[1].split("ERROR - ")[1]
-                    results.append({"input": test_cases[test_index]["input"], 
-                                    "output": None, 
-                                    "expected_output": test_cases[test_index]['expected_output'],
-                                    "passed": False,
-                                    "error": error1})
+
         # TODO: Format results as a list of dictionaries
         
         # TODO: Clean up temporary files
@@ -611,12 +626,8 @@ async def compile_and_run(cpp_code, test_cases, standard):
         try:
             if tmp_cpp_file is not None and os.path.exists(tmp_cpp_file):
                 os.unlink(tmp_cpp_file)
-            else:
-                return "File never generated"
             if executable is not None and os.path.exists(executable):
                 os.unlink(executable)
-            else:
-                return "Executable never generated."
         except Exception as e:
             print(f"Error cleaning up temp files: {e}")
     return results

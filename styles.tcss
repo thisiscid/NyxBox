@@ -176,3 +176,12 @@ EditorResetConfirm {
   content-align: center middle;
   margin: 1
 }
+
+CompilationStandardPopup {
+  align: center middle;
+  content-align: center middle;
+  max-width: 20;
+  min-width: 10;
+  max-height: 10;
+  min-height: 5
+}
