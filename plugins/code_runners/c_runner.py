@@ -1,26 +1,24 @@
-# Yes, C++ was so complex I needed a seperate file to put it all in. Java will probably be the same.
-
 import os
 import json
 import tempfile
 import asyncio
 import shutil
 
-async def run_cpp_code(user_code, func_name, test_cases, standard):
+async def run_c_code(user_code, func_name, test_cases, standard):
     """
     Run C++ code against test cases and return results.
     """    
     # TODO: Generate a complete C++ program that includes the user's code and test functions
-    cpp_code = generate_cpp_program(user_code, func_name, test_cases)
+    c_code = generate_c_program(user_code, func_name, test_cases)
 
     # TODO: Write the program to a temporary file, compile it, run it, and capture output
-    results = await compile_and_run(cpp_code, test_cases, standard)
+    results = await compile_and_run(c_code, test_cases, standard)
     # TODO: Return a list of dictionaries containing test results
     return results
 
-def generate_cpp_program(user_code, func_name, test_cases):
+def generate_c_program(user_code, func_name, test_cases):
     """
-    Generate a C++ program with test code.
+    Generate a C program with test code.
     """
     
     # TODO: Create test code for each test case
@@ -64,15 +62,15 @@ def generate_test_code(func_name, test_cases):
         input_vars = []
         input_args = []
         for j, input_val in enumerate(inputs):
-            cpp_type = infer_cpp_type(input_val)
+            c_type = infer_c_type(input_val)
             var_name = f"input_{i}_{j}"
-            cpp_value = python_to_cpp_value(input_val)
-            input_vars.append(f"    {cpp_type} {var_name} = {cpp_value};")
+            c_value = python_to_c_value(input_val)
+            input_vars.append(f"    {c_type} {var_name} = {c_value};")
             input_args.append(var_name)
 
-        expected_type = infer_cpp_type(expected)
+        expected_type = infer_c_type(expected)
         expected_var = f"expected_{i}"
-        expected_value = python_to_cpp_value(expected)
+        expected_value = python_to_c_value(expected)
 
     # TODO: For each test case:
     #   - Get input values and expected output
@@ -107,7 +105,7 @@ def generate_test_code(func_name, test_cases):
 
     return "\n".join(test_code_blocks)
 
-def python_to_cpp_value(value):
+def python_to_c_value(value):
     """
     Convert Python values to C++ literals.
     """
@@ -125,17 +123,17 @@ def python_to_cpp_value(value):
         escaped = value.replace('\\', '\\\\').replace('"', '\\"')
         return f'"{escaped}"'
     elif isinstance(value, list):
-        elements = [python_to_cpp_value(item) for item in value]
+        elements = [python_to_c_value(item) for item in value]
         return "{" + ", ".join(elements) + "}"
     elif isinstance(value, dict):
-        pairs = ["{" + python_to_cpp_value(k) + ", " + python_to_cpp_value(v) + "}" 
+        pairs = ["{" + python_to_c_value(k) + ", " + python_to_c_value(v) + "}" 
                  for k, v in value.items()]
         return "{" + ", ".join(pairs) + "}"
     else:
         return "Warning: Unsupported type!"
 
 
-def infer_cpp_type(value):
+def infer_c_type(value):
     """
     Determine the appropriate C++ type for a Python value.
     """
@@ -154,7 +152,7 @@ def infer_cpp_type(value):
             return "vector<int>"
         first_type = type(value[0])
         if all(isinstance(item, first_type) for item in value):
-            element_type = infer_cpp_type(value[0])
+            element_type = infer_c_type(value[0])
             return f"vector<{element_type}>"
         else:
             return "vector<auto>"  # Not valid C++ but indicates a type issue
@@ -163,8 +161,8 @@ def infer_cpp_type(value):
             return "map<string, int>"  # Default for empty dict
         
         key, val = next(iter(value.items()))
-        key_type = infer_cpp_type(key)
-        val_type = infer_cpp_type(val)
+        key_type = infer_c_type(key)
+        val_type = infer_c_type(val)
         return f"map<{key_type}, {val_type}>"
     else:
         return "auto"
@@ -177,22 +175,22 @@ def infer_cpp_type(value):
     #   - list → vector<appropriate_type>
     #   - dict → map<key_type, value_type>
 
-async def compile_and_run(cpp_code, test_cases, standard):
+async def compile_and_run(c_code, test_cases, standard):
     """
     Compile and run C++ code, then parse the results.
     """
-    tmp_cpp_file = None
+    tmp_c_file = None
     executable = None
     results = []
     
     try:
         # TODO: Create a temporary file for the C++ code
         with tempfile.NamedTemporaryFile(suffix='.cpp', delete=False) as tmp_file:
-            tmp_cpp_file = tmp_file.name
-            tmp_file.write(cpp_code.encode('utf-8'))
+            tmp_c_file = tmp_file.name
+            tmp_file.write(c_code.encode('utf-8'))
         # TODO: Find a C++ compiler (g++ or clang++)
-        executable = tmp_cpp_file + ('.exe' if os.name == 'nt' else '')
-        compiler = shutil.which("g++") or shutil.which("clang++")
+        executable = tmp_c_file + ('.exe' if os.name == 'nt' else '')
+        compiler = shutil.which("gcc") or shutil.which("clang")
         if not compiler:
             return [{
                     "input": "Compiler check",
@@ -202,7 +200,7 @@ async def compile_and_run(cpp_code, test_cases, standard):
                     "error": "No compiler found."
                 }]
         compiler_process = await asyncio.create_subprocess_exec(
-            compiler, f'-std={standard}', tmp_cpp_file, '-o', executable, 
+            compiler, f'-std={standard}', tmp_c_file, '-o', executable, 
             stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
         )
         try:
@@ -212,7 +210,7 @@ async def compile_and_run(cpp_code, test_cases, standard):
                 # Compiler reached error, return the error
                 # TODO: Handle compilation errors Done
                 return [{
-                        "input": f"{compiler} -std={standard} {tmp_cpp_file} -o {executable}",
+                        "input": f"{compiler} -std={standard} {tmp_c_file} -o {executable}",
                         "output": None,
                         "expected_output": None,
                         "passed": False,
@@ -220,7 +218,7 @@ async def compile_and_run(cpp_code, test_cases, standard):
                     }]
         except asyncio.TimeoutError:
             return [{
-            "input": f"{compiler} -std={standard} {tmp_cpp_file} -o {executable}",
+            "input": f"{compiler} -std={standard} {tmp_c_file} -o {executable}",
             "output": None,
             "expected_output": None,
             "passed": False,
@@ -277,8 +275,8 @@ async def compile_and_run(cpp_code, test_cases, standard):
         # TODO: Clean up temporary files
     finally:
         try:
-            if tmp_cpp_file is not None and os.path.exists(tmp_cpp_file):
-                os.unlink(tmp_cpp_file)
+            if tmp_c_file is not None and os.path.exists(tmp_c_file):
+                os.unlink(tmp_c_file)
             if executable is not None and os.path.exists(executable):
                 os.unlink(executable)
         except Exception as e:

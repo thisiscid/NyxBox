@@ -1,5 +1,3 @@
-# Yes, C++ was so complex I needed a seperate file to put it all in. Java will probably be the same.
-
 import os
 import json
 import tempfile

@@ -409,7 +409,7 @@ class Editor(Screen):
                         return f"vector<{element_type}>"
                     else:
                         return "auto"  # Fallback for unknown types
-                def default_return_value(cpp_type):
+                def default_return_value_cpp(cpp_type):
                     """Provide a default return value for a given C++ type."""
                     if cpp_type == "bool":
                         return "false"
@@ -444,9 +444,83 @@ using namespace std;
     // Your code here.
     // Do NOT use cout/printf, return the result instead!
     // Tests will FAIL if you print.
-    return {default_return_value(return_type)};
+    return {default_return_value_cpp(return_type)};
 }}
 """
+            case 'c':
+                example_test = self.challenge.get('tests', [{}])[0]
+                inputs = example_test.get("input", [])
+                expected_output = example_test.get("expected_output", None)
+                def infer_c_type(value):
+                    """Infer C type from a Python value."""
+                    if isinstance(value, bool):
+                        return "bool" 
+                    if isinstance(value, int):
+                        return "int"
+                    elif isinstance(value, dict):
+                        return "/* No built in map/dict in C */ void*"
+                    elif isinstance(value, float):
+                        return "double"
+                    elif isinstance(value, str):
+                        return "char*"
+                    elif isinstance(value, list):
+                        # Check if the list is empty
+                        if not value:
+                            return "int arr[]"
+                        # Check if all elements are same type
+                        first_type = type(value[0])
+                        if all(isinstance(x, first_type) for x in value):
+                            element_type = infer_cpp_type(value[0])
+                        else:
+                            # Mixed types - use most general type or auto
+                            return "int*"  # This isn't valid C but signals a type issue
+                        return f"{element_type}*"
+                    else:
+                        return "void* /*Mixed lists not fully supported*/"  # Fallback for unknown types
+                def default_return_value_c(c_type):
+                    """Provide a default return value for a given C type."""
+                    if c_type == "bool":
+                        return "false"
+                    elif c_type == "int":
+                        return "0"
+                    elif c_type == "double":
+                        return "0.0"
+                    elif c_type == "char*":
+                        return "\"\""
+                    elif c_type.startswith("void*"):
+                        return "NULL"
+                    elif c_type.startswith("int*"):
+                        return "NULL"
+                    else:
+                        return "NULL"  # Fallback for unknown types
+                param_types = [infer_c_type(param) for param in inputs]
+                param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
+                return_type = infer_c_type(expected_output)
+                c_template = """#include <stdio.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+// DO NOT REMOVE THE ABOVE!
+// Add extra libraries if necessary.
+// There won't be any syntax highlighting, sorry!
+
+// Example function signature (edit as needed):
+// int my_function(int* arr, int arr_size) {{
+
+{return_type} {function_name}({param_str}) {{
+    // Your code here.
+    // Do NOT use printf, return the result instead!
+    // Tests will FAIL if you print.
+    return {default_return_value};
+}}
+"""
+                template = c_template.format(
+                return_type=return_type,
+                function_name=self.challenge['function_name'],
+                param_str=param_str,
+                default_return_value=default_return_value_c(return_type)
+                )
+
         try:
             self.template=template
             self.textarea.text = template
@@ -644,7 +718,7 @@ try {{
                     ("C17", "c17"),
                     ("C11", "c11"),
                     ("C99", "c99"),
-                    ("C90", "c90"),
+                    ("C90 [bold][red]Old, providede template likely won't work with this.[/][/]", "c90")
                     ],
                     value="c11",
                     id="std_select")
@@ -668,7 +742,6 @@ try {{
                 if self.lang == "cpp":
                     results = await run_cpp_code(self.code, self.func_name, self.tests, value)
                     formatted_results = [format_result(result) for result in results]
-                    
                     self.all_view.update_content(self.chall, formatted_results)
                 self.app.pop_screen()
             else:
