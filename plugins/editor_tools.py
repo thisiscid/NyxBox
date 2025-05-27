@@ -16,7 +16,8 @@ from textual import on
 from textual.widget import Widget
 from plugins.challenge_view import UserChallView
 from plugins.code_runners.cpp_runner import run_cpp_code
-from tree_sitter_languages import get_language
+import tree_sitter_cpp
+from tree_sitter import Language
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
 # 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
@@ -177,7 +178,8 @@ class TestResultsWidget(Widget):
             passed_tests_static.update("\n\n".join([r for r in results if "[green]" in r]))
 
         self.refresh()
-
+    def update_submit_content(self, chall, results=None):
+        pass
 
 class EditorClosePrompt(ModalScreen):
     
@@ -299,7 +301,7 @@ class Editor(Screen):
         
     def on_mount(self):
         """Initialize editor state when it's first created"""
-        cpp_lang = get_language("cpp")
+        cpp_lang = Language(tree_sitter_cpp.language())
         cpp_highlight_query = (Path(__file__).parent.parent / "language-support/highlights-cpp.scm").read_text()
         self.textarea.register_language("cpp", cpp_lang, cpp_highlight_query)
         self.CHALLENGE_FOLDER="./vendncode/challenge_solutions"
@@ -431,7 +433,7 @@ class Editor(Screen):
 using namespace std;
 // DO NOT REMOVE THE ABOVE!
 // Add extra libraries if necessary.
-//  There won't be any syntax highlighting, sorry, been trying to find a way to make it work. :c
+// Only minimal syntax highlighting present, sorry!
 
 {return_type} {self.challenge['function_name']}({param_str}) {{
     // Your code here.
@@ -443,7 +445,7 @@ using namespace std;
                 self.all_view.update_content(self.challenge, None)
                 self.textarea.language="cpp"
                 self.app.pop_screen()
-            case 'c': # I removed C support because its hard to handle dicts, i'll try when the main loop is done
+            case 'c': # I removed C support because its hard to handle dicts, i'll try when the main stuff is done
 #                 example_test = self.challenge.get('tests', [{}])[0]
 #                 inputs = example_test.get("input", [])
 #                 expected_output = example_test.get("expected_output", None)
@@ -531,7 +533,6 @@ using namespace std;
                     timeout=3,
                     markup=True
                     )
-
 
         try:
             self.template=template
