@@ -17,6 +17,7 @@ Cool features. But please add them after you actually finish the core.
 - Challenge structure supports flavor + hidden tests 
 - Errors never crash the UI (hopefully)
 - Output is safe, escaped, and readable
+
 ### Packaging:
 
 - textual run . or CLI launcher
@@ -24,7 +25,8 @@ Cool features. But please add them after you actually finish the core.
 - README.md with install + demo instructions
 
 ##  Delayed Features
-
+- **User defined text editor**
+  - Allow user to edit in an editor of their choice instead of only the built-in one
 - **Multiplayer / Co-op Mode (maybe?)**
   - Synchronized challenge solving
   - Daemon chat relay or shared log
@@ -57,13 +59,6 @@ Cool features. But please add them after you actually finish the core.
 
 ## Freezing Criteria
 
-If a feature:
 - Doesn't directly improve the vend → solve → verdict loop
 - Requires nontrivial backend or persistent storage
 - Adds >1 hour to implementation without core benefit
-
-It goes here.
-
----
-
-This list is a vault. Not a graveyard.

@@ -3,7 +3,7 @@ import json
 import tempfile
 import asyncio
 import shutil
-
+#This file is largely unused because I would need to write custom dictionary headers or wtv
 async def run_c_code(user_code, func_name, test_cases, standard):
     """
     Run C++ code against test cases and return results.
@@ -20,34 +20,27 @@ def generate_c_program(user_code, func_name, test_cases):
     """
     Generate a C program with test code.
     """
-    
-    # TODO: Create test code for each test case
     test_code = generate_test_code(func_name, test_cases)
-    # TODO: Make a program template with proper includes, user code section, and a main function
     program_template = """
-#include <iostream>
-#include <vector>
-#include <string>
-#include <map>
-#include <stdexcept>
-using namespace std;
+#include <stdio.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 // ===== USER CODE START =====
 {user_code}
 // ===== USER CODE END =====
 
-int main() {{
-    bool all_passed = true;
+int main(void) {{
+    int all_passed = 1;
 
 {test_code}
 
-    cout << (all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED") << endl;
+    printf("%s\\n", all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
     return all_passed ? 0 : 1;
-}}
-"""
-    # TODO: Insert user code and test code into the template and return the complete program
+}}"""
     ret = program_template.format(user_code=user_code, test_code=test_code)
     return ret
+
 def generate_test_code(func_name, test_cases):
     """
     Generate C++ code that tests the user's function.
@@ -110,7 +103,7 @@ def python_to_c_value(value):
     Convert Python values to C++ literals.
     """
     if value is None:
-        return "nullptr"
+        return "NULL"
     elif isinstance(value, bool):
         if value:
             return "true"

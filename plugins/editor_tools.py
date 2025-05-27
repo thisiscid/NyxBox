@@ -16,6 +16,7 @@ from textual import on
 from textual.widget import Widget
 from plugins.challenge_view import UserChallView
 from plugins.code_runners.cpp_runner import run_cpp_code
+from tree_sitter_languages import get_language
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
 # 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
@@ -30,6 +31,21 @@ from plugins.code_runners.cpp_runner import run_cpp_code
 # ================================
 
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
+
+class EditorClosed(Message):
+    """Message passed when user has closed editor"""
+    pass
+
+class LanguageSelected(Message):
+    """Message sent when a language is selected."""
+    def __init__(self, language: str) -> None:
+        self.language = language
+        super().__init__()
+
+class UserCodeError(Exception):
+    """Custom exception for user code errors."""
+    pass
+
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
     def __init__(self):
@@ -56,7 +72,7 @@ class TestResultsWidget(Widget):
             with TabPane("Challenge", id="challenge_tab_pane"): #Remember: random list!
                 with ScrollableContainer():
                     yield Static(f"{DAEMON_USER} Working on getting your challenge...", id="challenge_content_static")
-            with TabPane("Submit Results", id="submit_tabsc"): 
+            with TabPane("Submit Results", id="submit_tabs"): 
                 with ScrollableContainer():
                     yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
@@ -163,20 +179,6 @@ class TestResultsWidget(Widget):
         self.refresh()
 
 
-class EditorClosed(Message):
-    """Message passed when user has closed editor"""
-    pass
-
-class LanguageSelected(Message):
-    """Message sent when a language is selected."""
-    def __init__(self, language: str) -> None:
-        self.language = language
-        super().__init__()
-
-class UserCodeError(Exception):
-    """Custom exception for user code errors."""
-    pass
-
 class EditorClosePrompt(ModalScreen):
     
     def compose(self) -> ComposeResult:
@@ -201,9 +203,9 @@ class SelectLanguage(ModalScreen):
             yield Select([
                     ("Python", "py"),
                     ("Javascript", "js"),
-                    ("Java", "java"),
-                    ("C", "c"),
                     ("C++", "cpp"),
+                    ("Java (coming soon)", "java"),
+                    ("C (coming soon)", "c")
                 ],
                 value="py",
                 id="language_select")
@@ -220,9 +222,7 @@ class SelectLanguage(ModalScreen):
     def post_message_selection(self) -> None:
         selected = self.query_one(Select).value
         if isinstance(selected, str):
-            self.app.post_message(LanguageSelected(selected))
-            self.app.pop_screen()
-    
+            self.app.post_message(LanguageSelected(selected))    
 
 class Editor(Screen):
 
@@ -276,7 +276,7 @@ class Editor(Screen):
             case "reset_edit_button":
                 self.action_reset_editor()
             case "submit_edit_button":
-                self.action_submit_solution()
+                asyncio.create_task(self.action_submit_solution())
             case "run_edit_button":
                 asyncio.create_task(self.action_run_code())
     def on_ready(self):
@@ -299,6 +299,9 @@ class Editor(Screen):
         
     def on_mount(self):
         """Initialize editor state when it's first created"""
+        cpp_lang = get_language("cpp")
+        cpp_highlight_query = (Path(__file__).parent.parent / "language-support/highlights-cpp.scm").read_text()
+        self.textarea.register_language("cpp", cpp_lang, cpp_highlight_query)
         self.CHALLENGE_FOLDER="./vendncode/challenge_solutions"
         self.call_later(self.show_language_modal)
 
@@ -351,6 +354,8 @@ class Editor(Screen):
 
         """
                 self.textarea.language = 'python'
+                self.all_view.update_content(self.challenge, None)
+                self.app.pop_screen()
             case 'js':
                 template=f"""function {self.challenge['function_name']}({param_str}) {{
     // Your code here.
@@ -359,20 +364,8 @@ class Editor(Screen):
     return null;
 }}"""
                 self.textarea.language = 'javascript'
-            case 'java':
-                example_test = self.challenge.get('tests', [{}])[0]
-                output_type = example_test.get('expected_output', [])
-                
-                template = f"""public class Solution {{
-    public static Object {self.challenge['function_name']}({param_str}) {{
-        // Your code here.
-        // Don't use System.out.println(), return the result instead!
-        // Tests will FAIL if you print.
-        return null;
-    }}
-}}
-            """
-                self.textarea.language = 'java'
+                self.all_view.update_content(self.challenge, None)
+                self.app.pop_screen()
             case 'cpp':
                 example_test = self.challenge.get('tests', [{}])[0]
                 inputs = example_test.get("input", [])
@@ -447,86 +440,106 @@ using namespace std;
     return {default_return_value_cpp(return_type)};
 }}
 """
-            case 'c':
-                example_test = self.challenge.get('tests', [{}])[0]
-                inputs = example_test.get("input", [])
-                expected_output = example_test.get("expected_output", None)
-                def infer_c_type(value):
-                    """Infer C type from a Python value."""
-                    if isinstance(value, bool):
-                        return "bool" 
-                    if isinstance(value, int):
-                        return "int"
-                    elif isinstance(value, dict):
-                        return "/* No built in map/dict in C */ void*"
-                    elif isinstance(value, float):
-                        return "double"
-                    elif isinstance(value, str):
-                        return "char*"
-                    elif isinstance(value, list):
-                        # Check if the list is empty
-                        if not value:
-                            return "int arr[]"
-                        # Check if all elements are same type
-                        first_type = type(value[0])
-                        if all(isinstance(x, first_type) for x in value):
-                            element_type = infer_cpp_type(value[0])
-                        else:
-                            # Mixed types - use most general type or auto
-                            return "int*"  # This isn't valid C but signals a type issue
-                        return f"{element_type}*"
-                    else:
-                        return "void* /*Mixed lists not fully supported*/"  # Fallback for unknown types
-                def default_return_value_c(c_type):
-                    """Provide a default return value for a given C type."""
-                    if c_type == "bool":
-                        return "false"
-                    elif c_type == "int":
-                        return "0"
-                    elif c_type == "double":
-                        return "0.0"
-                    elif c_type == "char*":
-                        return "\"\""
-                    elif c_type.startswith("void*"):
-                        return "NULL"
-                    elif c_type.startswith("int*"):
-                        return "NULL"
-                    else:
-                        return "NULL"  # Fallback for unknown types
-                param_types = [infer_c_type(param) for param in inputs]
-                param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
-                return_type = infer_c_type(expected_output)
-                c_template = """#include <stdio.h>
-#include <stdbool.h>
-#include <stddef.h>
+                self.all_view.update_content(self.challenge, None)
+                self.textarea.language="cpp"
+                self.app.pop_screen()
+            case 'c': # I removed C support because its hard to handle dicts, i'll try when the main loop is done
+#                 example_test = self.challenge.get('tests', [{}])[0]
+#                 inputs = example_test.get("input", [])
+#                 expected_output = example_test.get("expected_output", None)
+#                 def infer_c_type(value):
+#                     """Infer C type from a Python value."""
+#                     if isinstance(value, bool):
+#                         return "bool" 
+#                     if isinstance(value, int):
+#                         return "int"
+#                     elif isinstance(value, dict):
+#                         return "/* No built in map/dict in C */ void*"
+#                     elif isinstance(value, float):
+#                         return "double"
+#                     elif isinstance(value, str):
+#                         return "char*"
+#                     elif isinstance(value, list):
+#                         # Check if the list is empty
+#                         if not value:
+#                             return "int arr[]"
+#                         # Check if all elements are same type
+#                         first_type = type(value[0])
+#                         if all(isinstance(x, first_type) for x in value):
+#                             element_type = infer_cpp_type(value[0])
+#                         else:
+#                             # Mixed types - use most general type or auto
+#                             return "int*"  # This isn't valid C but signals a type issue
+#                         return f"{element_type}*"
+#                     else:
+#                         return "void* /*Mixed lists not fully supported*/"  # Fallback for unknown types
+#                 def default_return_value_c(c_type):
+#                     """Provide a default return value for a given C type."""
+#                     if c_type == "bool":
+#                         return "false"
+#                     elif c_type == "int":
+#                         return "0"
+#                     elif c_type == "double":
+#                         return "0.0"
+#                     elif c_type == "char*":
+#                         return "\"\""
+#                     elif c_type.startswith("void*"):
+#                         return "NULL"
+#                     elif c_type.startswith("int*"):
+#                         return "NULL"
+#                     else:
+#                         return "NULL"  # Fallback for unknown types
+#                 param_types = [infer_c_type(param) for param in inputs]
+#                 param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
+#                 return_type = infer_c_type(expected_output)
+#                 c_template = """#include <stdio.h>
+# #include <stdbool.h>
+# #include <stddef.h>
 
-// DO NOT REMOVE THE ABOVE!
-// Add extra libraries if necessary.
-// There won't be any syntax highlighting, sorry!
+# // DO NOT REMOVE THE ABOVE!
+# // Add extra libraries if necessary.
+# // There won't be any syntax highlighting, sorry!
 
-// Example function signature (edit as needed):
-// int my_function(int* arr, int arr_size) {{
+# // Example function signature (edit as needed):
+# // int my_function(int* arr, int arr_size) {{
 
-{return_type} {function_name}({param_str}) {{
-    // Your code here.
-    // Do NOT use printf, return the result instead!
-    // Tests will FAIL if you print.
-    return {default_return_value};
-}}
-"""
-                template = c_template.format(
-                return_type=return_type,
-                function_name=self.challenge['function_name'],
-                param_str=param_str,
-                default_return_value=default_return_value_c(return_type)
-                )
+# {return_type} {function_name}({param_str}) {{
+#     // Your code here.
+#     // Do NOT use printf, return the result instead!
+#     // Tests will FAIL if you print.
+#     return {default_return_value};
+# }}
+# """
+#                 template = c_template.format(
+#                 return_type=return_type,
+#                 function_name=self.challenge['function_name'],
+#                 param_str=param_str,
+#                 default_return_value=default_return_value_c(return_type)
+#                 )
+                self.notify(
+                    title="I'm working on it!",
+                    message=f"{DAEMON_USER} C is so hard... Come back later maybe?",
+                    severity="error",
+                    timeout=3,
+                    markup=True
+                    )
+            case 'java':
+                self.notify(
+                    title="I'm working on it!",
+                    message=f"{DAEMON_USER} Hey, I haven't implemented Java yet! Come back later...",
+                    severity="error",
+                    timeout=3,
+                    markup=True
+                    )
+
 
         try:
             self.template=template
             self.textarea.text = template
-            self.textarea.refresh()
-            self.refresh()
-            self.all_view.update_content(self.challenge, None)
+            # Do we really need to refresh it?
+            # self.textarea.refresh()
+            # self.refresh()
+            #self.all_view.update_content(self.challenge, None) We want to update only when the user chooses a supported language
         except Exception as e:
             print("Failed to update TextArea:", e)
         # textarea = self.query_one("#edit_text", TextArea)
@@ -682,9 +695,147 @@ try {{
 
         
     
-    def action_submit_solution(self):
+    async def action_submit_solution(self):
         """Submit solution for evaluation against test cases"""
-        pass
+        #TODO: There is a bunch of static nyu text, change it to rotate!
+        #Python and JS are in this file because they're easy to implement and not that long.
+        #Since C++, C, and Java are compiled, we will need to fix it later.
+        code = self.query_one(TextArea).text
+        #test_cases=self.challenge["tests"]
+        namespace={}
+        all_results=[]
+        formatted_results=[]
+        match self.language:
+            case 'py':
+                try:
+                    exec(code, namespace)
+                except Exception as e:
+                    result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
+                    formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? Hey, I've never seen that error![/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+                    self.notify(
+                    title="Hey mortal...I finished running your code!",
+                    message=f"{DAEMON_USER} I don't think your code works though. Hey, wait, did you even actually try running it first? Anyways, check the 'Submit' tab.",
+                    severity="error",
+                    timeout=3,
+                    markup=True
+                    )
+                    self.all_view.update_content(self.challenge, formatted_results)
+                    return
+                try:
+                    user_func = namespace[self.challenge['function_name']]
+                    for test_case in self.challenge['tests']:
+                        if test_case.get("hidden", False):
+                            continue
+                        try:
+                            result = user_func(*test_case["input"])
+                            if result != test_case['expected_output']:
+                                result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
+                                all_results.append(result_dict) 
+                                # Last param indicates if it passed the test or not
+                            else:
+                                result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
+                                all_results.append(result_dict)
+                        except Exception as e:
+                            all_results.append({"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":None, "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
+                except Exception as e:
+                    all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
+                for result in all_results:
+                    if result['error']:
+                        formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+                    elif not result['passed']:
+                        formatted_results.append(f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+                    elif result['passed']:
+                        formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+                    else:
+                        formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+                self.notify(
+                    title="Hey mortal...I finished running your code!",
+                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                    severity="information",
+                    timeout=3,
+                    markup=True
+                    )
+                self.all_view.update_content(self.challenge, formatted_results)
+            case 'js':
+                for test_case in self.challenge['tests']:
+                    if test_case.get("hidden", False):
+                        continue
+                    args = ", ".join(json.dumps(arg) for arg in test_case["input"])
+                    wrapped_code = f"""
+// --- USER CODE START ---
+{code}
+// --- USER CODE END ---
+
+try {{
+    const result = {self.func_name}({args});
+    console.log(JSON.stringify(result));
+}} catch (err) {{
+    console.error("ERROR:", err.message);
+    process.exit(1);
+}}
+"""
+                    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".js") as f:
+                        f.write(wrapped_code)
+                        js_file = f.name
+
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                        "node", js_file,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+
+                        stdout, stderr = await proc.communicate()
+                        if proc.returncode != 0:
+                            # formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+                            # all_results.append({
+                            #     "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                            #     "output": None,
+                            #     "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                            #     "passed": False,
+                            #     "error": stderr.decode().strip()
+                            # })
+                            formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {TestResultsWidget.escape_brackets(str(test_case["input"]))} \n Error: {stderr.decode().strip()}")
+                            self.all_view.update_content(self.challenge, formatted_results)
+                            return
+
+                        else:
+                            result = json.loads(stdout.decode().strip())
+                            all_results.append({
+                                "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                                "output": TestResultsWidget.escape_brackets(str(result)),
+                                "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                                "passed": result == test_case["expected_output"],
+                                "error": None
+                            })
+                    except subprocess.TimeoutExpired:
+                        all_results.append({
+                            "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                            "output": None,
+                            "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                            "passed": False,
+                            "error": "Execution timed out"
+                        })
+                for result in all_results:
+                    if result['error']:
+                        formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
+                    elif not result['passed']:
+                        formatted_results.append(f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+                    elif result['passed']:
+                        formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
+                    else:
+                        formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+                self.notify(
+                    title="Hey mortal...I finished running your code!",
+                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                    severity="information",
+                    timeout=3,
+                    markup=True
+                )
+                self.all_view.update_content(self.challenge, formatted_results)
+            case 'cpp':
+                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+
     
     def action_reset_editor(self):
         """Reset the editor to initial state or template"""
@@ -712,25 +863,26 @@ try {{
                     ],
                     value="c++17",
                     id="std_select")
-                elif self.lang == "c":
-                    yield Select([
-                    ("C23 [bold][red]Danger! May be unsupported![/][/]", "c23"),
-                    ("C17", "c17"),
-                    ("C11", "c11"),
-                    ("C99", "c99"),
-                    ("C90 [bold][red]Old, providede template likely won't work with this.[/][/]", "c90")
-                    ],
-                    value="c11",
-                    id="std_select")
-                elif self.lang == "java":
-                    yield Select([
-                    ("Java 21 (LTS)", "21"),
-                    ("Java 17 (LTS)", "17"),
-                    ("Java 11 (LTS)", "11"),
-                    ("Java 8", "8"),
-                    ], 
-                    value="17", 
-                    id="std_select")
+                # These should literally never be called right now. If they do, that's bad.
+                # elif self.lang == "c":
+                #     yield Select([
+                #     ("C23 [bold][red]Danger! May be unsupported![/][/]", "c23"),
+                #     ("C17", "c17"),
+                #     ("C11", "c11"),
+                #     ("C99", "c99"),
+                #     ("C90 [bold][red]Old, providede template likely won't work with this.[/][/]", "c90")
+                #     ],
+                #     value="c11",
+                #     id="std_select")
+                # elif self.lang == "java":
+                #     yield Select([
+                #     ("Java 21 (LTS)", "21"),
+                #     ("Java 17 (LTS)", "17"),
+                #     ("Java 11 (LTS)", "11"),
+                #     ("Java 8", "8"),
+                #     ], 
+                #     value="17", 
+                #     id="std_select")
                 with Horizontal(id = "comp_type_select"):
                     yield Button.success("Select", id="yes_comp")
                     yield Button.error("Quit", id="no_comp")

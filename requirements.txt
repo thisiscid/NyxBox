@@ -5,6 +5,9 @@ textual>=3.2.0 # I'm running on textual 3.2.0, this MAY work but I cannot guaren
 # Syntax highlighting
 tree-sitter>=0.24.0
 tree-sitter-languages>=1.10.2
+tree-sitter-cpp>=0.23.4
+tree-sitter-javascript>=0.23.1
+tree-sitter-python>=0.23.6
 
 # Optional dependencies
 rich>=13.9.4       # Pretty printing (used by Textual but good to specify)
