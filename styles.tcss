@@ -185,3 +185,13 @@ CompilationStandardPopup {
   max-height: 10;
   min-height: 5
 }
+
+#compilation_dialog {
+  width: 60;
+  height: 15;
+  align: center middle;
+  content-align: center middle;
+  border: tall #3b82f6;
+  background: #222;
+  padding: 2;
+}
