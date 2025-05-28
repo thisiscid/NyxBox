@@ -3,6 +3,7 @@ import json
 import sys
 import time
 import pathlib
+import re
 from plugins import challenge_view, challenge_loader
 from plugins.editor_tools import Editor, EditorClosed, LanguageSelected, TestResultsWidget
 from textual import on
@@ -12,7 +13,7 @@ from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Dig
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 
-DAEMON_USER="[#B3507D][bold]nyu[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
+DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 
 class VendAnimation(Static):
     pass

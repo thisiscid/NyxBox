@@ -31,8 +31,77 @@ def generate_cpp_program(user_code, func_name, test_cases):
 #include <vector>
 #include <string>
 #include <map>
+#include <set>
+#include <unordered_set>
+#include <unordered_map>
 #include <stdexcept>
 using namespace std;
+
+// Helper to print STL containers for test output
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {{
+    os << "[";
+    for (size_t i = 0; i < vec.size(); ++i) {{
+        if (i > 0) os << ", ";
+        os << vec[i];
+    }}
+    os << "]";
+    return os;
+}}
+
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::set<T>& s) {{
+    os << "{{";
+    size_t i = 0;
+    for (const auto& item : s) {{
+        if (i++ > 0) os << ", ";
+        os << item;
+    }}
+    os << "}}";
+    return os;
+}}
+
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::unordered_set<T>& s) {{
+    os << "{{";
+    size_t i = 0;
+    for (const auto& item : s) {{
+        if (i++ > 0) os << ", ";
+        os << item;
+    }}
+    os << "}}";
+    return os;
+}}
+
+template <typename K, typename V>
+std::ostream& operator<<(std::ostream& os, const std::map<K, V>& m) {{
+    os << "{{";
+    size_t i = 0;
+    for (const auto& kv : m) {{
+        if (i++ > 0) os << ", ";
+        os << kv.first << ": " << kv.second;
+    }}
+    os << "}}";
+    return os;
+}}
+
+template <typename K, typename V>
+std::ostream& operator<<(std::ostream& os, const std::unordered_map<K, V>& m) {{
+    os << "{{";
+    size_t i = 0;
+    for (const auto& kv : m) {{
+        if (i++ > 0) os << ", ";
+        os << kv.first << ": " << kv.second;
+    }}
+    os << "}}";
+    return os;
+}}
+
+template <typename A, typename B>
+std::ostream& operator<<(std::ostream& os, const std::pair<A, B>& p) {{
+    os << "(" << p.first << ", " << p.second << ")";
+    return os;
+}}
 
 // ===== USER CODE START =====
 {user_code}
@@ -191,7 +260,7 @@ async def compile_and_run(cpp_code, test_cases, standard):
             tmp_cpp_file = tmp_file.name
             tmp_file.write(cpp_code.encode('utf-8'))
         # TODO: Find a C++ compiler (g++ or clang++)
-        executable = tmp_cpp_file + ('.exe' if os.name == 'nt' else '')
+        executable = tmp_cpp_file.strip(".cpp") + ('out.exe' if os.name == 'nt' else 'out')
         compiler = shutil.which("g++") or shutil.which("clang++")
         if not compiler:
             return [{
@@ -279,8 +348,8 @@ async def compile_and_run(cpp_code, test_cases, standard):
         try:
             if tmp_cpp_file is not None and os.path.exists(tmp_cpp_file):
                 os.unlink(tmp_cpp_file)
-            if executable is not None and os.path.exists(executable):
-                os.unlink(executable)
+            if tmp_cpp_file is not None and os.path.exists(tmp_cpp_file):
+                os.unlink(tmp_cpp_file)
         except Exception as e:
             print(f"Error cleaning up temp files: {e}")
     return results

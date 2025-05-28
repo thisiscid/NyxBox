@@ -21,7 +21,7 @@ from tree_sitter import Language
 # TODO:
 # 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
 # 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
-# 3. List of messages to pick out of for DAEMON!
+# 3. List of messages to pick out of for Nyx!
 # 4. In TestResultsWidget.update_content():
 #    - Separate results into passed/failed
 #    - Render them in "Passed Tests" and "Failed Tests" TabPane
