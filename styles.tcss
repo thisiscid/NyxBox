@@ -177,14 +177,14 @@ EditorResetConfirm {
   margin: 1
 }
 
-CompilationStandardPopup {
-  align: center middle;
-  content-align: center middle;
-  max-width: 20;
-  min-width: 10;
-  max-height: 10;
-  min-height: 5
-}
+# CompilationStandardPopup {
+#   align: center middle;
+#   content-align: center middle;
+#   max-width: 20;
+#   min-width: 10;
+#   max-height: 10;
+#   min-height: 5
+# }
 
 #compilation_dialog {
   width: 60;
