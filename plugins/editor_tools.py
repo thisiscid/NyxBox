@@ -75,7 +75,7 @@ class TestResultsWidget(Widget):
                 with ScrollableContainer():
                     yield Static(f"{DAEMON_USER} Working on getting your challenge...", id="challenge_content_static")
             with TabPane("Submit Results", id="submit_tabs"): 
-                with ScrollableContainer():
+                with ScrollableContainer(id="submit_results_container"):
                     yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
                 with ScrollableContainer():
@@ -180,7 +180,29 @@ class TestResultsWidget(Widget):
 
         self.refresh()
     def update_submit_content(self, chall, results=None):
-        pass
+        container = self.query_one("#submit_results_container", ScrollableContainer)
+        container.remove_children()  # Clear old content
+
+        # Separate results into categories
+        results = results or []
+        passed = [r for r in results if r.get("passed")]
+        failed = [r for r in results if r.get("passed") is False and not r.get("error")]
+        errors = [r for r in results if r.get("error")]
+        # Create the inner TabbedContent
+        tabbed = TabbedContent(id="submit_inner_tabs")
+        with tabbed:
+            with TabPane("Passed"):
+                for r in passed:
+                    tabbed.mount(Static(str(r)))
+            with TabPane("Failed"):
+                for r in failed:
+                    tabbed.mount(Static(str(r)))
+            with TabPane("Errors"):
+                for r in errors:
+                    tabbed.mount(Static(str(r)))
+
+        container.mount(tabbed)
+        self.refresh()
 
 class EditorClosePrompt(ModalScreen):
     
@@ -726,38 +748,43 @@ try {{
                 try:
                     user_func = namespace[self.challenge['function_name']]
                     for test_case in self.challenge['tests']:
-                        if test_case.get("hidden", False):
-                            continue
                         try:
                             result = user_func(*test_case["input"])
                             if result != test_case['expected_output']:
                                 result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
                                 all_results.append(result_dict) 
+                                break
                                 # Last param indicates if it passed the test or not
                             else:
                                 result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
                                 all_results.append(result_dict)
                         except Exception as e:
                             all_results.append({"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":None, "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
+                            break
                 except Exception as e:
                     all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
-                for result in all_results:
-                    if result['error']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                    elif not result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    elif result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    else:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
-                self.notify(
-                    title="Hey mortal...I finished running your code!",
-                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
-                    severity="information",
-                    timeout=3,
-                    markup=True
-                    )
-                self.all_view.update_content(self.challenge, formatted_results)
+                if not all_results[-1]["passed"]:
+                    failed_test=all_results[-1]
+                else:
+                    failed_test=None
+                if not failed_test:
+                    self.notify(
+                        title="Hey mortal...I think your code passed!",
+                        message=f"{DAEMON_USER} Check ur submit tab!",
+                        severity="information",
+                        timeout=3,
+                        markup=True
+                        )
+                else:
+                    self.notify(
+                        title="Maybe check again...",
+                        message=f"{DAEMON_USER} I don't think your code passed. Check the submit tab.",
+                        severity="information",
+                        timeout=3,
+                        markup=True
+                        )
+                formatted_results = [format_result(result) for result in all_results]
+                self.all_view.update_submit_content(self.challenge, formatted_results)
             case 'js':
                 for test_case in self.challenge['tests']:
                     if test_case.get("hidden", False):
@@ -855,10 +882,62 @@ try {{
             self.all_view = testresultswidget
             self.lang = language
             self.editor = editor
+        def on_mount(self) -> None:
+            if self.lang == "cpp":
+                failed = False
+                result = None
+                try:
+                    result = subprocess.run(["clang++", "--version"], capture_output=True, text=True)
+                    if result.returncode != 0:
+                        try:
+                            result = subprocess.run(["g++", "--version"], capture_output=True, text=True)
+                        except FileNotFoundError:
+                            self.app.pop_screen()
+                            self.notify(
+                                title="No compiler?",
+                                message=f"{DAEMON_USER} Hey, you don't have a supported compiler. How do you want me to compile? Maybe install clang++ or g++?",
+                                severity="error",
+                                timeout=3,
+                                markup=True
+                            )
+                except FileNotFoundError:
+                    try:
+                        result = subprocess.run(["g++", "--version"], capture_output=True, text=True)
+                    except FileNotFoundError:
+                        self.app.pop_screen()
+                        self.notify(
+                            title="No compiler?",
+                            message=f"{DAEMON_USER} Hey, you don't have a supported compiler. How do you want me to compile? Maybe install clang++ or g++?",
+                            severity="error",
+                            timeout=3,
+                            markup=True
+                        )
+                    except Exception as e:
+                        self.app.pop_screen()
+                        self.notify(
+                            title="Random error?",
+                            message=f"{DAEMON_USER} What the heck? Attempted to check g++ version, got {str(e)}",
+                            severity="error",
+                            timeout=10,
+                            markup=True
+                        )
+                except Exception as e:
+                    self.app.pop_screen()
+                    self.notify(
+                            title="Random error?",
+                            message=f"{DAEMON_USER} What the heck? Attempted to check clang++ version, got: {str(e)}",
+                            severity="error",
+                            timeout=10,
+                            markup=True
+                        )
+
+                
+
         def compose(self) -> ComposeResult:
             with Vertical(id="compilation_dialog"):
                 yield Label(f"{DAEMON_USER} Choose your compiler!", id="choose_comp_text")
                 if self.lang == "cpp":
+                    
                     yield Select([
                     ("C++20", "c++20"),
                     ("C++17", "c++17"),
@@ -881,12 +960,12 @@ try {{
                 elif self.lang == "java":
                     system=platform.system()
                     if system == "Windows":
-                        if os.path.exists("C:\Program Files\Java"):
-                            if os.path.exists("C:\Program Files (x86)\Java"):
-                                x86_java_dirs=os.listdir("C:\Program Files (x86)\Java")
+                        if os.path.exists(r"C:\Program Files\Java"):
+                            if os.path.exists(r"C:\Program Files (x86)\Java"):
+                                x86_java_dirs=os.listdir(r"C:\Program Files (x86)\Java")
                                 for java_subdir in x86_java_dirs:
                                     pass
-                            java_dirs=os.listdir("C:\Program Files\Java")
+                            java_dirs=os.listdir(r"C:\Program Files\Java")
                     yield Select([
                     ("Java 21 (LTS)", "21"),
                     ("Java 17 (LTS)", "17"),
