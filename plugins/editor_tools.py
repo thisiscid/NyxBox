@@ -5,6 +5,7 @@ import random
 import subprocess
 import tempfile
 import asyncio
+import platform
 from pathlib import Path
 from tree_sitter_languages import get_language
 from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select, TabbedContent, TabPane, Header, Footer
@@ -836,6 +837,8 @@ try {{
                 self.all_view.update_content(self.challenge, formatted_results)
             case 'cpp':
                 self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+            case 'java':
+                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
 
     
     def action_reset_editor(self):
@@ -875,15 +878,23 @@ try {{
                 #     ],
                 #     value="c11",
                 #     id="std_select")
-                # elif self.lang == "java":
-                #     yield Select([
-                #     ("Java 21 (LTS)", "21"),
-                #     ("Java 17 (LTS)", "17"),
-                #     ("Java 11 (LTS)", "11"),
-                #     ("Java 8", "8"),
-                #     ], 
-                #     value="17", 
-                #     id="std_select")
+                elif self.lang == "java":
+                    system=platform.system()
+                    if system == "Windows":
+                        if os.path.exists("C:\Program Files\Java"):
+                            if os.path.exists("C:\Program Files (x86)\Java"):
+                                x86_java_dirs=os.listdir("C:\Program Files (x86)\Java")
+                                for java_subdir in x86_java_dirs:
+                                    pass
+                            java_dirs=os.listdir("C:\Program Files\Java")
+                    yield Select([
+                    ("Java 21 (LTS)", "21"),
+                    ("Java 17 (LTS)", "17"),
+                    ("Java 11 (LTS)", "11"),
+                    ("Java 8", "8"),
+                    ], 
+                    value="17", 
+                    id="std_select")
                 with Horizontal(id = "comp_type_select"):
                     yield Button.success("Select", id="yes_comp")
                     yield Button.error("Quit", id="no_comp")

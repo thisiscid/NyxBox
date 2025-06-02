@@ -20,34 +20,24 @@ def generate_java_program(user_code, func_name, test_cases):
     """
     Generate a C++ program with test code.
     """
-    
-    # TODO: Create test code for each test case
     test_code = generate_test_code(func_name, test_cases)
-    # TODO: Change this to java
     program_template = """
-#include <iostream>
-#include <vector>
-#include <string>
-#include <map>
-#include <stdexcept>
-using namespace std;
+import java.util.Map;
+import java.util.HashMap;
 
-// ===== USER CODE START =====
+public class Solution {{
+    // ===== USER CODE START =====
 {user_code}
-// ===== USER CODE END =====
+    // ===== USER CODE END =====
 
-int main() {{
-    bool all_passed = true;
-
+    public static void main(String[] args) {{
+        boolean all_passed = true;
 {test_code}
-
-    cout << (all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED") << endl;
-    return all_passed ? 0 : 1;
+        System.out.println(all_passed ? "ALL TESTS PASSED" : "SOME TESTS FAILED");
+    }}
 }}
 """
-    # TODO: Insert user code and test code into the template and return the complete program
-    ret = program_template.format(user_code=user_code, test_code=test_code)
-    return ret
+    return program_template.format(user_code=user_code, test_code=test_code)
 def generate_test_code(func_name, test_cases):
     """
     Generate C++ code that tests the user's function.
@@ -105,12 +95,12 @@ def generate_test_code(func_name, test_cases):
 
     return "\n".join(test_code_blocks)
 
-def python_to_java_value(value):
+def python_to_java_value(value, var_name="map"):
     """
     Convert Python values to C++ literals.
     """
     if value is None:
-        return "nullptr"
+        return "null"
     elif isinstance(value, bool):
         if value:
             return "true"
@@ -126,11 +116,14 @@ def python_to_java_value(value):
         elements = [python_to_java_value(item) for item in value]
         return "{" + ", ".join(elements) + "}"
     elif isinstance(value, dict):
-        pairs = ["{" + python_to_java_value(k) + ", " + python_to_java_value(v) + "}" 
-                 for k, v in value.items()]
-        return "{" + ", ".join(pairs) + "}"
+        key_type = infer_java_type(next(iter(value.keys())))
+        val_type = infer_java_type(next(iter(value.values())))
+        lines = [f"Map<{key_type}, {val_type}> {var_name} = new HashMap<>();"]
+        for k, v in value.items():
+            lines.append(f'{var_name}.put({python_to_java_value(k)}, {python_to_java_value(v)});')
+        return "\n".join(lines)
     else:
-        return "Warning: Unsupported type!"
+        return "null"
 
 
 def infer_java_type(value):
@@ -138,34 +131,33 @@ def infer_java_type(value):
     Determine the appropriate C++ type for a Python value.
     """
     if value is None:
-        return "nullptr"
+        return "Object"
     elif isinstance(value, bool):
-        return "bool"
+        return "boolean"
     elif isinstance(value, int):
         return "int"
     elif isinstance(value, float):
         return "double"
     elif isinstance(value, str):
-        return "string"
+        return "String"
     elif isinstance(value, list):
         if not value:
-            return "vector<int>"
+            return "int[]"
         first_type = type(value[0])
         if all(isinstance(item, first_type) for item in value):
             element_type = infer_java_type(value[0])
-            return f"vector<{element_type}>"
+            return f"{element_type}[]"
         else:
-            return "vector<auto>"  # Not valid C++ but indicates a type issue
+            return "int[]"
     elif isinstance(value, dict):
         if not value:
-            return "map<string, int>"  # Default for empty dict
-        
+            return "Map<String, Integer>"  # Default for empty dicts
         key, val = next(iter(value.items()))
         key_type = infer_java_type(key)
         val_type = infer_java_type(val)
-        return f"map<{key_type}, {val_type}>"
+        return f"Map<{key_type}, {val_type}>"
     else:
-        return "auto"
+        return "Object"
     # TODO: Determine C++ type based on Python type:
     #   - None → nullptr_t
     #   - bool → bool
@@ -185,12 +177,13 @@ async def compile_and_run(java_code, test_cases, standard):
     
     try:
         # TODO: Create a temporary file for the C++ code
-        with tempfile.NamedTemporaryFile(suffix='.cpp', delete=False) as tmp_file:
-            tmp_java_file = tmp_file.name
-            tmp_file.write(java_code.encode('utf-8'))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_java_file = os.path.join(tmpdir, "Solution.java")
+            with open(tmp_java_file, "w") as tmp_file:
+                tmp_file.write(java_code)
         # TODO: Find a C++ compiler (g++ or clang++)
         executable = tmp_java_file + ('.exe' if os.name == 'nt' else '')
-        compiler = shutil.which("g++") or shutil.which("clang++")
+        compiler = shutil.which("javac")
         if not compiler:
             return [{
                     "input": "Compiler check",
@@ -200,7 +193,7 @@ async def compile_and_run(java_code, test_cases, standard):
                     "error": "No compiler found."
                 }]
         compiler_process = await asyncio.create_subprocess_exec(
-            compiler, f'-std={standard}', tmp_java_file, '-o', executable, 
+            compiler, tmp_java_file,
             stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
         )
         try:
