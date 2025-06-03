@@ -6,25 +6,29 @@ import tempfile
 import asyncio
 import shutil
 
-async def run_cpp_code(user_code, func_name, test_cases, standard):
+async def run_cpp_code(user_code, func_name, test_cases, standard, is_submission=False):
     """
     Run C++ code against test cases and return results.
     """    
+    if is_submission:
+        filtered_tests = test_cases  # All tests, including hidden
+    else:
+        filtered_tests = [t for t in test_cases if not t.get("hidden", False)]
     # TODO: Generate a complete C++ program that includes the user's code and test functions
-    cpp_code = generate_cpp_program(user_code, func_name, test_cases)
+    cpp_code = generate_cpp_program(user_code, func_name, filtered_tests, is_submission)
 
     # TODO: Write the program to a temporary file, compile it, run it, and capture output
-    results = await compile_and_run(cpp_code, test_cases, standard)
+    results = await compile_and_run(cpp_code, filtered_tests, standard)
     # TODO: Return a list of dictionaries containing test results
     return results
 
-def generate_cpp_program(user_code, func_name, test_cases):
+def generate_cpp_program(user_code, func_name, test_cases, is_submission):
     """
     Generate a C++ program with test code.
     """
     
     # TODO: Create test code for each test case
-    test_code = generate_test_code(func_name, test_cases)
+    test_code = generate_test_code(func_name, test_cases, is_submission)
     # TODO: Make a program template with proper includes, user code section, and a main function
     program_template = """
 #include <iostream>
@@ -119,15 +123,17 @@ int main() {{
     # TODO: Insert user code and test code into the template and return the complete program
     ret = program_template.format(user_code=user_code, test_code=test_code)
     return ret
-def generate_test_code(func_name, test_cases):
+def generate_test_code(func_name, test_cases, is_submission):
     """
     Generate C++ code that tests the user's function.
     """
     test_code_blocks=[]
     # TODO: Create a list to hold test code blocks
+    
     for i, test in enumerate(test_cases):
-        if test.get("hidden", False):
+        if not is_submission and test.get("hidden", False):
             continue
+            
         inputs = test.get('input', [])
         expected = test.get('expected_output')
         input_vars = []
@@ -143,14 +149,13 @@ def generate_test_code(func_name, test_cases):
         expected_var = f"expected_{i}"
         expected_value = python_to_cpp_value(expected)
 
-    # TODO: For each test case:
-    #   - Get input values and expected output
-    #   - Create C++ variables for inputs with correct types
-    #   - Create variable for expected output
-    #   - Add code to call the function and compare results
-    #   - Print PASS/FAIL with appropriate information
-    
-    # TODO: Join all test blocks into a single string and return it
+        # TODO: For each test case:
+        #   - Get input values and expected output
+        #   - Create C++ variables for inputs with correct types
+        #   - Create variable for expected output
+        #   - Add code to call the function and compare results
+        #   - Print PASS/FAIL with appropriate information
+        
         test_block = f"""
     // Test case {i+1}
     cout << "Test {i+1}: ";
@@ -174,6 +179,7 @@ def generate_test_code(func_name, test_cases):
     }}"""
         test_code_blocks.append(test_block)
 
+    # TODO: Join all test blocks into a single string and return it
     return "\n".join(test_code_blocks)
 
 def python_to_cpp_value(value):

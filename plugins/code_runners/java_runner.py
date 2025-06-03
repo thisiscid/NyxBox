@@ -4,23 +4,27 @@ import tempfile
 import asyncio
 import shutil
 
-async def run_java_code(user_code, func_name, test_cases, standard):
+async def run_java_code(user_code, func_name, test_cases, standard, is_submission=False):
     """
     Run C++ code against test cases and return results.
     """    
     # TODO: Generate a complete C++ program that includes the user's code and test functions
-    java_code = generate_java_program(user_code, func_name, test_cases)
+    if is_submission:
+        filtered_tests = test_cases  # All tests, including hidden
+    else:
+        filtered_tests = [t for t in test_cases if not t.get("hidden", False)]
+    java_code = generate_java_program(user_code, func_name, filtered_tests, is_submission)
 
     # TODO: Write the program to a temporary file, compile it, run it, and capture output
-    results = await compile_and_run(java_code, test_cases, standard)
+    results = await compile_and_run(java_code, filtered_tests, standard, is_submission)
     # TODO: Return a list of dictionaries containing test results
     return results
 
-def generate_java_program(user_code, func_name, test_cases):
+def generate_java_program(user_code, func_name, test_cases, is_submission=False):
     """
     Generate a C++ program with test code.
     """
-    test_code = generate_test_code(func_name, test_cases)
+    test_code = generate_test_code(func_name, test_cases, is_submission)
     program_template = """
 import java.util.Map;
 import java.util.HashMap;
@@ -38,39 +42,30 @@ public class Solution {{
 }}
 """
     return program_template.format(user_code=user_code, test_code=test_code)
-def generate_test_code(func_name, test_cases):
+def generate_test_code(func_name, test_cases, is_submission=False):
     """
     Generate C++ code that tests the user's function.
     """
     test_code_blocks=[]
     # TODO: Create a list to hold test code blocks
-    for i, test in enumerate(test_cases):
-        if test.get("hidden", False):
-            continue
-        inputs = test.get('input', [])
-        expected = test.get('expected_output')
-        input_vars = []
-        input_args = []
-        for j, input_val in enumerate(inputs):
-            java_type = infer_java_type(input_val)
-            var_name = f"input_{i}_{j}"
-            java_value = python_to_java_value(input_val)
-            input_vars.append(f"    {java_type} {var_name} = {java_value};")
-            input_args.append(var_name)
+    if is_submission:
+        for i, test in enumerate(test_cases):
+            inputs = test.get('input', [])
+            expected = test.get('expected_output')
+            input_vars = []
+            input_args = []
+            for j, input_val in enumerate(inputs):
+                java_type = infer_java_type(input_val)
+                var_name = f"input_{i}_{j}"
+                java_value = python_to_java_value(input_val)
+                input_vars.append(f"    {java_type} {var_name} = {java_value};")
+                input_args.append(var_name)
 
-        expected_type = infer_java_type(expected)
-        expected_var = f"expected_{i}"
-        expected_value = python_to_java_value(expected)
-
-    # TODO: For each test case:
-    #   - Get input values and expected output
-    #   - Create C++ variables for inputs with correct types
-    #   - Create variable for expected output
-    #   - Add code to call the function and compare results
-    #   - Print PASS/FAIL with appropriate information
-    
-    # TODO: Join all test blocks into a single string and return it
-        test_block = f"""
+            expected_type = infer_java_type(expected)
+            expected_var = f"expected_{i}"
+            expected_value = python_to_java_value(expected)
+            
+            test_block = f"""
     // Test case {i+1}
     cout << "Test {i+1}: ";
     try {{
@@ -91,7 +86,48 @@ def generate_test_code(func_name, test_cases):
         all_passed = false;
         cout << "ERROR - " << e.what() << endl;
     }}"""
-        test_code_blocks.append(test_block)
+            test_code_blocks.append(test_block)
+    else:
+        for i, test in enumerate(test_cases):
+            if test.get("hidden", False):
+                continue
+            inputs = test.get('input', [])
+            expected = test.get('expected_output')
+            input_vars = []
+            input_args = []
+            for j, input_val in enumerate(inputs):
+                java_type = infer_java_type(input_val)
+                var_name = f"input_{i}_{j}"
+                java_value = python_to_java_value(input_val)
+                input_vars.append(f"    {java_type} {var_name} = {java_value};")
+                input_args.append(var_name)
+
+            expected_type = infer_java_type(expected)
+            expected_var = f"expected_{i}"
+            expected_value = python_to_java_value(expected)
+
+            test_block = f"""
+    // Test case {i+1}
+    cout << "Test {i+1}: ";
+    try {{
+{chr(10).join(input_vars)}
+        {expected_type} {expected_var} = {expected_value};
+
+        // Call the function with test inputs
+        auto result = {func_name}({", ".join(input_args)});
+
+        // Compare result with expected output
+        if (result == {expected_var}) {{
+            cout << "PASS" << endl;
+        }} else {{
+            all_passed = false;
+            cout << "FAIL - Got: " << result << ", Expected: " << {expected_var} << endl;
+        }}
+    }} catch (exception& e) {{
+        all_passed = false;
+        cout << "ERROR - " << e.what() << endl;
+    }}"""
+            test_code_blocks.append(test_block)
 
     return "\n".join(test_code_blocks)
 
@@ -167,7 +203,7 @@ def infer_java_type(value):
     #   - list → vector<appropriate_type>
     #   - dict → map<key_type, value_type>
 
-async def compile_and_run(java_code, test_cases, standard):
+async def compile_and_run(java_code, test_cases, standard, is_submission):
     """
     Compile and run C++ code, then parse the results.
     """

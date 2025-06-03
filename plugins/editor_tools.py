@@ -17,6 +17,7 @@ from textual import on
 from textual.widget import Widget
 from plugins.challenge_view import UserChallView
 from plugins.code_runners.cpp_runner import run_cpp_code
+from plugins.code_runners.java_runner import run_java_code
 import tree_sitter_cpp
 from tree_sitter import Language
 # TODO:
@@ -549,13 +550,28 @@ using namespace std;
                     markup=True
                     )
             case 'java':
-                self.notify(
-                    title="I'm working on it!",
-                    message=f"{DAEMON_USER} Hey, I haven't implemented Java yet! Come back later...",
-                    severity="error",
-                    timeout=3,
-                    markup=True
-                    )
+                example_test = self.challenge.get('tests', [{}])[0]
+                output_type = example_test.get('expected_output', [])
+                
+                template = f"""public class Solution {{
+    public static Object {self.challenge['function_name']}({param_str}) {{
+        // Your code here.
+        // Don't use System.out.println(), return the result instead!
+        // Tests will FAIL if you print.
+        return null;
+    }}
+}}
+            """
+                self.textarea.language = 'java'
+                self.all_view.update_content(self.challenge)
+                self.app.pop_screen()
+                # self.notify(
+                #     title="I'm working on it!",
+                #     message=f"{DAEMON_USER} Hey, I haven't implemented Java yet! Come back later...",
+                #     severity="error",
+                #     timeout=3,
+                #     markup=True
+                #     )
 
         try:
             self.template=template
@@ -873,7 +889,7 @@ try {{
         self.app.push_screen(self.EditorResetConfirm(self))
 
     class CompilationStandardPopup(ModalScreen):
-        def __init__(self, chall, user_code, func_name, test_cases, language, editor, testresultswidget):
+        def __init__(self, chall, user_code, func_name, test_cases, language, editor, testresultswidget, is_submission=False):
             super().__init__()
             self.chall = chall
             self.code = user_code
@@ -882,7 +898,8 @@ try {{
             self.all_view = testresultswidget
             self.lang = language
             self.editor = editor
-        def on_mount(self) -> None:
+            self.is_submission = is_submission
+        async def on_mount(self) -> None:
             if self.lang == "cpp":
                 failed = False
                 result = None
@@ -930,14 +947,26 @@ try {{
                             timeout=10,
                             markup=True
                         )
+            elif self.lang == "java":
+                jdk_mapping = await asyncio.to_thread(self.scan_jdks)
+                system=platform.system()
+                select = self.query_one("#std_select", Select)
+                yes_button = self.query_one("#yes_comp", Button)
+                no_button = self.query_one("#no_comp", Button)
+                options = [(f"Java {v}", v) for v in sorted(jdk_mapping.keys(), reverse=True)]
+                if not options:
+                    options = [("No JDKs found!", "none")]
+                    no_button.disabled=False
+                select.set_options(options)
+                select.value = options[0][1]
+                yes_button.disabled = False
+                no_button.disabled = False
 
-                
 
         def compose(self) -> ComposeResult:
             with Vertical(id="compilation_dialog"):
                 yield Label(f"{DAEMON_USER} Choose your compiler!", id="choose_comp_text")
                 if self.lang == "cpp":
-                    
                     yield Select([
                     ("C++20", "c++20"),
                     ("C++17", "c++17"),
@@ -946,37 +975,14 @@ try {{
                     ],
                     value="c++17",
                     id="std_select")
-                # These should literally never be called right now. If they do, that's bad.
-                # elif self.lang == "c":
-                #     yield Select([
-                #     ("C23 [bold][red]Danger! May be unsupported![/][/]", "c23"),
-                #     ("C17", "c17"),
-                #     ("C11", "c11"),
-                #     ("C99", "c99"),
-                #     ("C90 [bold][red]Old, providede template likely won't work with this.[/][/]", "c90")
-                #     ],
-                #     value="c11",
-                #     id="std_select")
+                    with Horizontal(id = "comp_type_select"):
+                        yield Button.success("Select", id="yes_comp")
+                        yield Button.error("Quit", id="no_comp")
                 elif self.lang == "java":
-                    system=platform.system()
-                    if system == "Windows":
-                        if os.path.exists(r"C:\Program Files\Java"):
-                            if os.path.exists(r"C:\Program Files (x86)\Java"):
-                                x86_java_dirs=os.listdir(r"C:\Program Files (x86)\Java")
-                                for java_subdir in x86_java_dirs:
-                                    pass
-                            java_dirs=os.listdir(r"C:\Program Files\Java")
-                    yield Select([
-                    ("Java 21 (LTS)", "21"),
-                    ("Java 17 (LTS)", "17"),
-                    ("Java 11 (LTS)", "11"),
-                    ("Java 8", "8"),
-                    ], 
-                    value="17", 
-                    id="std_select")
-                with Horizontal(id = "comp_type_select"):
-                    yield Button.success("Select", id="yes_comp")
-                    yield Button.error("Quit", id="no_comp")
+                    yield Select([("Scanning for compilers...", "loading")], value="loading", id="std_select")
+                    with Horizontal(id = "comp_type_select"):
+                        yield Button.success("Select", id="yes_comp", disabled=True)
+                        yield Button.error("Quit", id="no_comp", disabled=True)
         @on(Button.Pressed, "#yes_comp")
         async def confirm_comp(self):
             std_selection=self.query_one("#std_select", Select)
@@ -986,7 +992,12 @@ try {{
                     results = await run_cpp_code(self.code, self.func_name, self.tests, value)
                     formatted_results = [format_result(result) for result in results]
                     self.all_view.update_content(self.chall, formatted_results)
+                elif self.lang == "java":
+                    results = await run_java_code(self.code, self.func_name, self.tests, value)
+                    formatted_results = [format_result(result) for result in results]
+                    self.all_view.update_content(self.chall, formatted_results)
                 self.app.pop_screen()
+                
             else:
                 self.notify(
                     title="Really?",
@@ -995,7 +1006,71 @@ try {{
                     timeout=3,
                     markup=True
                 )
-                
+        def scan_jdks(self) -> dict:
+            system = platform.system()
+            jdk_mapping={}
+            if system=="Windows":
+                base_dirs = [r"C:\Program Files\Java", r"C:\Program Files (x86)\Java"]
+                for base in base_dirs:
+                    if os.path.exists(base):
+                        for sub in os.listdir(base):
+                            jdk_path = os.path.join(base, sub)
+                            javac = os.path.join(jdk_path, "bin", "javac.exe")
+                            if os.path.exists(javac):
+                                try:
+                                    result = subprocess.run([javac, "-version"], capture_output=True, text=True)
+                                    version_line = result.stdout or result.stderr
+                                    if version_line.startswith("javac"):
+                                        version_str = version_line.split()[1]
+                                        if version_str.startswith("1."):
+                                            version = version_str.split(".")[1]
+                                        else:
+                                            version = version_str.split(".")[0]
+                                        jdk_mapping[version] = jdk_path
+                                except Exception:
+                                    pass
+            elif system=="Darwin":
+                base_dirs = [r"/Library/Java/JavaVirtualMachines/"]
+                for base in base_dirs:
+                    if os.path.exists(base):
+                        for sub_folder in os.listdir(base):
+                            jdk_path = os.path.join(base, sub_folder, "Contents", "Home")
+                            javac = os.path.join(jdk_path, "bin", "javac")
+                            if os.path.exists(javac):
+                                try:
+                                    result = subprocess.run([javac, "-version"], capture_output=True, text=True)
+                                    version_line = result.stdout or result.stderr
+                                    if version_line.startswith("javac"):
+                                        version_str = version_line.split()[1]
+                                        if version_str.startswith("1."):
+                                            version = version_str.split(".")[1]
+                                        else:
+                                            version = version_str.split(".")[0]
+                                        jdk_mapping[version] = jdk_path
+                                except Exception:
+                                    pass
+            elif system=="Linux":
+                base_dirs = [r"/usr/lib/jvm"]
+                for base in base_dirs:
+                    if os.path.exists(base):
+                        for sub_folder in os.listdir(base):
+                            jdk_path = os.path.join(base, sub_folder)
+                            javac = os.path.join(jdk_path, "bin", "javac")
+                            if os.path.exists(javac):
+                                try:
+                                    result = subprocess.run([javac, "-version"], capture_output=True, text=True)
+                                    version_line = result.stdout or result.stderr
+                                    if version_line.startswith("javac"):
+                                        version_str = version_line.split()[1]
+                                        if version_str.startswith("1."):
+                                            version = version_str.split(".")[1]  
+                                        else:
+                                            version = version_str.split(".")[0] 
+                                        jdk_mapping[version] = jdk_path
+                                except Exception:
+                                    pass
+            self.jdk_mapping = jdk_mapping
+            return jdk_mapping
 
 
         @on(Button.Pressed, "#no_comp")
