@@ -191,16 +191,11 @@ class TestResultsWidget(Widget):
         errors = [r for r in results if r.get("error")]
         # Create the inner TabbedContent
         tabbed = TabbedContent(id="submit_inner_tabs")
-        with tabbed:
-            with TabPane("Passed"):
-                for r in passed:
-                    tabbed.mount(Static(str(r)))
-            with TabPane("Failed"):
-                for r in failed:
-                    tabbed.mount(Static(str(r)))
-            with TabPane("Errors"):
-                for r in errors:
-                    tabbed.mount(Static(str(r)))
+        tabbed.mount(
+            TabPane("Passed", *[Static(str(r)) for r in passed]),
+            TabPane("Failed", *[Static(str(r)) for r in failed]),
+            TabPane("Errors", *[Static(str(r)) for r in errors]),
+        )
 
         container.mount(tabbed)
         self.refresh()
@@ -800,7 +795,7 @@ try {{
                         markup=True
                         )
                 formatted_results = [format_result(result) for result in all_results]
-                self.all_view.update_submit_content(self.challenge, formatted_results)
+                self.all_view.update_submit_content(self.challenge, all_results)
             case 'js':
                 for test_case in self.challenge['tests']:
                     if test_case.get("hidden", False):
