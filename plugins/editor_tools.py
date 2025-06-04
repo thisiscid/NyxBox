@@ -8,7 +8,7 @@ import asyncio
 import platform
 from pathlib import Path
 from tree_sitter_languages import get_language
-from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select, TabbedContent, TabPane, Header, Footer
+from textual.widgets import TextArea, Static, Button, Label, SelectionList, Select, TabbedContent, TabPane, Header, Footer, Input
 from textual.containers import Vertical, Horizontal, ScrollableContainer
 from textual.app import ComposeResult
 from textual.message import Message
@@ -203,6 +203,7 @@ class TestResultsWidget(Widget):
 
         self.refresh()
     def update_submit_content(self, chall, results=None):
+        #TODO: Expand this bcs its very basic rn
         submit_static = self.query_one("#submit_static", Static)
         results = results or []
         passed = [r for r in results if r.get("passed")]
@@ -213,10 +214,10 @@ class TestResultsWidget(Widget):
         summary += f"Total: {total} | ✅ Passed: {len(passed)} \n \n"
         if failed:
             last_failed = failed[-1]
-            summary += f"[b][red]❌ Last Failed Test[/red][/b]\nInput: {last_failed.get('input')}\nOutput: {last_failed.get('output')}\nExpected: {last_failed.get('expected')}\n\n"
+            summary += f"[b][red]❌ Last Failed Test[/red][/b]\nInput: {self.escape_brackets(last_failed.get('input'))}\nOutput: {self.escape_brackets(last_failed.get('output'))}\nExpected: {self.escape_brackets(last_failed.get('expected'))}\n\n"
         elif errors:
             last_error = errors[-1]
-            summary += f"[b][yellow]⚠️ Last Error[/yellow][/b]\nInput: {last_error.get('input')}\nError: {last_error.get('error')}\n\n"
+            summary += f"[b][yellow]⚠️ Last Error[/yellow][/b]\nInput: {self.escape_brackets(last_error.get('input'))}\nError: {self.escape_brackets(last_error.get('error'))}\n\n"
         elif passed:
             summary += "[b][green]🎉 All tests passed![/green][/b]\n"
 
@@ -568,28 +569,47 @@ using namespace std;
                     markup=True
                     )
             case 'java':
-                example_test = self.challenge.get('tests', [{}])[0]
-                output_type = example_test.get('expected_output', [])
+
+                def infer_java_type(value):
+                    if value is None:
+                        return "Object"
+                    elif isinstance(value, bool):
+                        return "boolean"
+                    elif isinstance(value, int):
+                        return "int"
+                    elif isinstance(value, float):
+                        return "double"
+                    elif isinstance(value, str):
+                        return "String"
+                    elif isinstance(value, list):
+                        if not value:
+                            return "int[]"  # Default for empty lists
+                        first_type = infer_java_type(value[0])
+                        return f"{first_type}[]"
+                    elif isinstance(value, dict):
+                        return "Map<Object, Object>"
+                    else:
+                        return "Object"
                 
-                template = f"""public class Solution {{
-    public static Object {self.challenge['function_name']}({param_str}) {{
-        // Your code here.
-        // Don't use System.out.println(), return the result instead!
-        // Tests will FAIL if you print.
-        return null;
-    }}
-}}
+                example_test = self.challenge.get('tests', [{}])[0]
+                inputs = example_test.get("input", [])
+                param_types = [infer_java_type(val) for val in inputs]
+                param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
+                expected_output = example_test.get("expected_output", None)
+                return_type = infer_java_type(expected_output)
+                template = f"""
+public static {return_type} {self.challenge['function_name']}({param_str}) {{
+    // Your code here.
+    // Don't use System.out.println(), return the result instead!
+    // Tests will FAIL if you print.
+    // Do NOT change the signature of the function!
+    return null;
+        }}
             """
                 self.textarea.language = 'java'
                 self.all_view.update_content(self.challenge)
                 self.app.pop_screen()
-                # self.notify(
-                #     title="I'm working on it!",
-                #     message=f"{DAEMON_USER} Hey, I haven't implemented Java yet! Come back later...",
-                #     severity="error",
-                #     timeout=3,
-                #     markup=True
-                #     )
+
 
         try:
             self.template=template
@@ -991,7 +1011,7 @@ try {{
 
         def compose(self) -> ComposeResult:
             with Vertical(id="compilation_dialog"):
-                yield Label(f"{DAEMON_USER} Choose your compiler, I don't have all day.", id="choose_comp_text")
+                yield Label(f"{DAEMON_USER} Choose ur compiler!", id="choose_comp_text")
                 if self.lang == "cpp":
                     yield Select([
                     ("C++20", "c++20"),
@@ -1002,11 +1022,17 @@ try {{
                     ],
                     value="c++17",
                     id="std_select")
+                    custom_input = Input(placeholder="Enter custom path...", id="custom_path_input")
+                    custom_input.display = False
+                    yield custom_input
                     with Horizontal(id = "comp_type_select"):
                         yield Button.success("Select", id="yes_comp")
                         yield Button.error("Quit", id="no_comp")
                 elif self.lang == "java":
-                    yield Select([("Scanning for compilers...", "loading")], value="loading", id="std_select")
+                    yield Select([("Custom path", "custom")], value="custom", id="std_select")
+                    custom_input = Input(placeholder="Enter custom path...", id="custom_path_input")
+                    custom_input.display = False
+                    yield custom_input
                     with Horizontal(id = "comp_type_select"):
                         yield Button.success("Select", id="yes_comp", disabled=True)
                         yield Button.error("Quit", id="no_comp", disabled=True)
@@ -1016,6 +1042,7 @@ try {{
             value=std_selection.value
             if value == "custom":
                 pass #TODO: Implement custom choice!!
+            #TODO: Figure out why on earth these are breaking (these should be fixed? run again to check)
             if value:
                 if self.lang == "cpp":
                     results = await run_cpp_code(self.code, self.func_name, self.tests, value)
@@ -1025,7 +1052,7 @@ try {{
                     self.all_view.update_submit_content(self.chall, formatted_results)
 
                 elif self.lang == "java":
-                    results = await run_java_code(self.code, self.func_name, self.tests, value, self.is_submission)
+                    results = await run_java_code(self.code, self.func_name, self.tests, self.jdk_mapping[value], self.is_submission)
                     formatted_results = [format_result(result) for result in results]
                     if self.is_submission:
                         self.all_view.update_submit_content(self.chall, results)

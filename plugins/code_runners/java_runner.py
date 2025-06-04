@@ -204,65 +204,64 @@ async def compile_and_run(java_code, test_cases, jdk_path, is_submission):
             tmp_java_file = os.path.join(tmpdir, "Solution.java")
             with open(tmp_java_file, "w") as tmp_file:
                 tmp_file.write(java_code)
-        executable = tmp_java_file + ('.exe' if os.name == 'nt' else '')
-        compiler_process = await asyncio.create_subprocess_exec(
-            os.path.join(jdk_path, "bin", "javac"), tmp_java_file,
-            stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
-        )
-        try:
-            _, stderr = await asyncio.wait_for(compiler_process.communicate(), timeout=20.0)
-            if compiler_process.returncode != 0:
+            compiler_process = await asyncio.create_subprocess_exec(
+                os.path.join(jdk_path, "bin", "javac"), tmp_java_file,
+                stdout = asyncio.subprocess.PIPE, stderr = asyncio.subprocess.PIPE
+            )
+            try:
+                _, stderr = await asyncio.wait_for(compiler_process.communicate(), timeout=20.0)
+                if compiler_process.returncode != 0:
+                    return [{
+                            "input": f"{os.path.join(jdk_path, "bin", "javac")} {tmp_java_file}",
+                            "output": None,
+                            "expected_output": None,
+                            "passed": False,
+                            "error": stderr.decode('utf-8', errors='replace').strip()
+                        }]
+            except asyncio.TimeoutError:
                 return [{
-                        "input": f"{os.path.join(jdk_path, "bin", "javac")} {tmp_java_file}",
-                        "output": None,
-                        "expected_output": None,
-                        "passed": False,
-                        "error": stderr.decode('utf-8', errors='replace').strip()
-                    }]
-        except asyncio.TimeoutError:
-            return [{
-            "input": f"{jdk_path} {tmp_java_file} ",
-            "output": None,
-            "expected_output": None,
-            "passed": False,
-            "error": "Execution timed out (20 seconds)"
-        }]
+                "input": f"{jdk_path} {tmp_java_file} ",
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": "Execution timed out (20 seconds)"
+            }]
 
-        process = await asyncio.create_subprocess_exec(
-            os.path.join(jdk_path, "bin", "java"), "-cp", tmpdir, "Solution",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=20.0)
-        except asyncio.TimeoutError:
-            return [{
-            "input": "Execution",
-            "output": None,
-            "expected_output": None,
-            "passed": False,
-            "error": "Execution timed out (20 seconds)"
-        }]
+            process = await asyncio.create_subprocess_exec(
+                os.path.join(jdk_path, "bin", "java"), "-cp", tmpdir, "Solution",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=20.0)
+            except asyncio.TimeoutError:
+                return [{
+                "input": "Execution",
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": "Execution timed out (20 seconds)"
+            }]
 
-        for test in stdout.decode('utf-8', errors='replace').splitlines():
-            if "Test " in test:
-                new1_test=test.split("Test ") # ["1: PASS"]
-                # ["Test ", "1: FAIL - Got: x Expected: y"]
-                test_index=int(new1_test[1].split(":")[0])-1
-                if "PASS" in test:
-                    results.append({"input": test_cases[test_index]["input"], 
-                                    "output": test_cases[test_index]['expected_output'], 
-                                    "expected_output": test_cases[test_index]['expected_output'],
-                                    "passed": True,
-                                    "error": None})
-                elif "FAIL" in test:
-                    fail_str = new1_test[1].split("FAIL - Got: ")[1]
-                    actual_output, expected_output = fail_str.split(", Expected: ")
-                    results.append({"input": test_cases[test_index]["input"], 
-                                    "output": actual_output, 
-                                    "expected_output": expected_output,
-                                    "passed": False,
-                                    "error": None})
+            for test in stdout.decode('utf-8', errors='replace').splitlines():
+                if "Test " in test:
+                    new1_test=test.split("Test ") # ["1: PASS"]
+                    # ["Test ", "1: FAIL - Got: x Expected: y"]
+                    test_index=int(new1_test[1].split(":")[0])-1
+                    if "PASS" in test:
+                        results.append({"input": test_cases[test_index]["input"], 
+                                        "output": test_cases[test_index]['expected_output'], 
+                                        "expected_output": test_cases[test_index]['expected_output'],
+                                        "passed": True,
+                                        "error": None})
+                    elif "FAIL" in test:
+                        fail_str = new1_test[1].split("FAIL - Got: ")[1]
+                        actual_output, expected_output = fail_str.split(", Expected: ")
+                        results.append({"input": test_cases[test_index]["input"], 
+                                        "output": actual_output, 
+                                        "expected_output": expected_output,
+                                        "passed": False,
+                                        "error": None})
     finally:
         try:
             if tmp_java_file is not None and os.path.exists(tmp_java_file):
