@@ -28,6 +28,8 @@ from tree_sitter import Language
 
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 
+# Most of the below are messages that are sent when something happens that the app has to handle
+# It's bcs u cant just return somehting
 class EditorClosed(Message):
     """Message passed when user has closed editor"""
     pass
@@ -37,10 +39,18 @@ class LanguageSelected(Message):
     def __init__(self, language: str) -> None:
         self.language = language
         super().__init__()
+        
+class CustomPathSelected(Message):
+    """Message sent when a custom path is selected."""
+    def __init__(self, path: str) -> None:
+        self.path = path
+        super().__init__()
 
 class UserCodeError(Exception):
     """Custom exception for user code errors."""
-    pass
+    pass # Man is this even used??
+
+
 # moreof a template than anything, i gotta fix it
 # do this later, you need to get the main flow working first
 # class ResultModal(ModalScreen):
@@ -481,79 +491,7 @@ using namespace std;
                 self.all_view.update_content(self.challenge, None)
                 self.textarea.language="cpp"
                 self.app.pop_screen()
-            case 'c': # I removed C support because its hard to handle dicts, i'll try when the main stuff is done
-#                 example_test = self.challenge.get('tests', [{}])[0]
-#                 inputs = example_test.get("input", [])
-#                 expected_output = example_test.get("expected_output", None)
-#                 def infer_c_type(value):
-#                     """Infer C type from a Python value."""
-#                     if isinstance(value, bool):
-#                         return "bool" 
-#                     if isinstance(value, int):
-#                         return "int"
-#                     elif isinstance(value, dict):
-#                         return "/* No built in map/dict in C */ void*"
-#                     elif isinstance(value, float):
-#                         return "double"
-#                     elif isinstance(value, str):
-#                         return "char*"
-#                     elif isinstance(value, list):
-#                         # Check if the list is empty
-#                         if not value:
-#                             return "int arr[]"
-#                         # Check if all elements are same type
-#                         first_type = type(value[0])
-#                         if all(isinstance(x, first_type) for x in value):
-#                             element_type = infer_cpp_type(value[0])
-#                         else:
-#                             # Mixed types - use most general type or auto
-#                             return "int*"  # This isn't valid C but signals a type issue
-#                         return f"{element_type}*"
-#                     else:
-#                         return "void* /*Mixed lists not fully supported*/"  # Fallback for unknown types
-#                 def default_return_value_c(c_type):
-#                     """Provide a default return value for a given C type."""
-#                     if c_type == "bool":
-#                         return "false"
-#                     elif c_type == "int":
-#                         return "0"
-#                     elif c_type == "double":
-#                         return "0.0"
-#                     elif c_type == "char*":
-#                         return "\"\""
-#                     elif c_type.startswith("void*"):
-#                         return "NULL"
-#                     elif c_type.startswith("int*"):
-#                         return "NULL"
-#                     else:
-#                         return "NULL"  # Fallback for unknown types
-#                 param_types = [infer_c_type(param) for param in inputs]
-#                 param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
-#                 return_type = infer_c_type(expected_output)
-#                 c_template = """#include <stdio.h>
-# #include <stdbool.h>
-# #include <stddef.h>
-
-# // DO NOT REMOVE THE ABOVE!
-# // Add extra libraries if necessary.
-# // There won't be any syntax highlighting, sorry!
-
-# // Example function signature (edit as needed):
-# // int my_function(int* arr, int arr_size) {{
-
-# {return_type} {function_name}({param_str}) {{
-#     // Your code here.
-#     // Do NOT use printf, return the result instead!
-#     // Tests will FAIL if you print.
-#     return {default_return_value};
-# }}
-# """
-#                 template = c_template.format(
-#                 return_type=return_type,
-#                 function_name=self.challenge['function_name'],
-#                 param_str=param_str,
-#                 default_return_value=default_return_value_c(return_type)
-#                 )
+            case 'c': 
                 self.notify(
                     title="I'm working on it!",
                     message=f"{DAEMON_USER} C is so hard... Come back later maybe?",
@@ -562,7 +500,6 @@ using namespace std;
                     markup=True
                     )
             case 'java':
-
                 def infer_java_type(value):
                     if value is None:
                         return "Object"
@@ -627,7 +564,6 @@ public static {return_type} {self.challenge['function_name']}({param_str}) {{
         #Python and JS are in this file because they're easy to implement and not that long.
         #Since C++, C, and Java are compiled, we will need to fix it later.
         code = self.query_one(TextArea).text
-        #test_cases=self.challenge["tests"]
         namespace={}
         all_results=[]
         formatted_results=[]
@@ -721,7 +657,9 @@ try {{
                             #     "passed": False,
                             #     "error": stderr.decode().strip()
                             # })
-                            formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {TestResultsWidget.escape_brackets(str(test_case["input"]))} \n Error: {stderr.decode().strip()}")
+                            formatted_results.append(
+                            f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {TestResultsWidget.escape_brackets(str(test_case['input']))} \n Error: {stderr.decode().strip()}"
+                            )
                             self.all_view.update_content(self.challenge, formatted_results)
                             return
 
@@ -760,6 +698,8 @@ try {{
                 )
                 self.all_view.update_content(self.challenge, formatted_results)
             case 'cpp':
+                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+            case 'java':
                 self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
 
 
@@ -902,7 +842,6 @@ try {{
                         ret_results.append(result)
                 self.all_view.update_submit_content(self.challenge, ret_results)
             case 'cpp':
-                is_submission=True
                 self.app.push_screen(self.CompilationStandardPopup(self.challenge, 
                     self.textarea.text, 
                     self.challenge['function_name'], 
@@ -1038,8 +977,7 @@ try {{
             std_selection=self.query_one("#std_select", Select)
             value=std_selection.value
             if value == "custom":
-                pass #TODO: Implement custom choice!!
-            #TODO: Figure out why on earth these are breaking (these should be fixed? run again to check)
+                self.app.push_screen(Editor.CustomCompilationPath(self.lang)) #TODO: Implement custom choice!!
             if value:
                 if self.lang == "cpp":
                     results = await run_cpp_code(self.code, self.func_name, self.tests, value)
@@ -1135,8 +1073,53 @@ try {{
         def stop_comp(self):
             self.app.pop_screen()
 
-                    
+    class CustomCompilationPath(ModalScreen):       
+        def __init__(self, language):
+                    super().__init__()
+                    self.language=language
 
+            
+        def compose(self) -> ComposeResult:
+            with Vertical(id="custom_comp_prompt"):
+                placeholder_text = "Enter custom path"
+                system = platform.system()
+                if self.language == "java":
+                    yield Label("Insert custom path (Should be the root of your JDK!)", id="reset_text")
+                    if system == "Darwin":
+                        placeholder_text = "/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home"
+                    elif system == "Linux":
+                        placeholder_text = "/usr/lib/jvm/java-21-openjdk-amd64"
+                    elif system == "Windows":
+                        placeholder_text = r"C:\Program Files\Java\jdk-21"
+                    else:
+                        placeholder_text = "Enter JDK root path"
+                if self.language == "cpp":
+                    yield Label("Insert custom path (Should be your compiler executable!)", id="reset_text")
+                    if system == "Darwin":
+                        placeholder_text = "/usr/bin/clang++"
+                    elif system == "Linux":
+                        placeholder_text = "/usr/bin/g++"
+                    elif system == "Windows":
+                        placeholder_text = r"C:\MinGW\bin\g++.exe"
+                    else:
+                        placeholder_text = "Enter C++ compiler path"
+                else:
+                    yield Label("Insert custom path", id="reset_text")
+                yield Input(placeholder=placeholder_text, id="custom_path_input")
+                with Horizontal(id="confirm_custom_buttons"):
+                    yield Button.success("Yes", id="yes_custom_button")
+                    yield Button.error("No", id="no_custom_button")
+    
+        def on_button_pressed(self, event: Button.Pressed) -> None:
+            match event.button.id:
+                case "yes_custom_button":
+                    # self.editor.textarea.text = self.editor.template
+                    # self.editor.textarea.refresh()
+                    # self.editor.all_view.reset_content()
+                    # self.app.pop_screen()
+                    pass
+                case "no_custom_button":
+                    self.app.pop_screen()
     class EditorResetConfirm(ModalScreen):
         def __init__(self, editor):
             super().__init__()

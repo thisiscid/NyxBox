@@ -212,7 +212,7 @@ async def compile_and_run(java_code, test_cases, jdk_path, is_submission):
                 _, stderr = await asyncio.wait_for(compiler_process.communicate(), timeout=20.0)
                 if compiler_process.returncode != 0:
                     return [{
-                            "input": f"{os.path.join(jdk_path, "bin", "javac")} {tmp_java_file}",
+                            "input": f"{os.path.join(jdk_path, 'bin', 'javac')} {tmp_java_file}",
                             "output": None,
                             "expected_output": None,
                             "passed": False,

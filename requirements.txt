@@ -1,5 +1,5 @@
 # Core TUI framework
-textual>=3.2.0 # I'm running on textual 3.2.0, this MAY work but I cannot guarentee it for lower versions.
+textual>=3.2.0 # I'm running on textual 3.2.0, this MAY work but I cannot guarantee it for lower versions.
 
 # Most requirements will be what I am running locally, may vary since I have a mac
 # Syntax highlighting

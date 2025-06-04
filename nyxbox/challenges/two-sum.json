@@ -1,7 +1,7 @@
 {
   "name": "two-sum",
   "difficulty": "easy",
-  "description": "Given an array and a target number, return the indices of the first pair of numbers that add up to the target. Return as a list of two indices.",
+  "description": "Given a list of integers and a target value, return the indices of the first pair of numbers that sum to the target. Iterate from left to right and choose the earliest valid pair (i < j). Return the indices as a list of two integers or null if no pair sums to the target.",
   "function_name": "two_sum",
   "type": "function",
   "inputs": ["arr", "target"],
@@ -31,6 +31,19 @@
     {
       "input": [[1, 2, 3, 4, 5], 9],
       "expected_output": [3, 4]
+    },
+    {
+      "input": [[3, 3, 4, 2], 6],
+      "expected_output": [0, 1]
+    },
+    {
+      "input": [[0, 4, 3, 0], 0],
+      "expected_output": [0, 3]
+    },
+    {
+      "input": [[-3, 4, 1, 2], 1],
+      "expected_output": [0, 1],
+      "hidden": true
     }
   ]
 }
