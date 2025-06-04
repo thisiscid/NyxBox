@@ -144,7 +144,8 @@ TestResultsWidget {
   min-height: 8;
   max-height: 18;
   border: round dodgerblue;     
-  margin-top: -1;                
+  margin-top: 0;
+  padding-top: 0
 }
 
 EditorResetConfirm {
@@ -194,4 +195,9 @@ EditorResetConfirm {
   border: tall #3b82f6;
   background: #222;
   padding: 2;
+}
+
+#results_tabs {
+    margin-top: 0;
+    padding-top: 0;
 }

@@ -48,6 +48,23 @@ class LanguageSelected(Message):
 class UserCodeError(Exception):
     """Custom exception for user code errors."""
     pass
+# moreof a template than anything, i gotta fix it
+# do this later, you need to get the main flow working first
+# class ResultModal(ModalScreen):
+#     def __init__(self, results, message: str, severity: str = "info"):
+#         super().__init__()
+#         self.results = results
+
+
+#     def compose(self) -> ComposeResult:
+#         with Vertical(id="result_modal"):
+#             # yield Label(self.message, id="result_modal_text")
+#             with Horizontal():
+#                 yield Button("OK", id="close_result_modal", variant="primary")
+
+#     @on(Button.Pressed, "#close_result_modal")
+#     def close_modal(self):
+#         self.app.pop_screen()
 
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
@@ -76,8 +93,13 @@ class TestResultsWidget(Widget):
                 with ScrollableContainer():
                     yield Static(f"{DAEMON_USER} Working on getting your challenge...", id="challenge_content_static")
             with TabPane("Submit Results", id="submit_tabs"): 
-                with ScrollableContainer(id="submit_results_container"):
-                    yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_static")
+                # IT SEEMS TO WORK WITH SCROLLABLE CONTAINER BUT NOT TABBED CONTENT??
+                # I'm gonna crash \ fr though, i'll keep debugging bcs thats weird?
+                with ScrollableContainer():
+                    yield Static(f"{DAEMON_USER} What? Have you tried submitting yet?", id="submit_static")
+                # with TabbedContent(id="submit_inner_tabs"):                    
+                #     with TabPane("Summary"):
+                #         yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_summary_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
                 with ScrollableContainer():
                     yield Static(f"{DAEMON_USER} Run it first, ya dummy.", id="all_tests_content_static")
@@ -181,23 +203,24 @@ class TestResultsWidget(Widget):
 
         self.refresh()
     def update_submit_content(self, chall, results=None):
-        container = self.query_one("#submit_results_container", ScrollableContainer)
-        container.remove_children()  # Clear old content
-
-        # Separate results into categories
+        submit_static = self.query_one("#submit_static", Static)
         results = results or []
         passed = [r for r in results if r.get("passed")]
         failed = [r for r in results if r.get("passed") is False and not r.get("error")]
         errors = [r for r in results if r.get("error")]
-        # Create the inner TabbedContent
-        tabbed = TabbedContent(id="submit_inner_tabs")
-        tabbed.mount(
-            TabPane("Passed", *[Static(str(r)) for r in passed]),
-            TabPane("Failed", *[Static(str(r)) for r in failed]),
-            TabPane("Errors", *[Static(str(r)) for r in errors]),
-        )
+        total = len(results)
+        summary = f"[b]Submission Results[/b]\n"
+        summary += f"Total: {total} | ✅ Passed: {len(passed)}"
+        if failed:
+            last_failed = failed[-1]
+            summary += f"[b][red]❌ Last Failed Test[/red][/b]\nInput: {last_failed.get('input')}\nOutput: {last_failed.get('output')}\nExpected: {last_failed.get('expected')}\n\n"
+        elif errors:
+            last_error = errors[-1]
+            summary += f"[b][yellow]⚠️ Last Error[/yellow][/b]\nInput: {last_error.get('input')}\nError: {last_error.get('error')}\n\n"
+        elif passed:
+            summary += "[b][green]🎉 All tests passed![/green][/b]\n"
 
-        container.mount(tabbed)
+        submit_static.update(summary)
         self.refresh()
 
 class EditorClosePrompt(ModalScreen):
