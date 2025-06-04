@@ -145,3 +145,7 @@ class VendingMachine(App):
 def main():
     app = VendingMachine()
     app.run()
+
+if __name__ == "__main__":
+    app = VendingMachine()
+    app.run()

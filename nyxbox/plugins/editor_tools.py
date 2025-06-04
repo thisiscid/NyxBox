@@ -21,15 +21,8 @@ from .code_runners.java_runner import run_java_code
 import tree_sitter_cpp
 from tree_sitter import Language
 # TODO:
-# 1. Call self.all_view.update_content(self.challenge, formatted_results) at end of action_run_code()
-# 2. Fix challenge test case key — should be 'tests' not 'test' in challenge JSON
 # 3. List of messages to pick out of for Nyx!
-# 4. In TestResultsWidget.update_content():
-#    - Separate results into passed/failed
-#    - Render them in "Passed Tests" and "Failed Tests" TabPane
 # 5. Optional polish:
-#    - Improve result formatting (centralize string styling)
-#    - Wire up Submit Code and Reset Code logic
 #    - Create ASCII startup screen for daemon flavor (List of messages to pick out of!)
 # ================================
 
@@ -999,10 +992,14 @@ try {{
                 select = self.query_one("#std_select", Select)
                 yes_button = self.query_one("#yes_comp", Button)
                 no_button = self.query_one("#no_comp", Button)
+                custom_choice = self.query_one("#custom_path_input", Input)
                 options = [(f"Java {v}", v) for v in sorted(jdk_mapping.keys(), reverse=True)]
                 if not options:
-                    options = [("No JDKs found!", "none")]
+                    options = [("Custom path", "custom")]
+                    custom_choice.display=True
+                    yes_button.disabled=False
                     no_button.disabled=False
+
                 select.set_options(options)
                 select.value = options[0][1]
                 yes_button.disabled = False
@@ -1022,7 +1019,7 @@ try {{
                     ],
                     value="c++17",
                     id="std_select")
-                    custom_input = Input(placeholder="Enter custom path...", id="custom_path_input")
+                    custom_input = Input(placeholder="Enter custom path ()", id="custom_path_input")
                     custom_input.display = False
                     yield custom_input
                     with Horizontal(id = "comp_type_select"):
