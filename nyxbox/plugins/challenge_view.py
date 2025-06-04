@@ -1,5 +1,5 @@
 from textual.widgets import Static
-import plugins.challenge_loader as chall_load
+from . import challenge_loader as chall_load
 DAEMON_USER="[#B3507D][bold]nyu[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 class UserChallView(Static):
     def on_mount(self):

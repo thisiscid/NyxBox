@@ -2,8 +2,6 @@
 
 A Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and C (not yet...) Also, just who is Nyx?
 
-![HackaTime badge](https://hackatime-badge.hackclub.com/U08SF8MVC82/coding-and-vending)
-
 ---
 
 ## Features
@@ -19,11 +17,9 @@ A Textual-based TUI app for all your challenge solving needs supporting Python, 
 ## Getting Started
 
 ### 1. Install Requirements
-(These are temporary for now!)
-First, clone the repo, and then cd into the repo and install requirements.txt
-
+Install nyxbox via pip.
 ```bash
-pip install -r requirements.txt
+pip install nyxbox
 ```
 Make sure you have clang++ or g++ installed, or Node.js for JavaScript if planning on using these langs, as NyxBox uses these to run your challenges written in C++ or JS.
 

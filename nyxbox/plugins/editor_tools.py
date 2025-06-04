@@ -15,9 +15,9 @@ from textual.message import Message
 from textual.screen import Screen, ModalScreen
 from textual import on
 from textual.widget import Widget
-from plugins.challenge_view import UserChallView
-from plugins.code_runners.cpp_runner import run_cpp_code
-from plugins.code_runners.java_runner import run_java_code
+from . import challenge_view as UserChallView
+from .code_runners.cpp_runner import run_cpp_code
+from .code_runners.java_runner import run_java_code
 import tree_sitter_cpp
 from tree_sitter import Language
 # TODO:
@@ -1046,10 +1046,9 @@ try {{
             if value:
                 if self.lang == "cpp":
                     results = await run_cpp_code(self.code, self.func_name, self.tests, value)
-                    formatted_results = [format_result(result) for result in results]
                     if self.is_submission:
                         self.all_view.update_submit_content(self.chall, results)
-                    self.all_view.update_submit_content(self.chall, formatted_results)
+                    self.all_view.update_submit_content(self.chall, results)
 
                 elif self.lang == "java":
                     results = await run_java_code(self.code, self.func_name, self.tests, self.jdk_mapping[value], self.is_submission)

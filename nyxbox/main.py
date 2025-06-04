@@ -4,14 +4,15 @@ import sys
 import time
 import pathlib
 import re
-from plugins import challenge_view, challenge_loader
-from plugins.editor_tools import Editor, EditorClosed, LanguageSelected, TestResultsWidget
+from .plugins import challenge_view, challenge_loader
+from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, TestResultsWidget
 from textual import on
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
+from importlib.resources import files
 
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 
@@ -35,7 +36,7 @@ class ConfirmExit(ModalScreen):
 
 
 class VendingMachine(App):
-    CSS_PATH = "./styles.tcss"
+    CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
     BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution"), ("ctrl+q", "quit_app", "Quit app")]
     
     #Define some consts so we don't have to do this every time we want to show or hide a widget
@@ -141,9 +142,6 @@ class VendingMachine(App):
         btn = self.query_one("#edit_button")
         btn.display = True # IT WORKS!!!! :D
 
-         
-        
-
-if __name__ == "__main__":
+def main():
     app = VendingMachine()
     app.run()
