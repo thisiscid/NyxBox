@@ -2,6 +2,15 @@
 
 A Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and C (not yet...) Also, just who is Nyx?
 
+## What's new?
+Latest - 0.1.1
+0.1.1 - 6/4/25
+- Fixed packaging bugs (tested on MacOS 15.2)
+- Fixed minor errors
+- Also, there's only two challenges. Sorry.
+
+0.1.0 - 6/4/25
+- Initial release
 ---
 
 ## Features
@@ -25,7 +34,7 @@ Make sure you have clang++ or g++ installed, or Node.js for JavaScript if planni
 
 ### 2. Run the App
 ```bash
-python3 main.py
+nyxbox
 ```
 ## Adding challenges
 Add new challenges in the form of a JSON in the challenges directory. Challenges will not work if they do not follow the style of pre-made challenges.

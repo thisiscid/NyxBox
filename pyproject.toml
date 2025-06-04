@@ -1,8 +1,8 @@
 [project]
 name = "NyxBox"
-version = "0.1.0"
-description = "Your code runner powered by Textual"
-authors = [{ name="rainger", email="losdos2341@gmail.com" }]
+version = "0.1.1"
+description = "Exercisim inspired tool, right in your terminal!"
+authors = [{ name="Rainger", email="tilt-hazard-swept@duck.com" }]
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -24,4 +24,8 @@ nyxbox = "nyxbox.main:main"
 where = ["."]
 
 [tool.setuptools.package-data]
-nyxbox = ["*", "challenges/*", "language-support/*"]
+nyxbox = [
+  "styles.tcss",
+  "challenges/*.json",
+  "language-support/*.scm"
+]
