@@ -30,7 +30,7 @@ Install nyxbox via pip.
 ```bash
 pip install nyxbox
 ```
-Make sure you have clang++ or g++ installed, or Node.js for JavaScript if planning on using these langs, as NyxBox uses these to run your challenges written in C++ or JS.
+Make sure you have clang++ or g++ installed, or Node.js for JavaScript if planning on using these langs, as NyxBox uses these to run your challenges written in C++ or JS. Same goes for Java (any jdk works! working on adding custom paths so it doesn't matther where you install it)
 
 ### 2. Run the App
 ```bash
