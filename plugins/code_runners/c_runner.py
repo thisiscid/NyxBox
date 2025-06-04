@@ -3,12 +3,12 @@ import json
 import tempfile
 import asyncio
 import shutil
-#This file is largely unused because I would need to write custom dictionary headers or wtv
+#This file is largely unused since C isn't supported and I can't bother for the life of me to do the custom dicts
+# I don't evne know how to write C
 async def run_c_code(user_code, func_name, test_cases, standard):
     """
     Run C++ code against test cases and return results.
     """    
-    # TODO: Generate a complete C++ program that includes the user's code and test functions
     c_code = generate_c_program(user_code, func_name, test_cases)
 
     # TODO: Write the program to a temporary file, compile it, run it, and capture output

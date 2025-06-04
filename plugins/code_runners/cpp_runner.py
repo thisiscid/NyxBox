@@ -14,12 +14,9 @@ async def run_cpp_code(user_code, func_name, test_cases, standard, is_submission
         filtered_tests = test_cases  # All tests, including hidden
     else:
         filtered_tests = [t for t in test_cases if not t.get("hidden", False)]
-    # TODO: Generate a complete C++ program that includes the user's code and test functions
     cpp_code = generate_cpp_program(user_code, func_name, filtered_tests, is_submission)
 
-    # TODO: Write the program to a temporary file, compile it, run it, and capture output
     results = await compile_and_run(cpp_code, filtered_tests, standard)
-    # TODO: Return a list of dictionaries containing test results
     return results
 
 def generate_cpp_program(user_code, func_name, test_cases, is_submission):
@@ -27,9 +24,7 @@ def generate_cpp_program(user_code, func_name, test_cases, is_submission):
     Generate a C++ program with test code.
     """
     
-    # TODO: Create test code for each test case
     test_code = generate_test_code(func_name, test_cases, is_submission)
-    # TODO: Make a program template with proper includes, user code section, and a main function
     program_template = """
 #include <iostream>
 #include <vector>
@@ -120,16 +115,13 @@ int main() {{
     return all_passed ? 0 : 1;
 }}
 """
-    # TODO: Insert user code and test code into the template and return the complete program
     ret = program_template.format(user_code=user_code, test_code=test_code)
     return ret
 def generate_test_code(func_name, test_cases, is_submission):
     """
     Generate C++ code that tests the user's function.
     """
-    test_code_blocks=[]
-    # TODO: Create a list to hold test code blocks
-    
+    test_code_blocks=[]    
     for i, test in enumerate(test_cases):
         if not is_submission and test.get("hidden", False):
             continue
@@ -149,13 +141,6 @@ def generate_test_code(func_name, test_cases, is_submission):
         expected_var = f"expected_{i}"
         expected_value = python_to_cpp_value(expected)
 
-        # TODO: For each test case:
-        #   - Get input values and expected output
-        #   - Create C++ variables for inputs with correct types
-        #   - Create variable for expected output
-        #   - Add code to call the function and compare results
-        #   - Print PASS/FAIL with appropriate information
-        
         test_block = f"""
     // Test case {i+1}
     cout << "Test {i+1}: ";
@@ -179,7 +164,6 @@ def generate_test_code(func_name, test_cases, is_submission):
     }}"""
         test_code_blocks.append(test_block)
 
-    # TODO: Join all test blocks into a single string and return it
     return "\n".join(test_code_blocks)
 
 def python_to_cpp_value(value):
@@ -243,15 +227,7 @@ def infer_cpp_type(value):
         return f"map<{key_type}, {val_type}>"
     else:
         return "auto"
-    # TODO: Determine C++ type based on Python type:
-    #   - None → nullptr_t
-    #   - bool → bool
-    #   - int → int
-    #   - float → double
-    #   - str → string
-    #   - list → vector<appropriate_type>
-    #   - dict → map<key_type, value_type>
-
+   
 async def compile_and_run(cpp_code, test_cases, standard):
     """
     Compile and run C++ code, then parse the results.
@@ -261,11 +237,9 @@ async def compile_and_run(cpp_code, test_cases, standard):
     results = []
     
     try:
-        # TODO: Create a temporary file for the C++ code
         with tempfile.NamedTemporaryFile(suffix='.cpp', delete=False) as tmp_file:
             tmp_cpp_file = tmp_file.name
             tmp_file.write(cpp_code.encode('utf-8'))
-        # TODO: Find a C++ compiler (g++ or clang++)
         executable = tmp_cpp_file.strip(".cpp") + ('out.exe' if os.name == 'nt' else 'out')
         compiler = shutil.which("g++") or shutil.which("clang++")
         if not compiler:
@@ -282,10 +256,8 @@ async def compile_and_run(cpp_code, test_cases, standard):
         )
         try:
             _, stderr = await asyncio.wait_for(compiler_process.communicate(), timeout=20.0)
-            # TODO: Compile the code with appropriate flags
             if compiler_process.returncode != 0:
                 # Compiler reached error, return the error
-                # TODO: Handle compilation errors Done
                 return [{
                         "input": f"{compiler} -std={standard} {tmp_cpp_file} -o {executable}",
                         "output": None,
@@ -302,7 +274,6 @@ async def compile_and_run(cpp_code, test_cases, standard):
             "error": "Execution timed out (20 seconds)"
         }]
 
-        # TODO: Run the compiled program with a timeout
         if os.name == 'nt':
             process = await asyncio.create_subprocess_exec(
             executable,
@@ -326,7 +297,6 @@ async def compile_and_run(cpp_code, test_cases, standard):
             "error": "Execution timed out (20 seconds)"
         }]
 
-        # TODO: Parse the output to determine which tests passed or failed
         for test in stdout.decode('utf-8', errors='replace').splitlines():
             if "Test " in test:
                 new1_test=test.split("Test ") # ["1: PASS"]
@@ -347,9 +317,6 @@ async def compile_and_run(cpp_code, test_cases, standard):
                                     "passed": False,
                                     "error": None})
 
-        # TODO: Format results as a list of dictionaries
-        
-        # TODO: Clean up temporary files
     finally:
         try:
             if tmp_cpp_file is not None and os.path.exists(tmp_cpp_file):

@@ -210,7 +210,7 @@ class TestResultsWidget(Widget):
         errors = [r for r in results if r.get("error")]
         total = len(results)
         summary = f"[b]Submission Results[/b]\n"
-        summary += f"Total: {total} | ✅ Passed: {len(passed)}"
+        summary += f"Total: {total} | ✅ Passed: {len(passed)} \n \n"
         if failed:
             last_failed = failed[-1]
             summary += f"[b][red]❌ Last Failed Test[/red][/b]\nInput: {last_failed.get('input')}\nOutput: {last_failed.get('output')}\nExpected: {last_failed.get('expected')}\n\n"
@@ -243,13 +243,13 @@ class EditorClosePrompt(ModalScreen):
 class SelectLanguage(ModalScreen):
     def compose(self) -> ComposeResult:
         with Vertical(id="language_select_box"):
-            yield Label("Select a language to write in:")
+            yield Label(f"{DAEMON_USER} Select a language to write in:")
             yield Select([
                     ("Python", "py"),
                     ("Javascript", "js"),
                     ("C++", "cpp"),
-                    ("Java (coming soon)", "java"),
-                    ("C (coming soon)", "c")
+                    ("Java", "java"),
+                    ("C (coming [s]never[/s] soon)", "c")
                 ],
                 value="py",
                 id="language_select")
@@ -817,12 +817,9 @@ try {{
                         timeout=3,
                         markup=True
                         )
-                formatted_results = [format_result(result) for result in all_results]
                 self.all_view.update_submit_content(self.challenge, all_results)
             case 'js':
                 for test_case in self.challenge['tests']:
-                    if test_case.get("hidden", False):
-                        continue
                     args = ", ".join(json.dumps(arg) for arg in test_case["input"])
                     wrapped_code = f"""
 // --- USER CODE START ---
@@ -850,18 +847,15 @@ try {{
 
                         stdout, stderr = await proc.communicate()
                         if proc.returncode != 0:
-                            # formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                            # all_results.append({
-                            #     "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
-                            #     "output": None,
-                            #     "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
-                            #     "passed": False,
-                            #     "error": stderr.decode().strip()
-                            # })
-                            formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {TestResultsWidget.escape_brackets(str(test_case["input"]))} \n Error: {stderr.decode().strip()}")
-                            self.all_view.update_content(self.challenge, formatted_results)
+                            all_results.append({
+                                "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                                "output": None,
+                                "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                                "passed": False,
+                                "error": stderr.decode().strip()
+                            })
+                            self.all_view.update_submit_content(self.challenge, all_results)
                             return
-
                         else:
                             result = json.loads(stdout.decode().strip())
                             all_results.append({
@@ -879,15 +873,6 @@ try {{
                             "passed": False,
                             "error": "Execution timed out"
                         })
-                for result in all_results:
-                    if result['error']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                    elif not result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    elif result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    else:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
                 self.notify(
                     title="Hey mortal...I finished running your code!",
                     message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
@@ -895,11 +880,34 @@ try {{
                     timeout=3,
                     markup=True
                 )
-                self.all_view.update_content(self.challenge, formatted_results)
+                ret_results=[]
+                for result in all_results:
+                    if not result.get("passed", False):
+                        ret_results.append(result)
+                        break
+                    else:
+                        ret_results.append(result)
+                self.all_view.update_submit_content(self.challenge, ret_results)
             case 'cpp':
-                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+                is_submission=True
+                self.app.push_screen(self.CompilationStandardPopup(self.challenge, 
+                    self.textarea.text, 
+                    self.challenge['function_name'], 
+                    self.challenge['tests'],
+                    self.language, 
+                    self.textarea, 
+                    self.all_view, 
+                    is_submission=True))
             case 'java':
-                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+                self.app.push_screen(self.CompilationStandardPopup(
+                    self.challenge, 
+                    self.textarea.text, 
+                    self.challenge['function_name'], 
+                    self.challenge['tests'],
+                    self.language, 
+                    self.textarea, 
+                    self.all_view, 
+                    is_submission=True))
 
     
     def action_reset_editor(self):
@@ -983,13 +991,14 @@ try {{
 
         def compose(self) -> ComposeResult:
             with Vertical(id="compilation_dialog"):
-                yield Label(f"{DAEMON_USER} Choose your compiler!", id="choose_comp_text")
+                yield Label(f"{DAEMON_USER} Choose your compiler, I don't have all day.", id="choose_comp_text")
                 if self.lang == "cpp":
                     yield Select([
                     ("C++20", "c++20"),
                     ("C++17", "c++17"),
                     ("C++14", "c++14"),
                     ("C++11", "c++11"),
+                    ("Custom path", "custom")
                     ],
                     value="c++17",
                     id="std_select")
@@ -1005,15 +1014,23 @@ try {{
         async def confirm_comp(self):
             std_selection=self.query_one("#std_select", Select)
             value=std_selection.value
+            if value == "custom":
+                pass #TODO: Implement custom choice!!
             if value:
                 if self.lang == "cpp":
                     results = await run_cpp_code(self.code, self.func_name, self.tests, value)
                     formatted_results = [format_result(result) for result in results]
-                    self.all_view.update_content(self.chall, formatted_results)
+                    if self.is_submission:
+                        self.all_view.update_submit_content(self.chall, results)
+                    self.all_view.update_submit_content(self.chall, formatted_results)
+
                 elif self.lang == "java":
-                    results = await run_java_code(self.code, self.func_name, self.tests, value)
+                    results = await run_java_code(self.code, self.func_name, self.tests, value, self.is_submission)
                     formatted_results = [format_result(result) for result in results]
-                    self.all_view.update_content(self.chall, formatted_results)
+                    if self.is_submission:
+                        self.all_view.update_submit_content(self.chall, results)
+                    else:
+                        self.all_view.update_content(self.chall, formatted_results)
                 self.app.pop_screen()
                 
             else:
