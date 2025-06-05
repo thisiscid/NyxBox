@@ -5,7 +5,8 @@ import time
 import pathlib
 import re
 from .plugins import challenge_view, challenge_loader
-from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, TestResultsWidget
+from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
+from .plugins.code_runners.java_runner import run_java_code
 from textual import on
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
@@ -20,7 +21,7 @@ DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 try:
     nyxbox_version = version("nyxbox")
 except PackageNotFoundError:
-    nyxbox_version = ""
+    nyxbox_version = None
 class VendAnimation(Static):
     pass
 
@@ -91,7 +92,7 @@ class NyxBox(App):
         self.push_screen(ConfirmExit())
 
     def action_search_button(self) -> None:
-
+        #TODO: Implement searching for xyz
         pass
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
@@ -122,7 +123,7 @@ class NyxBox(App):
                     markup=True
                 )
             # This was back when the editor buttons were still there. If this happens, something went terribly wrong.
-
+    
     @on(LanguageSelected)
     def handle_language_selection(self, message: LanguageSelected):
         print(f"Language selected: {message.language}")

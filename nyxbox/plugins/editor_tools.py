@@ -42,8 +42,13 @@ class LanguageSelected(Message):
         
 class CustomPathSelected(Message):
     """Message sent when a custom path is selected."""
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, lang: str, code, func_name, tests, is_submission) -> None:
         self.path = path
+        self.lang = lang if lang else ""
+        self.code = code
+        self.func_name = func_name
+        self.tests = tests
+        self.is_submission = is_submission
         super().__init__()
 
 class UserCodeError(Exception):
@@ -237,8 +242,8 @@ class TestResultsWidget(Widget):
         total = len(results)
         SUMMARY_MESSAGE = [
             f"{DAEMON_USER} Let's take a look at how you did, hm?~",
-            f"{DAEMON_USER} The results are in. You best hope you didn't fail."
-            f"{DAEMON_USER} You ready? Just kidding, I don't actually care."
+            f"{DAEMON_USER} The results are in. You best hope you didn't fail.",
+            f"{DAEMON_USER} You ready? Just kidding, I don't actually care.",
             f"{DAEMON_USER} Okay, let's see if you learned something this time."
         ]
         summary = f"{random.choice(SUMMARY_MESSAGE)}\n \n"
@@ -918,6 +923,7 @@ try {{
             self.all_view = testresultswidget
             self.lang = language
             self.editor = editor
+            self.editor_class = Editor
             self.is_submission = is_submission
         async def on_mount(self) -> None:
             if self.lang == "cpp":
@@ -1012,7 +1018,14 @@ try {{
             std_selection=self.query_one("#std_select", Select)
             value=std_selection.value
             if value == "custom":
-                self.app.push_screen(Editor.CustomCompilationPath(self.lang))
+                self.app.push_screen(Editor.CustomCompilationPath(
+                    language=self.lang,
+                    editor=self.editor,
+                    func_name=self.func_name,
+                    tests=self.tests,
+                    is_submission=self.is_submission,
+                    all_view=self.all_view,
+                    chall=self.chall))
                 return 
             else:
                 if value and isinstance(value, str):
@@ -1046,16 +1059,16 @@ try {{
                         timeout=3,
                         markup=True
                     )
-        @on(CustomPathSelected)
-        async def handle_custom_path(self, event: CustomPathSelected):
-            if self.lang == "java":
-                results = await run_java_code(self.code, self.func_name, self.tests, event.path, self.is_submission)
-                formatted_results = [format_result(result) for result in results]
-                if self.is_submission:
-                    self.all_view.update_submit_content(self.chall, results)
-                else:
-                    self.all_view.update_content(self.chall, formatted_results)
-                self.app.pop_screen() 
+        # @on(CustomPathSelected)
+        # async def handle_custom_path(self, event: CustomPathSelected):
+        #     if self.lang == "java":
+        #         results = await run_java_code(self.code, self.func_name, self.tests, event.path, self.is_submission)
+        #         formatted_results = [format_result(result) for result in results]
+        #         if self.is_submission:
+        #             self.all_view.update_submit_content(self.chall, results)
+        #         else:
+        #             self.all_view.update_content(self.chall, formatted_results)
+        #         self.app.pop_screen() 
 
         def scan_jdks(self) -> dict:
             system = platform.system()
@@ -1127,11 +1140,18 @@ try {{
         @on(Button.Pressed, "#no_comp")
         def stop_comp(self):
             self.app.pop_screen()
-
     class CustomCompilationPath(ModalScreen):       
-        def __init__(self, language):
+        def __init__(self, language, editor, func_name, tests, is_submission, all_view, chall):
                     super().__init__()
                     self.language=language
+                    self.editor=editor
+                    self.func_name = func_name
+                    self.tests = tests
+                    self.is_submission = is_submission
+                    self.all_view = all_view
+                    self.chall = chall
+                    self.all_view = all_view
+                    self.editor_class = Editor
 
             
         def compose(self) -> ComposeResult:
@@ -1165,9 +1185,22 @@ try {{
                     yield Button.success("Yes", id="yes_custom_button")
                     yield Button.error("No", id="no_custom_button")
     
-        def on_button_pressed(self, event: Button.Pressed) -> None:
+        async def on_button_pressed(self, event: Button.Pressed) -> None:
             match event.button.id:
                 case "yes_custom_button":
+                    print(os.path.exists(self.query_one("#custom_path_input", Input).value))
+                    input_widget = self.query_one("#custom_path_input", Input)
+
+                    current_path_value = input_widget.value
+                    if not current_path_value.strip():
+                        self.notify(
+                            title="Input needed!",
+                            message=f"{DAEMON_USER} [b]Please enter a path![/b]",
+                            severity="warning",
+                            timeout=5,
+                            markup=True
+                        )
+                        return
                     if not os.path.exists(self.query_one("#custom_path_input", Input).value):
                         self.notify(
                         title="Are you serious?",
@@ -1177,8 +1210,14 @@ try {{
                         markup=True
                     ) 
                         return
-                    self.app.post_message(CustomPathSelected(self.query_one("#custom_path_input", Input).value))
                     self.app.pop_screen()
+                    self.app.pop_screen() #We do it twice since we know there are two layers of screens
+                    results = await run_java_code(self.editor.text, self.func_name, self.tests, current_path_value, self.is_submission)
+                    formatted_results = [format_result(result) for result in results]
+                    if self.is_submission:
+                        self.all_view.update_submit_content(self.chall, results)
+                    else:
+                        self.all_view.update_content(self.chall, formatted_results)
                 case "no_custom_button":
                     self.app.pop_screen()
     class EditorResetConfirm(ModalScreen):
