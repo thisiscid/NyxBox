@@ -968,21 +968,21 @@ try {{
                             markup=True
                         )
             elif self.lang == "java":
-                jdk_mapping = await asyncio.to_thread(self.scan_jdks)
-                system=platform.system()
+                self.jdk_mapping = await asyncio.to_thread(self.scan_jdks) # Store discovered JDKs
                 select = self.query_one("#std_select", Select)
                 yes_button = self.query_one("#yes_comp", Button)
                 no_button = self.query_one("#no_comp", Button)
-                custom_choice = self.query_one("#custom_path_input", Input)
-                options = [(f"Java {v}", v) for v in sorted(jdk_mapping.keys(), reverse=True)]
-                if not options:
-                    options = [("Custom path", "custom")]
-                    custom_choice.display=True
-                    yes_button.disabled=False
-                    no_button.disabled=False
+
+                options = [(f"Java {v}", v) for v in sorted(self.jdk_mapping.keys(), reverse=True)]
+                options.append(("Custom path", "custom")) # Add custom path option
 
                 select.set_options(options)
-                select.value = options[0][1]
+
+                if self.jdk_mapping: # If JDKs were found, select the latest
+                    select.value = sorted(self.jdk_mapping.keys(), reverse=True)[0]
+                else: # Otherwise, default to custom path
+                    select.value = "custom"
+                
                 yes_button.disabled = False
                 no_button.disabled = False
 
@@ -1003,10 +1003,7 @@ try {{
                         yield Button.success("Select", id="yes_comp")
                         yield Button.error("Quit", id="no_comp")
                 elif self.lang == "java":
-                    yield Select([("Custom path", "custom")], value="custom", id="std_select")
-                    custom_input = Input(placeholder="Enter custom path...", id="custom_path_input")
-                    custom_input.display = False
-                    yield custom_input
+                    yield Select([("Custom", "custom")], value="custom", id="std_select")
                     with Horizontal(id = "comp_type_select"):
                         yield Button.success("Select", id="yes_comp", disabled=True)
                         yield Button.error("Quit", id="no_comp", disabled=True)
@@ -1016,39 +1013,41 @@ try {{
             value=std_selection.value
             if value == "custom":
                 self.app.push_screen(Editor.CustomCompilationPath(self.lang))
-            if value and isinstance(value, str):
-                if self.lang == "cpp":
-                    results = await run_cpp_code(self.code, self.func_name, self.tests, value)
-                    formatted_results = [format_result(result) for result in results]
-                    if self.is_submission:
-                        self.all_view.update_submit_content(self.chall, results)
-                    else:
-                        self.all_view.update_content(self.chall, formatted_results)
-
-                elif self.lang == "java":
-                    results = await run_java_code(self.code, self.func_name, self.tests, self.jdk_mapping[value], self.is_submission)
-                    formatted_results = [format_result(result) for result in results]
-                    if self.is_submission:
-                        self.all_view.update_submit_content(self.chall, results)
-                    else:
-                        self.all_view.update_content(self.chall, formatted_results)
-                self.app.pop_screen()
-                
+                return 
             else:
-                self.notify(
-                    title="Really?",
-                    message=f"{DAEMON_USER} Choose an option, stupid! How do you want me to compile if you won't tell me how?",
-                    severity="error",
-                    timeout=3,
-                    markup=True
-                )
+                if value and isinstance(value, str):
+                    if self.lang == "cpp":
+                        results = await run_cpp_code(self.code, self.func_name, self.tests, value)
+                        formatted_results = [format_result(result) for result in results]
+                        if self.is_submission:
+                            self.all_view.update_submit_content(self.chall, results)
+                        else:
+                            self.all_view.update_content(self.chall, formatted_results)
+
+                    elif self.lang == "java":
+                        # Ensure 'value' is a key for a discovered JDK path
+                        jdk_path = self.jdk_mapping.get(value)
+                        if not jdk_path:
+                            self.notify(title="Error", message=f"Selected JDK version '{value}' not found in mapping.", severity="error")
+                            return
+
+                        results = await run_java_code(self.code, self.func_name, self.tests, jdk_path, self.is_submission)
+                        formatted_results = [format_result(result) for result in results]
+                        if self.is_submission:
+                            self.all_view.update_submit_content(self.chall, results)
+                        else:
+                            self.all_view.update_content(self.chall, formatted_results)
+                    self.app.pop_screen()
+                else:
+                    self.notify(
+                        title="Really?",
+                        message=f"{DAEMON_USER} Choose an option, stupid! How do you want me to compile if you won't tell me how?",
+                        severity="error",
+                        timeout=3,
+                        markup=True
+                    )
         @on(CustomPathSelected)
         async def handle_custom_path(self, event: CustomPathSelected):
-            # if self.lang == "cpp":
-            #     results = await run_cpp_code(self.code, self.func_name, self.tests, event.path)
-            #     if self.is_submission:
-            #         self.all_view.update_submit_content(self.chall, results)
-            #     self.all_view.update_submit_content(self.chall, results)
             if self.lang == "java":
                 results = await run_java_code(self.code, self.func_name, self.tests, event.path, self.is_submission)
                 formatted_results = [format_result(result) for result in results]
@@ -1056,10 +1055,11 @@ try {{
                     self.all_view.update_submit_content(self.chall, results)
                 else:
                     self.all_view.update_content(self.chall, formatted_results)
+                self.app.pop_screen() 
 
         def scan_jdks(self) -> dict:
             system = platform.system()
-            jdk_mapping={"Custom path": "custom"}
+            jdk_mapping={} 
             if system=="Windows":
                 base_dirs = [r"C:\Program Files\Java", r"C:\Program Files (x86)\Java"]
                 for base in base_dirs:
@@ -1168,6 +1168,15 @@ try {{
         def on_button_pressed(self, event: Button.Pressed) -> None:
             match event.button.id:
                 case "yes_custom_button":
+                    if not os.path.exists(self.query_one("#custom_path_input", Input).value):
+                        self.notify(
+                        title="Are you serious?",
+                        message=f"{DAEMON_USER} [b]Hey, that path doesn't exist![/b]",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    ) 
+                        return
                     self.app.post_message(CustomPathSelected(self.query_one("#custom_path_input", Input).value))
                     self.app.pop_screen()
                 case "no_custom_button":
