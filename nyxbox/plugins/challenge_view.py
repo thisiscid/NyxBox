@@ -16,6 +16,7 @@ class UserChallView(Static):
         )
         self.update(formatted)
     
-    def custom_message(self, msg: str):
-        # Print custom message when required (check editor_tools.py)
-        self.update(msg)
+    # def custom_message(self, msg: str):
+    #     # Print custom message when required (check editor_tools.py)
+    #     self.update(msg)
+    # This is completely unnecessary, its already been implemented in other places

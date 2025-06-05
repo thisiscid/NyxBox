@@ -13,9 +13,14 @@ from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Dig
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from importlib.resources import files
+from importlib.metadata import version, PackageNotFoundError
 
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 
+try:
+    nyxbox_version = version("nyxbox")
+except PackageNotFoundError:
+    nyxbox_version = ""
 class VendAnimation(Static):
     pass
 
@@ -35,11 +40,11 @@ class ConfirmExit(ModalScreen):
                 self.app.pop_screen()
 
 
-class VendingMachine(App):
+class NyxBox(App):
     CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
     BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution"), ("ctrl+q", "quit_app", "Quit app")]
-    
-    #Define some consts so we don't have to do this every time we want to show or hide a widget
+    TITLE = f"NyxBox {nyxbox_version}" if nyxbox_version else f"NyxBox"
+    # Define some consts so we don't have to do this every time we want to show or hide a widget
     BUTTON_PANEL_ID = "button_panel"
     CHALLENGE_VIEW_ID = "challengeview"
     EDITOR_ID = "editor"
@@ -143,9 +148,11 @@ class VendingMachine(App):
         btn.display = True # IT WORKS!!!! :D
 
 def main():
-    app = VendingMachine()
+    if "--version" in sys.argv:
+        print(f"NyxBox {nyxbox_version}")
+        return
+    app = NyxBox()
     app.run()
 
 if __name__ == "__main__":
-    app = VendingMachine()
-    app.run()
+    main()

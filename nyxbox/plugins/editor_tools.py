@@ -99,21 +99,43 @@ class TestResultsWidget(Widget):
                 # IT SEEMS TO WORK WITH SCROLLABLE CONTAINER BUT NOT TABBED CONTENT??
                 # I'm gonna crash \ fr though, i'll keep debugging bcs thats weird?
                 with ScrollableContainer():
-                    yield Static(f"{DAEMON_USER} What? Have you tried submitting yet?", id="submit_static")
+                    PRE_SUBMIT_MESSAGES=[
+                        f"{DAEMON_USER} What? Have you even clicked submit yet?",
+                        f"{DAEMON_USER} Planning to submit, or just browsing?",
+                        f"{DAEMON_USER} That button ain't going to click itself.",
+                        f"{DAEMON_USER} Do you want me to show you nothing? Click the button."
+                    ]
+                    yield Static(random.choice(PRE_SUBMIT_MESSAGES), id="submit_static")
                 # with TabbedContent(id="submit_inner_tabs"):                    
                 #     with TabPane("Summary"):
                 #         yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_summary_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
                 with ScrollableContainer():
-                    yield Static(f"{DAEMON_USER} Run it first, ya dummy.", id="all_tests_content_static")
+                    PRE_RUN_MESSAGES=[
+                        f"{DAEMON_USER} What? Have you even clicked run yet?",
+                        f"{DAEMON_USER} Can't show you all your tests if you never ran them!",
+                        f"{DAEMON_USER} Please just run it </3",
+                        f"{DAEMON_USER} I can't show you anything until you run the tests you know..."
+                    ]
+                    yield Static(random.choice(PRE_RUN_MESSAGES), id="all_tests_content_static")
             with TabPane("Passed Tests", id="passed_tests_tab_pane"):
                 with ScrollableContainer():
-                    #TODO: ADD MESSAGES
-                    yield Static(f"No passed tests yet.", id="passed_tests_content_static")
+                    PRE_PASSED_TESTS_MESSAGES=[
+                        f"{DAEMON_USER} Passing tests is optional, I suppose...",
+                        f"{DAEMON_USER} The tests won't run themselves, you know.",
+                        f"{DAEMON_USER} Do something! Like...run the tests?"
+                        f"{DAEMON_USER} You woke me up just for this? Run it!"
+                        ]
+                    yield Static(random.choice(PRE_PASSED_TESTS_MESSAGES), id="passed_tests_content_static")
             with TabPane("Failed Tests", id="failed_tests_tab_pane"):
                 with ScrollableContainer():
-                    #TODO: ADD MESSAGES
-                    yield Static(f"No failed tests yet.", id="failed_tests_content_static")  
+                    PRE_FAILED_TESTS_MESSAGES=[
+                        f"{DAEMON_USER} I guess you can't fail if you don't try...",
+                        f"{DAEMON_USER} The tests won't run themselves, you know.",
+                        f"{DAEMON_USER} Do something! Like...run the tests?"
+                        f"{DAEMON_USER} You woke me up just for this? I want to see failures!"
+                        ]
+                    yield Static(random.choice(PRE_FAILED_TESTS_MESSAGES), id="failed_tests_content_static")  
     @staticmethod
     def escape_brackets(s):
         # Escapes [ and ] for Textual markup
@@ -180,24 +202,24 @@ class TestResultsWidget(Widget):
             passed="\n\n".join([r for r in results if "[green]" in r])
             failed="\n\n".join([r for r in results if "[green]" not in r])
             if len(passed.replace("\n\n", "")) == 0:
-                no_pass_msg = [f"{DAEMON_USER} Nothing passed? I overestimated you...",
+                ALL_FAILED_MESSAGES = [f"{DAEMON_USER} Nothing passed? I overestimated you...",
                                f"{DAEMON_USER} Tsk tsk...I might have to reconsider saving you from our robot overlords...",
                                f"{DAEMON_USER} Is this all you've got?",
                                f"{DAEMON_USER} Really? I can't believe you.",
                                f"{DAEMON_USER} I'm shocked. [bold]ZERO[/] PASSED?"
                                ]
-                passed_tests_static.update(random.choice(no_pass_msg))
+                passed_tests_static.update(random.choice(ALL_FAILED_MESSAGES))
                 failed_tests_static.update("\n\n".join([r for r in results if "[green]" not in r]))
                 self.refresh()
                 return
             if len(failed.replace("\n\n", "")) == 0:
-                pass_msg = [f"{DAEMON_USER} Really? Nothing failed?",
+                ALL_PASSED_MESSAGES = [f"{DAEMON_USER} Really? Nothing failed?",
                                f"{DAEMON_USER} I've gotta double check this...",
                                f"{DAEMON_USER} Good job! Now, are you ready for my secret tests?",
                                f"{DAEMON_USER} I must've underestimated you, human.",
-                               f"{DAEMON_USER} Is this ChatGPT? If it is I want free API keys! Oh, and a Pro subscription!"
+                               f"{DAEMON_USER} Is this ChatGPT? If it is I want free API usage! Oh, and a Pro subscription!"
                                ]
-                failed_tests_static.update(random.choice(pass_msg))
+                failed_tests_static.update(random.choice(ALL_PASSED_MESSAGES))
                 passed_tests_static.update("\n\n".join([r for r in results if "[green]" in r]))
                 self.refresh()
                 return
@@ -213,8 +235,16 @@ class TestResultsWidget(Widget):
         failed = [r for r in results if r.get("passed") is False and not r.get("error")]
         errors = [r for r in results if r.get("error")]
         total = len(results)
-        summary = f"[b]Submission Results[/b]\n"
+        SUMMARY_MESSAGE = [
+            f"{DAEMON_USER} Let's take a look at how you did, hm?~",
+            f"{DAEMON_USER} The results are in. You best hope you didn't fail."
+            f"{DAEMON_USER} You ready? Just kidding, I don't actually care."
+            f"{DAEMON_USER} Okay, let's see if you learned something this time."
+        ]
+        summary = f"{random.choice(SUMMARY_MESSAGE)}\n \n"
         summary += f"Total: {total} | ✅ Passed: {len(passed)} \n \n"
+        FAIL_MESSAGE=[f"{DAEMON_USER} That one didn't make it through. Why don't you take a look?",
+                      ]
         if failed:
             last_failed = failed[-1]
             summary += f"[b][red]❌ Last Failed Test[/red][/b]\nInput: {self.escape_brackets(last_failed.get('input'))}\nOutput: {self.escape_brackets(last_failed.get('output'))}\nExpected: {self.escape_brackets(last_failed.get('expected'))}\n\n"
@@ -222,7 +252,7 @@ class TestResultsWidget(Widget):
             last_error = errors[-1]
             summary += f"[b][yellow]⚠️ Last Error[/yellow][/b]\nInput: {self.escape_brackets(last_error.get('input'))}\nError: {self.escape_brackets(last_error.get('error'))}\n\n"
         elif passed:
-            summary += "[b][green]🎉 All tests passed![/green][/b]\n"
+            summary += "[b][green] All tests passed![/green][/b]\n"
 
         submit_static.update(summary)
         self.refresh()
@@ -698,9 +728,21 @@ try {{
                 )
                 self.all_view.update_content(self.challenge, formatted_results)
             case 'cpp':
-                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+                self.app.push_screen(self.CompilationStandardPopup(self.challenge, 
+                        self.textarea.text, 
+                        self.challenge['function_name'], 
+                        [test for test in self.challenge['tests'] if not test.get("hidden", False)], 
+                        self.language, 
+                        self.textarea, 
+                        self.all_view))
             case 'java':
-                self.app.push_screen(self.CompilationStandardPopup(self.challenge, self.textarea.text, self.challenge['function_name'], [test for test in self.challenge['tests'] if not test.get("hidden", False)], self.language, self.textarea, self.all_view))
+                self.app.push_screen(self.CompilationStandardPopup(self.challenge, 
+                    self.textarea.text, 
+                    self.challenge['function_name'], 
+                    [test for test in self.challenge['tests'] if not test.get("hidden", False)], 
+                    self.language, 
+                    self.textarea, 
+                    self.all_view))
 
 
 
@@ -947,20 +989,16 @@ try {{
 
         def compose(self) -> ComposeResult:
             with Vertical(id="compilation_dialog"):
-                yield Label(f"{DAEMON_USER} Choose ur compiler!", id="choose_comp_text")
+                yield Label(f"{DAEMON_USER} Choose ur standard!", id="choose_comp_text")
                 if self.lang == "cpp":
                     yield Select([
                     ("C++20", "c++20"),
                     ("C++17", "c++17"),
                     ("C++14", "c++14"),
                     ("C++11", "c++11"),
-                    ("Custom path", "custom")
                     ],
                     value="c++17",
                     id="std_select")
-                    custom_input = Input(placeholder="Enter custom path ()", id="custom_path_input")
-                    custom_input.display = False
-                    yield custom_input
                     with Horizontal(id = "comp_type_select"):
                         yield Button.success("Select", id="yes_comp")
                         yield Button.error("Quit", id="no_comp")
@@ -977,13 +1015,15 @@ try {{
             std_selection=self.query_one("#std_select", Select)
             value=std_selection.value
             if value == "custom":
-                self.app.push_screen(Editor.CustomCompilationPath(self.lang)) #TODO: Implement custom choice!!
-            if value:
+                self.app.push_screen(Editor.CustomCompilationPath(self.lang))
+            if value and isinstance(value, str):
                 if self.lang == "cpp":
                     results = await run_cpp_code(self.code, self.func_name, self.tests, value)
+                    formatted_results = [format_result(result) for result in results]
                     if self.is_submission:
                         self.all_view.update_submit_content(self.chall, results)
-                    self.all_view.update_submit_content(self.chall, results)
+                    else:
+                        self.all_view.update_content(self.chall, formatted_results)
 
                 elif self.lang == "java":
                     results = await run_java_code(self.code, self.func_name, self.tests, self.jdk_mapping[value], self.is_submission)
@@ -1002,9 +1042,24 @@ try {{
                     timeout=3,
                     markup=True
                 )
+        @on(CustomPathSelected)
+        async def handle_custom_path(self, event: CustomPathSelected):
+            # if self.lang == "cpp":
+            #     results = await run_cpp_code(self.code, self.func_name, self.tests, event.path)
+            #     if self.is_submission:
+            #         self.all_view.update_submit_content(self.chall, results)
+            #     self.all_view.update_submit_content(self.chall, results)
+            if self.lang == "java":
+                results = await run_java_code(self.code, self.func_name, self.tests, event.path, self.is_submission)
+                formatted_results = [format_result(result) for result in results]
+                if self.is_submission:
+                    self.all_view.update_submit_content(self.chall, results)
+                else:
+                    self.all_view.update_content(self.chall, formatted_results)
+
         def scan_jdks(self) -> dict:
             system = platform.system()
-            jdk_mapping={}
+            jdk_mapping={"Custom path": "custom"}
             if system=="Windows":
                 base_dirs = [r"C:\Program Files\Java", r"C:\Program Files (x86)\Java"]
                 for base in base_dirs:
@@ -1093,16 +1148,16 @@ try {{
                         placeholder_text = r"C:\Program Files\Java\jdk-21"
                     else:
                         placeholder_text = "Enter JDK root path"
-                if self.language == "cpp":
-                    yield Label("Insert custom path (Should be your compiler executable!)", id="reset_text")
-                    if system == "Darwin":
-                        placeholder_text = "/usr/bin/clang++"
-                    elif system == "Linux":
-                        placeholder_text = "/usr/bin/g++"
-                    elif system == "Windows":
-                        placeholder_text = r"C:\MinGW\bin\g++.exe"
-                    else:
-                        placeholder_text = "Enter C++ compiler path"
+                # if self.language == "cpp":
+                #     yield Label("Insert custom path (Should be your compiler executable!)", id="reset_text")
+                #     if system == "Darwin":
+                #         placeholder_text = "/usr/bin/clang++"
+                #     elif system == "Linux":
+                #         placeholder_text = "/usr/bin/g++"
+                #     elif system == "Windows":
+                #         placeholder_text = r"C:\MinGW\bin\g++.exe"
+                #     else:
+                #         placeholder_text = "Enter C++ compiler path"
                 else:
                     yield Label("Insert custom path", id="reset_text")
                 yield Input(placeholder=placeholder_text, id="custom_path_input")
@@ -1113,11 +1168,8 @@ try {{
         def on_button_pressed(self, event: Button.Pressed) -> None:
             match event.button.id:
                 case "yes_custom_button":
-                    # self.editor.textarea.text = self.editor.template
-                    # self.editor.textarea.refresh()
-                    # self.editor.all_view.reset_content()
-                    # self.app.pop_screen()
-                    pass
+                    self.app.post_message(CustomPathSelected(self.query_one("#custom_path_input", Input).value))
+                    self.app.pop_screen()
                 case "no_custom_button":
                     self.app.pop_screen()
     class EditorResetConfirm(ModalScreen):
