@@ -247,12 +247,16 @@ class TestResultsWidget(Widget):
             f"{DAEMON_USER} Okay, let's see if you learned something this time."
         ]
         summary = f"{random.choice(SUMMARY_MESSAGE)}\n \n"
-        summary += f"Total: {total} | ✅ Passed: {len(passed)} \n \n"
-        FAIL_MESSAGE=[f"{DAEMON_USER} That one didn't make it through. Why don't you take a look?",
+        summary += f"There were {total} tests. You passed {len(passed)} tests. \n \n"
+        FAIL_MESSAGE=[
+            f"{DAEMON_USER} That one didn't make it through. Why don't you take a look?",
+            f"{DAEMON_USER} You were the chosen one! How could you?",
+            f"{DAEMON_USER} Take a break! (/lyr, /ref)",
+            f"{DAEMON_USER} Maybe AI is going to take over our jobs..."
                       ]
         if failed:
             last_failed = failed[-1]
-            summary += f"[b][red]❌ Last Failed Test[/red][/b]\nInput: {self.escape_brackets(last_failed.get('input'))}\nOutput: {self.escape_brackets(last_failed.get('output'))}\nExpected: {self.escape_brackets(last_failed.get('expected'))}\n\n"
+            summary += f"{random.choice(FAIL_MESSAGE)}\nInput: {self.escape_brackets(last_failed.get('input'))}\nOutput: {self.escape_brackets(last_failed.get('output'))}\nExpected: {self.escape_brackets(last_failed.get('expected'))}\n\n"
         elif errors:
             last_error = errors[-1]
             summary += f"[b][yellow]⚠️ Last Error[/yellow][/b]\nInput: {self.escape_brackets(last_error.get('input'))}\nError: {self.escape_brackets(last_error.get('error'))}\n\n"
