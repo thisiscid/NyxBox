@@ -24,7 +24,13 @@ try:
 except PackageNotFoundError:
     nyxbox_version = None
 class VendAnimation(Static):
-    pass
+    pass # I don't think this is getting done for a good while
+
+class SearchComplete(Message):
+    """Message passed upon the user selecting a challenge in SearchForProblem"""
+    def __init__(self, challenge):
+        super().__init__()
+        self.challenge = challenge
 
 class ConfirmExit(ModalScreen):
     def compose(self) -> ComposeResult:
@@ -54,18 +60,24 @@ class SearchForProblem(Screen):
         files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
         self.files_list = files_list
         self.placeholder = ["Start typing to search for a challenge."]
+        
+        terminal_width = self.app.size.width
+        reserved_space = 45
+        available_description_space = max(20, terminal_width - reserved_space)
+        
         for file in files_list:
             file_dict = self.grab_metadata(file)
             name = file_dict.get("name") or ""
             description = file_dict.get("description") or ""
             difficulty = file_dict.get("difficulty") or ""
-            description=description
-            challenges.add_row(name, description[0:50]+"...", difficulty)
+            if len(description) > available_description_space:
+                truncated_description = description[:available_description_space-3] + "..."
+            else:
+                truncated_description = description
+            
+            challenges.add_row(name, truncated_description, difficulty)
             # rows.append((str(name).title(), str(description), str(difficulty)))
         self.refresh()
-
-    def on_ready(self) -> None:
-        pass
         
     def compose(self) -> ComposeResult:
         yield Header()
@@ -73,12 +85,13 @@ class SearchForProblem(Screen):
             yield Input(placeholder="Search...", id="search_bar")
             # self.challenges = DataTable(id="chall_list")
             # self.challenges.loading=True
-            yield DataTable(id="chall_list")
-            # self.challenge_widget.id = "challengeview"
-            # yield self.challenge_widget
+            yield DataTable(id="chall_list", cursor_type="row")
+            self.challenge_widget = challenge_view.UserChallView()
+            self.challenge_widget.id = "challengeview"
+            yield self.challenge_widget
             with Horizontal():
                 yield Button("Quit", variant="error", id="search_quit")
-                yield Button("Select Challenge", variant="default", id="search_select")
+                yield Button("Select Challenge", variant="success", id="search_select")
         yield Footer()
 
     def grab_metadata(self, file) -> dict:
@@ -89,8 +102,69 @@ class SearchForProblem(Screen):
             case "search_quit":
                 self.app.pop_screen()
             case "search_select":
-                pass
+                datatable = self.query_one("#chall_list", DataTable)
+                # challengeview=self.query_one("#challengeview", challenge_view.UserChallView)
+                current_row = datatable.get_row_at(datatable.cursor_row)
+                challenge_name = current_row[0]
+                if current_row:
+                    for file in self.files_list:
+                        try:
+                            file_dict = self.grab_metadata(file)
+                            if file_dict.get("name") == challenge_name:
+                                # Update the challenge widget with the full challenge data
+                                # challengeview.update_chall(file_dict)
+                                self.app.pop_screen()
+                                self.notify(
+                                title="I got you!",
+                                message=f"{DAEMON_USER} [b]Successfully selected {challenge_name}![/b]",
+                                severity="information",
+                                timeout=5,
+                                markup=True
+                            )
+                                self.post_message(SearchComplete(file_dict))
+                        except:
+                            pass
 
+    def on_data_table_row_highlighted(self, Message) -> None:
+        datatable = self.query_one("#chall_list", DataTable)
+        if datatable.cursor_row is not None:
+            selected_data = datatable.get_row_at(datatable.cursor_row)
+            challenge_name = selected_data[0]
+            for file in self.files_list:
+                file_dict = self.grab_metadata(file)
+                if file_dict.get("name") == challenge_name:
+                    # Update the challenge widget with the full challenge data
+                    self.challenge_widget.update_chall(file_dict)
+                    break
+        return
+    
+    def on_input_changed(self, Message) -> None:
+        datatable = self.query_one("#chall_list", DataTable)
+        search_input = self.query_one("#search_bar", Input)
+        query = search_input.value
+        datatable.clear()
+        item_found=False
+        
+        terminal_width = self.app.size.width
+        reserved_space = 45
+        available_description_space = max(20, terminal_width - reserved_space)
+        
+        for file in self.files_list:
+            file_dict = self.grab_metadata(file)
+            name = file_dict.get("name", "")
+            description = file_dict.get("description", "")
+            difficulty = file_dict.get("difficulty", "")
+            
+            if len(description) > available_description_space:
+                truncated_description = description[:available_description_space-3] + "..."
+            else:
+                truncated_description = description
+            
+            if query.lower() in name.lower():
+                datatable.add_row(name, truncated_description, difficulty)
+                item_found=True
+        if not item_found:
+            datatable.add_row("No challenges found matching your search.")
 class NyxBox(App):
     CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
     BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution"), ("ctrl+q", "quit_app", "Quit app")]
@@ -104,6 +178,7 @@ class NyxBox(App):
         """Initialize variables to be used later and other stuff"""
         self.editor_opened = False
         self.has_vended = False
+        self.current_challenge = None
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -148,6 +223,15 @@ class NyxBox(App):
         """Allows user to edit a challenge, loads instance then displays"""
         self.editor_instance = Editor()
         self.editor_instance.get_and_update_chall(self.current_challenge)
+        if not self.has_vended:
+            self.notify(
+                    title="Theres no challenge...",
+                    message=f"{DAEMON_USER} [b]Please vend a challenge before trying to open the editor![/b]",
+                    severity="warning",
+                    timeout=5,
+                    markup=True
+                )
+            return
         if not self.editor_opened:
             if hasattr(self, 'current_challenge'):
                 self.editor_opened=True
@@ -182,15 +266,21 @@ class NyxBox(App):
             # Update the editor with the selected language
             self.editor_instance.load_challenge(message)
         
-  
+    @on(SearchComplete)
+    def handle_search(self, message: SearchComplete):
+        self.has_vended = True
+        self.challenge=message.challenge
+        self.current_challenge=message.challenge
+        self.challenge_widget.update_chall(self.current_challenge)
+        btn = self.query_one("#edit_button")
+        btn.display = True
   
     def action_vend_challenge(self) -> None:
         """Output a challenge"""
         self.has_vended = True
         challenge = challenge_loader.vend_random_chall()
         self.challenge = challenge
-        self.current_challenge = challenge  # Set current_challenge attribute
-        # Update the challenge view with the new challenge
+        self.current_challenge = challenge
         self.challenge_widget.update_chall(challenge)
         # Show edit button after vending
         btn = self.query_one("#edit_button")
