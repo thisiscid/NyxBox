@@ -3,14 +3,12 @@
 A Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and C (not yet...) Also, just who is Nyx?
 
 ## What's new?
-Latest - 0.1.1
-0.1.1 - 6/4/25
-- Fixed packaging bugs (tested on MacOS 15.2)
+Latest - 0.1.2
+0.1.2 - 6/5/25
+- Some search fuctionality! (i'm working on it i promise)
 - Fixed minor errors
-- Also, there's only two challenges. Sorry.
+- Fixed README + Getting Started instructions
 
-0.1.0 - 6/4/25
-- Initial release
 ---
 
 ## Features
@@ -25,6 +23,7 @@ Latest - 0.1.1
 
 ## Getting Started
 
+## Method 1: Install via pip
 ### 1. Install Requirements
 Install nyxbox via pip.
 ```bash
@@ -35,6 +34,20 @@ Make sure you have clang++ or g++ installed, or Node.js for JavaScript if planni
 ### 2. Run the App
 ```bash
 nyxbox
+```
+## Method 2: Install via git
+
+Clone git repo and cd.
+
+```bash
+git clone https://github.com/thisiscid/NyxBox
+cd NyxBox
+```
+
+Then, run as a module.
+
+```bash
+python3 -m nyxbox.main
 ```
 ## Adding challenges
 Add new challenges in the form of a JSON in the challenges directory. Challenges will not work if they do not follow the style of pre-made challenges.
