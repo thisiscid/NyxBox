@@ -21,6 +21,8 @@ from .code_runners.java_runner import run_java_code
 import tree_sitter_cpp
 from tree_sitter import Language
 # TODO:
+# 1. Test cases (infinite loops, malformed code, etc.)
+# 2. Maybe add timeouts to all runners, not just cpp or java?
 # 3. List of messages to pick out of for Nyx!
 # 5. Optional polish:
 #    - Create ASCII startup screen for daemon flavor (List of messages to pick out of!)
