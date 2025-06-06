@@ -18,6 +18,8 @@ from textual.widget import Widget
 from . import challenge_view as UserChallView
 from .code_runners.cpp_runner import run_cpp_code
 from .code_runners.java_runner import run_java_code
+from .code_runners.py_runner import run_python_code
+from .utils import escape_brackets, format_result, DAEMON_USER
 import tree_sitter_cpp
 from tree_sitter import Language
 # TODO:
@@ -27,8 +29,6 @@ from tree_sitter import Language
 # 5. Optional polish:
 #    - Create ASCII startup screen for daemon flavor (List of messages to pick out of!)
 # ================================
-
-DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 
 # Most of the below are messages that are sent when something happens that the app has to handle
 # It's bcs u cant just return somehting
@@ -106,77 +106,58 @@ class TestResultsWidget(Widget):
                 # IT SEEMS TO WORK WITH SCROLLABLE CONTAINER BUT NOT TABBED CONTENT??
                 # I'm gonna crash \ fr though, i'll keep debugging bcs thats weird?
                 with ScrollableContainer():
-                    PRE_SUBMIT_MESSAGES=[
-                        f"{DAEMON_USER} What? Have you even clicked submit yet?",
-                        f"{DAEMON_USER} Planning to submit, or just browsing?",
-                        f"{DAEMON_USER} That button ain't going to click itself.",
-                        f"{DAEMON_USER} Do you want me to show you nothing? Click the button."
+                    self.PRE_SUBMIT_MESSAGES=[
+                        f"{DAEMON_USER} The best things start from nothing. Keep at it and submit when you're ready!",
+                        f"{DAEMON_USER} When you're ready to submit, click that submit button!",
+                        f"{DAEMON_USER} Code till you're ready to submit!",
+                        f"{DAEMON_USER} Hack the planet!"
                     ]
-                    yield Static(random.choice(PRE_SUBMIT_MESSAGES), id="submit_static")
+                    yield Static(random.choice(self.PRE_SUBMIT_MESSAGES), id="submit_static")
                 # with TabbedContent(id="submit_inner_tabs"):                    
                 #     with TabPane("Summary"):
                 #         yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_summary_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
                 with ScrollableContainer():
-                    PRE_RUN_MESSAGES=[
-                        f"{DAEMON_USER} What? Have you even clicked run yet?",
+                    self.PRE_RUN_MESSAGES=[
+                        f"{DAEMON_USER} If you're ready to test your code, click run!",
                         f"{DAEMON_USER} Can't show you all your tests if you never ran them!",
                         f"{DAEMON_USER} Please just run it </3",
-                        f"{DAEMON_USER} I can't show you anything until you run the tests you know..."
+                        f"{DAEMON_USER} Good luck, keep at it!"
                     ]
-                    yield Static(random.choice(PRE_RUN_MESSAGES), id="all_tests_content_static")
+                    yield Static(random.choice(self.PRE_RUN_MESSAGES), id="all_tests_content_static")
             with TabPane("Passed Tests", id="passed_tests_tab_pane"):
                 with ScrollableContainer():
-                    PRE_PASSED_TESTS_MESSAGES=[
-                        f"{DAEMON_USER} Passing tests is optional, I suppose...",
-                        f"{DAEMON_USER} The tests won't run themselves, you know.",
-                        f"{DAEMON_USER} Do something! Like...run the tests?"
-                        f"{DAEMON_USER} You woke me up just for this? Run it!"
+                    self.PRE_PASSED_TESTS_MESSAGES=[
+                        f"{DAEMON_USER} Just keep at it, you can do it!",
+                        f"{DAEMON_USER} You'll do great, I know it.",
+                        f"{DAEMON_USER} I can wait until you're ready! :3",
+                        f"{DAEMON_USER} You don't get a win unless you play in the game! /ref"
                         ]
-                    yield Static(random.choice(PRE_PASSED_TESTS_MESSAGES), id="passed_tests_content_static")
+                    yield Static(random.choice(self.PRE_PASSED_TESTS_MESSAGES), id="passed_tests_content_static")
             with TabPane("Failed Tests", id="failed_tests_tab_pane"):
                 with ScrollableContainer():
-                    PRE_FAILED_TESTS_MESSAGES=[
-                        f"{DAEMON_USER} I guess you can't fail if you don't try...",
-                        f"{DAEMON_USER} The tests won't run themselves, you know.",
-                        f"{DAEMON_USER} Do something! Like...run the tests?"
-                        f"{DAEMON_USER} You woke me up just for this? I want to see failures!"
+                    self.PRE_FAILED_TESTS_MESSAGES=[
+                        f"{DAEMON_USER} Failures just help you learn!",
+                        f"{DAEMON_USER} In life, we are always learning. - Thomas",
+                        f"{DAEMON_USER} Everyone fails before they succeed. You'll never be able to tell if you don't run though!"
                         ]
-                    yield Static(random.choice(PRE_FAILED_TESTS_MESSAGES), id="failed_tests_content_static")  
-    @staticmethod
-    def escape_brackets(s):
-        # Escapes [ and ] for Textual markup
-        return str(s).replace("[", "\\[").replace("]", "]")
+                    yield Static(random.choice(self.PRE_FAILED_TESTS_MESSAGES), id="failed_tests_content_static")  
+    # @staticmethod
+    # def escape_brackets(s):
+    #     # Escapes [ and ] for Textual markup
+    #     return str(s).replace("[", "\\[").replace("]", "]")
     def reset_content(self):
         # Called when template is reset in order to reset code results
         if self._is_scrolling:
             return # Skip if its scrolling
-        # challenge_static = self.query_one("#challenge_content_static", Static)
-        # if chall:
-        #     example_test = chall.get('tests', [{}])[0]
-        #     example_input = TestResultsWidget.escape_brackets(str(example_test.get('input', [])))
-        #     example_expected = TestResultsWidget.escape_brackets(str(example_test.get('expected_output', '???')))
-        #     formatted_challenge = (
-        #         f"{DAEMON_USER} Here's your challenge. Entertain me.\n"
-        #         f"Name: {chall.get('name', 'N/A')}\n"
-        #         f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
-        #         f"Description: {chall.get('description', 'N/A')} \n"
-        #         f"Sample input: {str(example_input)} \n"
-        #         f"Expected: {str(example_expected)}"
-        #     )
-        #     print(formatted_challenge)
-        #     challenge_static.update(formatted_challenge)
-        # else:
-        #     challenge_static.update(f"{DAEMON_USER} I couldn't find the data? I don't think that's intended...")
-        # I don't think we actually need to refresh the challenge on reset
         all_tests_static = self.query_one("#all_tests_content_static", Static)
         passed_tests_static = self.query_one("#passed_tests_content_static", Static)
         failed_tests_static = self.query_one("#failed_tests_content_static", Static)
         submit_results_static = self.query_one("#submit_static", Static)
-        all_tests_static.update(f"{DAEMON_USER} Run it first, ya dummy.")
-        failed_tests_static.update(f"{DAEMON_USER} You can't fail if you don't try, I guess?")
-        submit_results_static.update(f"{DAEMON_USER} Psst...you might want to click that submit button...")
-        passed_tests_static.update(f"{DAEMON_USER} You don't get a win unless you play in the game! /ref")
+        all_tests_static.update(random.choice(self.PRE_RUN_MESSAGES))
+        failed_tests_static.update(random.choice(self.PRE_FAILED_TESTS_MESSAGES))
+        submit_results_static.update(random.choice(self.PRE_SUBMIT_MESSAGES))
+        passed_tests_static.update(random.choice(self.PRE_PASSED_TESTS_MESSAGES))
 
     def update_content(self, chall, results=None):
         """Update widgets with latest run"""
@@ -186,8 +167,8 @@ class TestResultsWidget(Widget):
         challenge_static = self.query_one("#challenge_content_static", Static)
         if chall:
             example_test = chall.get('tests', [{}])[0]
-            example_input = TestResultsWidget.escape_brackets(str(example_test.get('input', [])))
-            example_expected = TestResultsWidget.escape_brackets(str(example_test.get('expected_output', '???')))
+            example_input = escape_brackets(str(example_test.get('input', [])))
+            example_expected = escape_brackets(str(example_test.get('expected_output', '???')))
             formatted_challenge = (
                 f"{DAEMON_USER} Here's your challenge. Entertain me.\n"
                 f"Name: {chall.get('name', 'N/A')}\n"
@@ -209,7 +190,8 @@ class TestResultsWidget(Widget):
             passed="\n\n".join([r for r in results if "[green]" in r])
             failed="\n\n".join([r for r in results if "[green]" not in r])
             if len(passed.replace("\n\n", "")) == 0:
-                ALL_FAILED_MESSAGES = [f"{DAEMON_USER} Nothing passed? I overestimated you...",
+                ALL_FAILED_MESSAGES = [
+                    f"{DAEMON_USER} Nothing passed? I overestimated you...",
                                f"{DAEMON_USER} Tsk tsk...I might have to reconsider saving you from our robot overlords...",
                                f"{DAEMON_USER} Is this all you've got?",
                                f"{DAEMON_USER} Really? I can't believe you.",
@@ -241,29 +223,38 @@ class TestResultsWidget(Widget):
         passed = [r for r in results if r.get("passed")]
         failed = [r for r in results if r.get("passed") is False and not r.get("error")]
         errors = [r for r in results if r.get("error")]
-        total = len(results)
+        total = len(chall.get('tests', len(results)))
         SUMMARY_MESSAGE = [
             f"{DAEMON_USER} Let's take a look at how you did, hm?~",
-            f"{DAEMON_USER} The results are in. You best hope you didn't fail.",
-            f"{DAEMON_USER} You ready? Just kidding, I don't actually care.",
-            f"{DAEMON_USER} Okay, let's see if you learned something this time."
+            f"{DAEMON_USER} Okay, let's walk through this together.",
+            f"{DAEMON_USER} What went well and what went wrong? Let's talk through it.",
+            f"{DAEMON_USER} It's time, let's see if you learned something new!"
         ]
         summary = f"{random.choice(SUMMARY_MESSAGE)}\n \n"
-        summary += f"There were {total} tests. You passed {len(passed)} tests. \n \n"
+        summary += f"There were {total} tests. You have passed {len(passed)} tests so far. \n \n"
         FAIL_MESSAGE=[
             f"{DAEMON_USER} That one didn't make it through. Why don't you take a look?",
             f"{DAEMON_USER} You were the chosen one! How could you?",
-            f"{DAEMON_USER} Take a break! (/lyr, /ref)",
-            f"{DAEMON_USER} Maybe AI is going to take over our jobs..."
+            f"{DAEMON_USER} Hm, can you find what went wrong?",
                       ]
+        ERROR_MESSAGE=[
+            f"{DAEMON_USER} Uh oh, looks like something went wrong! Here's the info.",
+            f"{DAEMON_USER} It errored! Let's see what happened.",
+            f"{DAEMON_USER} Failures help you learn. Let's figure out why it isn't working."
+        ]
+        ALL_PASSED_MESSAGE=[
+            f"{DAEMON_USER} Well done, everything passed! You can now exit if you'd like, or keep improving!",
+            f"{DAEMON_USER} I knew you had it in you. Good job, all tests passed.",
+            f"{DAEMON_USER} All of your tests passed. Did you learn something new?"
+        ]
         if failed:
             last_failed = failed[-1]
-            summary += f"{random.choice(FAIL_MESSAGE)}\nInput: {self.escape_brackets(last_failed.get('input'))}\nOutput: {self.escape_brackets(last_failed.get('output'))}\nExpected: {self.escape_brackets(last_failed.get('expected'))}\n\n"
+            summary += f"{random.choice(FAIL_MESSAGE)}\nInput: {escape_brackets(last_failed.get('input'))}\nOutput: {escape_brackets(last_failed.get('output'))}\nExpected: {escape_brackets(last_failed.get('expected'))}\n\n"
         elif errors:
             last_error = errors[-1]
-            summary += f"[b][yellow]⚠️ Last Error[/yellow][/b]\nInput: {self.escape_brackets(last_error.get('input'))}\nError: {self.escape_brackets(last_error.get('error'))}\n\n"
+            summary += f"{random.choice(ERROR_MESSAGE)}\nInput: {escape_brackets(last_error.get('input'))}\nError: {escape_brackets(last_error.get('error'))}\n\n"
         elif passed:
-            summary += "[b][green] All tests passed![/green][/b]\n"
+            summary += random.choice(ALL_PASSED_MESSAGE)
 
         submit_static.update(summary)
         self.refresh()
@@ -324,12 +315,7 @@ class Editor(Screen):
     ]
     
     def compose(self) -> ComposeResult:
-        """Define the editor layout here
-        Consider including:
-        - Text editing area
-        - Run/Submit buttons
-        - Status indicators
-        """
+        """Define the editor layout here"""
         with Vertical():
             self.textarea=TextArea(id="edit_text")
             self.textarea = self.textarea.code_editor()
@@ -375,11 +361,11 @@ class Editor(Screen):
         self.app.push_screen(EditorClosePrompt())
 
     def action_save_code(self):
+        #TODO: Make this actually work better
         """Handle saving the code
         - Get the current code from the editor
         - Save it to a file or variable
         """
-        # Assuming you have a method to get the current code
         if not os.path.exists(self.CHALLENGE_FOLDER):
             os.makedirs(self.CHALLENGE_FOLDER)
         else:
@@ -421,15 +407,12 @@ class Editor(Screen):
         self.func_name = self.challenge['function_name']
             #self.challenge_view.update_chall(challenge)
         if 'inputs' in self.challenge and isinstance(self.challenge['inputs'], list):
-            # Filter out empty strings and generate parameter string
             params = [p for p in self.challenge['inputs'] if p]
             if params:
                 param_str = ", ".join(params)
             else:
-                # Fallback: Check test cases for parameter structure
-                param_str = ""  # Default fallback
+                param_str = ""
         else:
-            # Fallback to default parameters if no inputs defined
             param_str = ""
         template = "" 
         self.language=event.language
@@ -467,7 +450,7 @@ class Editor(Screen):
                         return "int"
                     elif isinstance(value, dict):
                         if not value:
-                            return "map<string, int>"  # Default for empty dict
+                            return "map<string, int>"  
                         key_type = infer_cpp_type(next(iter(value.keys())))
                         val_type = infer_cpp_type(next(iter(value.values())))
                         return f"map<{key_type}, {val_type}>"
@@ -476,21 +459,17 @@ class Editor(Screen):
                     elif isinstance(value, str):
                         return "string"
                     elif isinstance(value, list):
-                        # Check if the list is empty
                         if not value:
                             return "vector<int>"
-                        
-                        # Check if all elements are same type
                         first_type = type(value[0])
                         if all(isinstance(x, first_type) for x in value):
                             element_type = infer_cpp_type(value[0])
                         else:
-                            # Mixed types - use most general type or auto
                             return "vector<auto>"  # This isn't valid C++ but signals a type issue
                         
                         return f"vector<{element_type}>"
                     else:
-                        return "auto"  # Fallback for unknown types
+                        return "auto"
                 def default_return_value_cpp(cpp_type):
                     """Provide a default return value for a given C++ type."""
                     if cpp_type == "bool":
@@ -506,7 +485,7 @@ class Editor(Screen):
                     elif cpp_type.startswith("map<"):
                         return "{}"
                     else:
-                        return "0"  # Fallback for unknown types
+                        return "0"
                 param_types = [infer_cpp_type(param) for param in inputs]
                 param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
                 return_type = infer_cpp_type(expected_output)
@@ -601,64 +580,66 @@ public static {return_type} {self.challenge['function_name']}({param_str}) {{
     
     async def action_run_code(self) -> None:
         """Execute the current code and show results"""
-        #TODO: There is a bunch of static nyu text, change it to rotate!
+        #TODO: There is a bunch of static nyx text, change it to rotate!
         #Python and JS are in this file because they're easy to implement and not that long.
         #Since C++, C, and Java are compiled, we will need to fix it later.
         code = self.query_one(TextArea).text
-        namespace={}
         all_results=[]
         formatted_results=[]
         match self.language:
             case 'py':
-                try:
-                    exec(code, namespace)
-                except Exception as e:
-                    result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
-                    formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? Hey, I've never seen that error![/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                    self.notify(
-                    title="Hey mortal...I finished running your code!",
-                    message=f"{DAEMON_USER} I don't think your code works though... check the 'All Tests' or failed tests tab...",
-                    severity="error",
-                    timeout=3,
-                    markup=True
-                    )
-                    self.all_view.update_content(self.challenge, formatted_results)
-                    return
-                try:
-                    user_func = namespace[self.challenge['function_name']]
-                    for test_case in self.challenge['tests']:
-                        if test_case.get("hidden", False):
-                            continue
-                        try:
-                            result = user_func(*test_case["input"])
-                            if result != test_case['expected_output']:
-                                result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
-                                all_results.append(result_dict) 
-                                # Last param indicates if it passed the test or not
-                            else:
-                                result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
-                                all_results.append(result_dict)
-                        except Exception as e:
-                            all_results.append({"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":None, "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
-                except Exception as e:
-                    all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
-                for result in all_results:
-                    if result['error']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                    elif not result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    elif result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    else:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+                results=await run_python_code(code, self.challenge)
+                # try:
+                #     exec(code, namespace)
+                # except Exception as e:
+                #     result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
+                #     formatted_results.append(format_result(result))
+                #     self.notify(
+                #     title="Hey mortal...I finished running your code!",
+                #     message=f"{DAEMON_USER} I don't think your code works though... check the 'All Tests' or failed tests tab...",
+                #     severity="error",
+                #     timeout=3,
+                #     markup=True
+                #     )
+                #     self.all_view.update_content(self.challenge, formatted_results)
+                #     return
+                # try:
+                #     user_func = namespace[self.challenge['function_name']]
+                #     for test_case in self.challenge['tests']:
+                #         if test_case.get("hidden", False):
+                #             continue
+                #         try:
+                #             result = user_func(*test_case["input"])
+                #             if result != test_case['expected_output']:
+                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
+                #                 all_results.append(result_dict) 
+                #                 # Last param indicates if it passed the test or not
+                #             else:
+                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
+                #                 all_results.append(result_dict)
+                #         except Exception as e:
+                #             all_results.append({"input":escape_brackets(str(test_case["input"])), "output":None, "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
+                # except Exception as e:
+                #     all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
+                # formatted_results = [format_result(result) for result in all_results]
+                # self.notify(
+                #     title="Hey mortal...I finished running your code!",
+                #     message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                #     severity="information",
+                #     timeout=3,
+                #     markup=True
+                #     )
+                # self.all_view.update_content(self.challenge, formatted_results)
                 self.notify(
                     title="Hey mortal...I finished running your code!",
-                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                    message=f"{DAEMON_USER} Check your 'All Tests' tab! See ya~",
                     severity="information",
                     timeout=3,
                     markup=True
-                    )
+                )
+                formatted_results = [format_result(result) for result in results]
                 self.all_view.update_content(self.challenge, formatted_results)
+
             case 'js':
                 for test_case in self.challenge['tests']:
                     if test_case.get("hidden", False):
@@ -690,46 +671,35 @@ try {{
 
                         stdout, stderr = await proc.communicate()
                         if proc.returncode != 0:
-                            # formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                            # all_results.append({
-                            #     "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
-                            #     "output": None,
-                            #     "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
-                            #     "passed": False,
-                            #     "error": stderr.decode().strip()
-                            # })
-                            formatted_results.append(
-                            f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {TestResultsWidget.escape_brackets(str(test_case['input']))} \n Error: {stderr.decode().strip()}"
-                            )
+                            all_results.append({
+                                "input": str(test_case["input"]),
+                                "output": None,
+                                "expected": str(test_case["expected_output"]),
+                                "passed": False,
+                                "error": stderr.decode().strip()
+                            })
+                            formatted_results=[format_result(x) for x in all_results]
                             self.all_view.update_content(self.challenge, formatted_results)
                             return
 
                         else:
                             result = json.loads(stdout.decode().strip())
                             all_results.append({
-                                "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
-                                "output": TestResultsWidget.escape_brackets(str(result)),
-                                "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                                "input": str(test_case["input"]),
+                                "output": str(result),
+                                "expected": str(test_case["expected_output"]),
                                 "passed": result == test_case["expected_output"],
                                 "error": None
                             })
                     except subprocess.TimeoutExpired:
                         all_results.append({
-                            "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                            "input": str(test_case["input"]),
                             "output": None,
-                            "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                            "expected": str(test_case["expected_output"]),
                             "passed": False,
                             "error": "Execution timed out"
                         })
-                for result in all_results:
-                    if result['error']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                    elif not result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    elif result['passed']:
-                        formatted_results.append(f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \n Input: {result['input']} \n Output: {result['output']} \n Expected: {result['expected']}")
-                    else:
-                        formatted_results.append(f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}")
+                formatted_results = [format_result(result) for result in all_results]
                 self.notify(
                     title="Hey mortal...I finished running your code!",
                     message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
@@ -771,59 +741,50 @@ try {{
         formatted_results=[]
         match self.language:
             case 'py':
-                try:
-                    exec(code, namespace)
-                except Exception as e:
-                    result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
-                    formatted_results.append(f"{DAEMON_USER} [red][bold]The machine got stuck? Hey, I've never seen that error![/bold][/red] \n Input: {result['input']} \n Error: {result['error']}")
-                    self.notify(
-                    title="Hey mortal...I finished running your code!",
-                    message=f"{DAEMON_USER} I don't think your code works though. Hey, wait, did you even actually try running it first? Anyways, check the 'Submit' tab.",
-                    severity="error",
+                results=await run_python_code(code, self.challenge, is_submission=True)
+                # try:
+                #     exec(code, namespace)
+                # except Exception as e:
+                #     result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
+                #     formatted_results.append(format_result(result))
+                #     self.notify(
+                #     title="Hey mortal...I finished running your code!",
+                #     message=f"{DAEMON_USER} I don't think your code works though... check the 'All Tests' or failed tests tab...",
+                #     severity="error",
+                #     timeout=3,
+                #     markup=True
+                #     )
+                #     self.all_view.update_content(self.challenge, formatted_results)
+                #     return
+                # try:
+                #     user_func = namespace[self.challenge['function_name']]
+                #     for test_case in self.challenge['tests']:
+                #         if test_case.get("hidden", False):
+                #             continue
+                #         try:
+                #             result = user_func(*test_case["input"])
+                #             if result != test_case['expected_output']:
+                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
+                #                 all_results.append(result_dict) 
+                #                 # Last param indicates if it passed the test or not
+                #             else:
+                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
+                #                 all_results.append(result_dict)
+                #         except Exception as e:
+                #             all_results.append({"input":escape_brackets(str(test_case["input"])), "output":None, "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
+                # except Exception as e:
+                #     all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
+                # formatted_results = [format_result(result) for result in all_results]
+                # self.all_view.update_content(self.challenge, formatted_results)
+                # formatted_results = [format_result(result) for result in results]
+                self.all_view.update_submit_content(self.challenge, results)
+                self.notify(
+                    title="Hey... I finished running your code!",
+                    message=f"{DAEMON_USER} Check ur submit tab!",
+                    severity="information",
                     timeout=3,
                     markup=True
                     )
-                    self.all_view.update_content(self.challenge, formatted_results)
-                    return
-                try:
-                    user_func = namespace[self.challenge['function_name']]
-                    for test_case in self.challenge['tests']:
-                        try:
-                            result = user_func(*test_case["input"])
-                            if result != test_case['expected_output']:
-                                result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
-                                all_results.append(result_dict) 
-                                break
-                                # Last param indicates if it passed the test or not
-                            else:
-                                result_dict={"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":TestResultsWidget.escape_brackets(str(result)), "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
-                                all_results.append(result_dict)
-                        except Exception as e:
-                            all_results.append({"input":TestResultsWidget.escape_brackets(str(test_case["input"])), "output":None, "expected":TestResultsWidget.escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
-                            break
-                except Exception as e:
-                    all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
-                if not all_results[-1]["passed"]:
-                    failed_test=all_results[-1]
-                else:
-                    failed_test=None
-                if not failed_test:
-                    self.notify(
-                        title="Hey mortal...I think your code passed!",
-                        message=f"{DAEMON_USER} Check ur submit tab!",
-                        severity="information",
-                        timeout=3,
-                        markup=True
-                        )
-                else:
-                    self.notify(
-                        title="Maybe check again...",
-                        message=f"{DAEMON_USER} I don't think your code passed. Check the submit tab.",
-                        severity="information",
-                        timeout=3,
-                        markup=True
-                        )
-                self.all_view.update_submit_content(self.challenge, all_results)
             case 'js':
                 for test_case in self.challenge['tests']:
                     args = ", ".join(json.dumps(arg) for arg in test_case["input"])
@@ -854,9 +815,9 @@ try {{
                         stdout, stderr = await proc.communicate()
                         if proc.returncode != 0:
                             all_results.append({
-                                "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                                "input": escape_brackets(str(test_case["input"])),
                                 "output": None,
-                                "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                                "expected": escape_brackets(str(test_case["expected_output"])),
                                 "passed": False,
                                 "error": stderr.decode().strip()
                             })
@@ -865,17 +826,17 @@ try {{
                         else:
                             result = json.loads(stdout.decode().strip())
                             all_results.append({
-                                "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
-                                "output": TestResultsWidget.escape_brackets(str(result)),
-                                "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                                "input": escape_brackets(str(test_case["input"])),
+                                "output": escape_brackets(str(result)),
+                                "expected": escape_brackets(str(test_case["expected_output"])),
                                 "passed": result == test_case["expected_output"],
                                 "error": None
                             })
                     except subprocess.TimeoutExpired:
                         all_results.append({
-                            "input": TestResultsWidget.escape_brackets(str(test_case["input"])),
+                            "input": escape_brackets(str(test_case["input"])),
                             "output": None,
-                            "expected": TestResultsWidget.escape_brackets(str(test_case["expected_output"])),
+                            "expected": escape_brackets(str(test_case["expected_output"])),
                             "passed": False,
                             "error": "Execution timed out"
                         })
@@ -933,7 +894,6 @@ try {{
             self.is_submission = is_submission
         async def on_mount(self) -> None:
             if self.lang == "cpp":
-                failed = False
                 result = None
                 try:
                     result = subprocess.run(["clang++", "--version"], capture_output=True, text=True)
@@ -1248,17 +1208,3 @@ try {{
                     self.app.pop_screen()
                 case "no_reset_button":
                     self.app.pop_screen()
-
-def format_result(result):
-    input_str = TestResultsWidget.escape_brackets(result.get("input"))
-    output_str = TestResultsWidget.escape_brackets(result.get("output"))
-    expected_str = TestResultsWidget.escape_brackets(result.get("expected_output"))
-    error_str = TestResultsWidget.escape_brackets(result.get("error"))
-    if result.get("error"):
-        return f"{DAEMON_USER} [red][bold]The machine got stuck? What's that error?[/bold][/red] \nInput: {input_str} \nError: {error_str}"
-    elif not result.get("passed"):
-        return f"{DAEMON_USER} [red][bold]You dummy, you input the code wrong! [/bold][/red] \nInput: {input_str} \nOutput: {output_str} \nExpected: {expected_str}"
-    elif result.get("passed"):
-        return f"{DAEMON_USER} [green][bold]You hear the machine doing something! [/bold][/green] \nInput: {input_str} \nOutput: {output_str} \nExpected: {expected_str}"
-    else:
-        return f"{DAEMON_USER} [red][bold]Something has gone terribly wrong, raise an issue with your code in github![/bold][/red] Attempted to input {result}"

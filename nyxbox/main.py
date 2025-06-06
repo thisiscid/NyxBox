@@ -103,7 +103,6 @@ class SearchForProblem(Screen):
                 self.app.pop_screen()
             case "search_select":
                 datatable = self.query_one("#chall_list", DataTable)
-                # challengeview=self.query_one("#challengeview", challenge_view.UserChallView)
                 current_row = datatable.get_row_at(datatable.cursor_row)
                 challenge_name = current_row[0]
                 if current_row:
@@ -111,8 +110,6 @@ class SearchForProblem(Screen):
                         try:
                             file_dict = self.grab_metadata(file)
                             if file_dict.get("name") == challenge_name:
-                                # Update the challenge widget with the full challenge data
-                                # challengeview.update_chall(file_dict)
                                 self.app.pop_screen()
                                 self.notify(
                                 title="I got you!",
@@ -133,7 +130,6 @@ class SearchForProblem(Screen):
             for file in self.files_list:
                 file_dict = self.grab_metadata(file)
                 if file_dict.get("name") == challenge_name:
-                    # Update the challenge widget with the full challenge data
                     self.challenge_widget.update_chall(file_dict)
                     break
         return
@@ -167,7 +163,7 @@ class SearchForProblem(Screen):
             datatable.add_row("No challenges found matching your search.")
 class NyxBox(App):
     CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
-    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution"), ("ctrl+q", "quit_app", "Quit app")]
+    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution"), ("s", "search_button", "Search"), ("ctrl+q", "quit_app", "Quit app")]
     TITLE = f"NyxBox {nyxbox_version}" if nyxbox_version else f"NyxBox"
     # Define some consts so we don't have to do this every time we want to show or hide a widget
     BUTTON_PANEL_ID = "button_panel"
@@ -217,7 +213,6 @@ class NyxBox(App):
         self.push_screen(ConfirmExit())
 
     def action_search_button(self) -> None:
-        #TODO: Implement searching for xyz
         self.push_screen(SearchForProblem())
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
@@ -256,14 +251,12 @@ class NyxBox(App):
                     timeout=5,
                     markup=True
                 )
-            # This was back when the editor buttons were still there. If this happens, something went terribly wrong.
+            # This was back when the editor buttons were there always. If this happens, something went terribly wrong.
     
     @on(LanguageSelected)
     def handle_language_selection(self, message: LanguageSelected):
         print(f"Language selected: {message.language}")
-        # Get the editor screen
         if self.editor_instance:
-            # Update the editor with the selected language
             self.editor_instance.load_challenge(message)
         
     @on(SearchComplete)
