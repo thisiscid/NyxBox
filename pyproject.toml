@@ -1,7 +1,7 @@
 [project]
 name = "NyxBox"
-version = "0.1.1"
-description = "Exercisim inspired tool, right in your terminal!"
+version = "0.1.2"
+description = "Exercisim inspired coding challenges, right in your terminal!"
 authors = [{ name="Rainger", email="tilt-hazard-swept@duck.com" }]
 readme = "README.md"
 requires-python = ">=3.8"
