@@ -7,10 +7,11 @@ import re
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
+from rich.text import Text
 from textual import on
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits
+from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits, Input, ListView, DataTable
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from importlib.resources import files
@@ -40,6 +41,55 @@ class ConfirmExit(ModalScreen):
             case "no_button":
                 self.app.pop_screen()
 
+class SearchForProblem(Screen):
+    def on_mount(self) -> None:
+        self.added_columns=False
+        challenges=self.query_one("#chall_list", DataTable)
+        if not self.added_columns:
+            challenges.add_column("Name")
+            challenges.add_column("Description")
+            challenges.add_column("Difficulty")
+        self.added_columns=True
+        challenge_dir = files("nyxbox.challenges")
+        files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
+        self.files_list = files_list
+        self.placeholder = ["Start typing to search for a challenge."]
+        for file in files_list:
+            file_dict = self.grab_metadata(file)
+            name = file_dict.get("name") or ""
+            description = file_dict.get("description") or ""
+            difficulty = file_dict.get("difficulty") or ""
+            description=description
+            challenges.add_row(name, description[0:50]+"...", difficulty)
+            # rows.append((str(name).title(), str(description), str(difficulty)))
+        self.refresh()
+
+    def on_ready(self) -> None:
+        pass
+        
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Vertical():
+            yield Input(placeholder="Search...", id="search_bar")
+            # self.challenges = DataTable(id="chall_list")
+            # self.challenges.loading=True
+            yield DataTable(id="chall_list")
+            # self.challenge_widget.id = "challengeview"
+            # yield self.challenge_widget
+            with Horizontal():
+                yield Button("Quit", variant="error", id="search_quit")
+                yield Button("Select Challenge", variant="default", id="search_select")
+        yield Footer()
+
+    def grab_metadata(self, file) -> dict:
+        with file.open("r") as file_content:
+            return json.load(file_content)
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "search_quit":
+                self.app.pop_screen()
+            case "search_select":
+                pass
 
 class NyxBox(App):
     CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
@@ -60,7 +110,7 @@ class NyxBox(App):
         yield Header()
         yield Footer()
         with Horizontal():
-            self.challenge_widget = self.chall_view()
+            self.challenge_widget = challenge_view.UserChallView()
             self.challenge_widget.id = "challengeview"
             yield self.challenge_widget
             with Vertical(id="button_panel"):
@@ -93,7 +143,7 @@ class NyxBox(App):
 
     def action_search_button(self) -> None:
         #TODO: Implement searching for xyz
-        pass
+        self.push_screen(SearchForProblem())
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
         self.editor_instance = Editor()
@@ -132,10 +182,8 @@ class NyxBox(App):
             # Update the editor with the selected language
             self.editor_instance.load_challenge(message)
         
-    def chall_view(self):
-        """Return the challenge view widget."""
-        return challenge_view.UserChallView()
-    
+  
+  
     def action_vend_challenge(self) -> None:
         """Output a challenge"""
         self.has_vended = True
