@@ -62,11 +62,13 @@ class UserCodeError(Exception):
 # moreof a template than anything, i gotta fix it
 # do this later, you need to get the main flow working first
 class ResultModal(ModalScreen):
-    def __init__(self, results, challenge: dict, is_success=False):
+    def __init__(self, results, challenge: dict, test_widget_instance, is_success=False):
         super().__init__()
         self.results = results
         self.chall = challenge
         self.is_success = is_success
+        self.test_widget_instance = test_widget_instance
+        self.passed=[r for r in results if r.get("passed")]
     
     def compose(self) -> ComposeResult:
         CONGRATULATION_MESSAGE=[
@@ -81,27 +83,33 @@ class ResultModal(ModalScreen):
             f"{DAEMON_USER} Failure is not the end! Keep trying!"
         ]
         if self.is_success:
-            yield Label(f"{random.choice(CONGRATULATION_MESSAGE)}\nThere were {len(self.results)} tests and you passed them all for {self.chall.get("name")}!", id="message_tutle")
-            with Horizontal(id="action_buttons"):
-                yield Button("Exit to Menu", id="exit_to_menu", variant="error")
-                yield Button("Keep Coding", id="keep_coding", variant="primary")
-                yield Button("Next Challenge!", id="next_challenge", variant="success")
+            with Vertical(id="result_container"):
+                yield Label(f"{random.choice(CONGRATULATION_MESSAGE)}\nThere were {len(self.results)} tests and you passed them all for {self.chall.get("name")}!", id="message_title")
+                with Horizontal(id="action_buttons"):
+                    yield Button("Exit to Menu", id="exit_to_menu", variant="error")
+                    yield Button("Keep Coding", id="keep_coding", variant="primary")
+                    yield Button("Next Challenge!", id="next_challenge", variant="success")
         else:
-            yield Label(f"{random.choice(IS_SUCCESS_FALSE_MESSAGE)}", id="message_title")
-            with Horizontal(id="action_buttons"):
-                yield Button("Exit to Menu", id="exit_to_menu", variant="error")
-                yield Button("Keep Coding", id="keep_coding_not_success", variant="primary")
-                yield Button("Show me the results!", id="show_results", variant="success")
+            with Vertical(id="result_container"):
+                yield Label(f"{random.choice(IS_SUCCESS_FALSE_MESSAGE)}", id="message_title")
+                yield Label(f"There were {len(self.results)} tests! Unfortuantely, you only passed {len(self.passed)} tests.", id="amount_failed")
+                with Horizontal(id="action_buttons"):
+                    yield Button("Exit to Menu", id="exit_to_menu", variant="error")
+                    yield Button("Keep Coding", id="keep_coding_not_success", variant="primary")
+                    yield Button("Show Results", id="show_results", variant="success")
             
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "exit_to_menu":
                 self.app.pop_screen()
-                self.app.pop_screen()
                 self.app.post_message(EditorClosed())
             case "keep_coding":
                 self.app.pop_screen()
             case "keep_coding_not_success":
+                self.app.pop_screen()
+            case 'show_results':
+                sumbit_tabs=self.test_widget_instance.query_one("#results_tabs", TabbedContent)
+                sumbit_tabs.active = "submit_tabs"
                 self.app.pop_screen()
             case "next_challenge":
                 pass
@@ -244,7 +252,6 @@ class TestResultsWidget(Widget):
                 return
             failed_tests_static.update("\n\n".join([r for r in results if "[green]" not in r]))
             passed_tests_static.update("\n\n".join([r for r in results if "[green]" in r]))
-
         self.refresh()
     def update_submit_content(self, chall, results=None):
         #TODO: Expand this bcs its very basic rn
@@ -285,7 +292,7 @@ class TestResultsWidget(Widget):
             summary += f"{random.choice(ERROR_MESSAGE)}\nInput: {escape_brackets(last_error.get('input'))}\nError: {escape_brackets(last_error.get('error'))}\n\n"
         elif passed:
             summary += random.choice(ALL_PASSED_MESSAGE)
-
+        self.app.push_screen(ResultModal(self.results, chall, self, len(failed) == 0))
         submit_static.update(summary)
         self.refresh()
 

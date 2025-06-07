@@ -1,6 +1,6 @@
 import sqlalchemy
 
-from sqlalchemy import Column, Integer, String, JSON, DateTime, create_engine
+from sqlalchemy import Column, Integer, String, JSON, DateTime, create_engine, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone, timedelta
@@ -48,10 +48,35 @@ class Challenges(Base):
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     is_active = Column(Integer, default=1)  # 1 for active, 0 for hidden/archived
     is_approved = Column(Integer, default=0) # 0 for approved, 1 for not approved
-    submitted_by = Column(Integer, nullable=True)  # User ID of submitter
+    submitted_by = Column(Integer, sqlalchemy.ForeignKey("users.id"), nullable=True)  # User ID of submitter
     is_featured = Column(Integer, default=0)  # 1 for featured, 0 for not
     likes = Column(Integer, default=0)
     solves = Column(Integer, default=0)
     tags = Column(JSON, nullable=True)  # List of tags
     flagged = Column(Integer, default=0)  # 1 if flagged for review
+
+class UserSolve(Base):
+    __tablename__ = "user_solves"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, sqlalchemy.ForeignKey("users.id"), nullable=False)
+    challenge_id = Column(Integer, sqlalchemy.ForeignKey("challenges.id"), nullable=False)
+    solved_at = Column(DateTime, default=datetime.now(timezone.utc))
+    __table_args__ = (UniqueConstraint('user_id', 'challenge_id', name='_user_challenge_solve_uc'),)
+
+class UserLike(Base):
+    __tablename__ = "user_likes"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, sqlalchemy.ForeignKey("users.id"), nullable=False)
+    challenge_id = Column(Integer, sqlalchemy.ForeignKey("challenges.id"), nullable=False)
+    liked_at = Column(DateTime, default=datetime.now(timezone.utc))
+    __table_args__ = (UniqueConstraint('user_id', 'challenge_id', name='_user_challenge_like_uc'),)
+
+class Submission(Base):
+    __tablename__ = "submissions"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, sqlalchemy.ForeignKey("users.id"), nullable=False)
+    challenge_id = Column(Integer, sqlalchemy.ForeignKey("challenges.id"), nullable=False)
+    code = Column(String)
+    result = Column(String)  # e.g., "passed", "failed"
+    submitted_at = Column(DateTime, default=datetime.now(timezone.utc))
 

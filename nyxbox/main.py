@@ -28,13 +28,20 @@ class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 
 #TODO: Remember to send a session id! Check your API for what you need to send!
-class LoginPage(ModalScreen):
+class LoginPage(Screen):
      def compose(self) -> ComposeResult:
         with Vertical(id="quit_screen"):
-            yield Label("Are you sure you want to quit?", id="quit_text")
-            with Horizontal(id="quit_buttons"):
-                yield Button.success("Yes", id="yes_button")
-                yield Button.error("No", id="no_button")
+            yield Label(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!", id="quit_text")
+            with Horizontal(id="sign_up_buttons"):
+                yield Button.success("Sign up with Google", id="sign_google_button")
+                yield Button.warning("Sign up with Github", id="sign_github_button")
+                yield Label("Have an account?", id="have_account")
+                yield Button("Switch to Login", id="switch_button")
+        
+        def on_button_pressed(event: Button.Pressed):
+            match event.button.id:
+                case 'sign_google_button':
+                    pass
 class SearchComplete(Message):
     """Message passed upon the user selecting a challenge in SearchForProblem"""
     def __init__(self, challenge):

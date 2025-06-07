@@ -201,3 +201,27 @@ EditorResetConfirm {
     margin-top: 0;
     padding-top: 0;
 }
+
+ResultModal {
+  width: 87;
+  height: 9;
+  align: center middle;
+  content-align: center middle;
+  border: tall #3b82f6
+} 
+
+#result_container {
+  height: 9;
+  width: 87;
+  align: center middle;
+  content-align: center middle;
+  border: tall #3b82f6
+} 
+
+#amount_failed {
+  content-align: center middle
+}
+
+#message_title {
+  content-align: center middle
+}

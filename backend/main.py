@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NyxBox API", lifespan=lifespan)
 
+# Account related things
 @app.get("/auth/google") # Start Google OAuth flow
 def begin_google_oauth(session_id: str):
     global oauth_state
@@ -231,12 +232,17 @@ def user_info(refresh_jwt: str, db: Session = Depends(get_db)):
             "avatar": user.avatar_url
             }
 
+#Challenge related things
 @app.get("/challenges") # List challenges  
 def list_available_challs():
     pass
+
 @app.get("/challenges/{id}") # Get challenge
 def get_chall_by_id():
     pass
+
+@app.get("/challenges/{id}/approve")
+
 @app.post("/challenges/{id}/submit") # Submit solution
 def submit_solution_by_id():
     pass

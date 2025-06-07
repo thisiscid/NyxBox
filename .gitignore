@@ -210,3 +210,5 @@ cython_debug/
 backend/*.db
 backend/nyxbox.db
 
+# Admin stuff
+backend/admin_tools.py
