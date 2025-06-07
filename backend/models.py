@@ -1,6 +1,6 @@
 import sqlalchemy
 
-from sqlalchemy import Column, Integer, String, DateTime, create_engine
+from sqlalchemy import Column, Integer, String, JSON, DateTime, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone, timedelta
@@ -23,6 +23,35 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     refresh_jwt = Column(String, unique=True)
     refresh_jwt_expiry = Column(DateTime, default=get_expiry_time)
+    # Community features
+    bio = Column(String, nullable=True)
+    is_admin = Column(Integer, default=0)  # 1 for admin, 0 for regular user
     
     def __repr__(self):
         return f"<User(email='{self.email}', name='{self.name}')>"
+
+class Challenges(Base):
+    
+    __tablename__ = "challenges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    description = Column(String, unique=True, nullable=False)
+    tests = Column(JSON)
+    points = Column(Integer, default=0)  # Points/score for solving
+    author = Column(String, nullable=True)  # Who created the challenge
+    difficulty = Column(String, nullable=False)
+    function_name = Column(String, nullable=False)
+    type = Column(String, nullable=False)
+    inputs = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    is_active = Column(Integer, default=1)  # 1 for active, 0 for hidden/archived
+    is_approved = Column(Integer, default=0) # 0 for approved, 1 for not approved
+    submitted_by = Column(Integer, nullable=True)  # User ID of submitter
+    is_featured = Column(Integer, default=0)  # 1 for featured, 0 for not
+    likes = Column(Integer, default=0)
+    solves = Column(Integer, default=0)
+    tags = Column(JSON, nullable=True)  # List of tags
+    flagged = Column(Integer, default=0)  # 1 if flagged for review
+
