@@ -256,8 +256,7 @@ async def compile_and_run(java_code, test_cases, jdk_path, is_submission):
 
             for test in stdout.decode('utf-8', errors='replace').splitlines():
                 if "Test " in test:
-                    new1_test=test.split("Test ") # ["1: PASS"]
-                    # ["Test ", "1: FAIL - Got: x Expected: y"]
+                    new1_test=test.split("Test ")
                     test_index=int(new1_test[1].split(":")[0])-1
                     if "PASS" in test:
                         results.append({"input": test_cases[test_index]["input"], 
@@ -270,7 +269,7 @@ async def compile_and_run(java_code, test_cases, jdk_path, is_submission):
                         actual_output, expected_output = fail_str.split(", Expected: ")
                         results.append({"input": test_cases[test_index]["input"], 
                                         "output": actual_output, 
-                                        "expected_output": expected_output,  # This is already correct from Java output
+                                        "expected_output": expected_output, 
                                         "passed": False,
                                         "error": None})
     finally:

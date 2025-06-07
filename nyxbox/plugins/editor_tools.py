@@ -19,6 +19,7 @@ from . import challenge_view as UserChallView
 from .code_runners.cpp_runner import run_cpp_code
 from .code_runners.java_runner import run_java_code
 from .code_runners.py_runner import run_python_code
+from .code_runners.js_runner import run_js_code
 from .utils import escape_brackets, format_result, DAEMON_USER
 import tree_sitter_cpp
 from tree_sitter import Language
@@ -563,15 +564,8 @@ using namespace std;
         try:
             self.template=template
             self.textarea.text = template
-            # Do we really need to refresh it?
-            # self.textarea.refresh()
-            # self.refresh()
-            #self.all_view.update_content(self.challenge, None) We want to update only when the user chooses a supported language
         except Exception as e:
             print("Failed to update TextArea:", e)
-        # textarea = self.query_one("#edit_text", TextArea)
-        # textarea.text = py_template
-        # textarea.refresh()
     
     def get_solution_code(self):
         """Return the current code from the editor"""
@@ -579,56 +573,19 @@ using namespace std;
     
     async def action_run_code(self) -> None:
         """Execute the current code and show results"""
-        #TODO: There is a bunch of static nyx text, change it to rotate!
-        #Python and JS are in this file because they're easy to implement and not that long.
-        #Since C++, C, and Java are compiled, we will need to fix it later.
         code = self.query_one(TextArea).text
         all_results=[]
         formatted_results=[]
         match self.language:
             case 'py':
                 results=await run_python_code(code, self.challenge)
-                # try:
-                #     exec(code, namespace)
-                # except Exception as e:
-                #     result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
-                #     formatted_results.append(format_result(result))
-                #     self.notify(
-                #     title="Hey mortal...I finished running your code!",
-                #     message=f"{DAEMON_USER} I don't think your code works though... check the 'All Tests' or failed tests tab...",
-                #     severity="error",
-                #     timeout=3,
-                #     markup=True
-                #     )
-                #     self.all_view.update_content(self.challenge, formatted_results)
-                #     return
-                # try:
-                #     user_func = namespace[self.challenge['function_name']]
-                #     for test_case in self.challenge['tests']:
-                #         if test_case.get("hidden", False):
-                #             continue
-                #         try:
-                #             result = user_func(*test_case["input"])
-                #             if result != test_case['expected_output']:
-                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
-                #                 all_results.append(result_dict) 
-                #                 # Last param indicates if it passed the test or not
-                #             else:
-                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
-                #                 all_results.append(result_dict)
-                #         except Exception as e:
-                #             all_results.append({"input":escape_brackets(str(test_case["input"])), "output":None, "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
-                # except Exception as e:
-                #     all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
-                # formatted_results = [format_result(result) for result in all_results]
-                # self.notify(
-                #     title="Hey mortal...I finished running your code!",
-                #     message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
-                #     severity="information",
-                #     timeout=3,
-                #     markup=True
-                #     )
-                # self.all_view.update_content(self.challenge, formatted_results)
+                self.notify(
+                    title="Hey... I started running your code!",
+                    message=f"{DAEMON_USER} Wait a sec as I finish!",
+                    severity="information",
+                    timeout=3,
+                    markup=True
+                    )
                 self.notify(
                     title="Hey mortal...I finished running your code!",
                     message=f"{DAEMON_USER} Check your 'All Tests' tab! See ya~",
@@ -640,68 +597,18 @@ using namespace std;
                 self.all_view.update_content(self.challenge, formatted_results)
 
             case 'js':
-                for test_case in self.challenge['tests']:
-                    if test_case.get("hidden", False):
-                        continue
-                    args = ", ".join(json.dumps(arg) for arg in test_case["input"])
-                    wrapped_code = f"""
-// --- USER CODE START ---
-{code}
-// --- USER CODE END ---
-
-try {{
-    const result = {self.func_name}({args});
-    console.log(JSON.stringify(result));
-}} catch (err) {{
-    console.error("ERROR:", err.message);
-    process.exit(1);
-}}
-"""
-                    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".js") as f:
-                        f.write(wrapped_code)
-                        js_file = f.name
-
-                    try:
-                        proc = await asyncio.create_subprocess_exec(
-                        "node", js_file,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
+                all_results = await run_js_code(code, self.challenge)
+                self.notify(
+                    title="Hey... I started running your code!",
+                    message=f"{DAEMON_USER} Wait a sec as I finish!",
+                    severity="information",
+                    timeout=3,
+                    markup=True
                     )
-
-                        stdout, stderr = await proc.communicate()
-                        if proc.returncode != 0:
-                            all_results.append({
-                                "input": str(test_case["input"]),
-                                "output": None,
-                                "expected": str(test_case["expected_output"]),
-                                "passed": False,
-                                "error": stderr.decode().strip()
-                            })
-                            formatted_results=[format_result(x) for x in all_results]
-                            self.all_view.update_content(self.challenge, formatted_results)
-                            return
-
-                        else:
-                            result = json.loads(stdout.decode().strip())
-                            all_results.append({
-                                "input": str(test_case["input"]),
-                                "output": str(result),
-                                "expected": str(test_case["expected_output"]),
-                                "passed": result == test_case["expected_output"],
-                                "error": None
-                            })
-                    except subprocess.TimeoutExpired:
-                        all_results.append({
-                            "input": str(test_case["input"]),
-                            "output": None,
-                            "expected": str(test_case["expected_output"]),
-                            "passed": False,
-                            "error": "Execution timed out"
-                        })
                 formatted_results = [format_result(result) for result in all_results]
                 self.notify(
                     title="Hey mortal...I finished running your code!",
-                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                    message=f"{DAEMON_USER} Check your 'All Tests' tab! See ya~",
                     severity="information",
                     timeout=3,
                     markup=True
@@ -724,58 +631,22 @@ try {{
                     self.textarea, 
                     self.all_view))
 
-
-
-        
-    
     async def action_submit_solution(self):
-        """Submit solution for evaluation against test cases"""
-        #TODO: There is a bunch of static nyu text, change it to rotate!
-        #Python and JS are in this file because they're easy to implement and not that long.
-        #Since C++, C, and Java are compiled, we will need to fix it later.
+        """Submit solution for evaluation against test cases, hidden and non-hidden"""
         code = self.query_one(TextArea).text
-        #test_cases=self.challenge["tests"]
         namespace={}
         all_results=[]
         formatted_results=[]
         match self.language:
             case 'py':
                 results=await run_python_code(code, self.challenge, is_submission=True)
-                # try:
-                #     exec(code, namespace)
-                # except Exception as e:
-                #     result={"input":None, "output":None, "expected":None, "passed":None, "error":str(e)}
-                #     formatted_results.append(format_result(result))
-                #     self.notify(
-                #     title="Hey mortal...I finished running your code!",
-                #     message=f"{DAEMON_USER} I don't think your code works though... check the 'All Tests' or failed tests tab...",
-                #     severity="error",
-                #     timeout=3,
-                #     markup=True
-                #     )
-                #     self.all_view.update_content(self.challenge, formatted_results)
-                #     return
-                # try:
-                #     user_func = namespace[self.challenge['function_name']]
-                #     for test_case in self.challenge['tests']:
-                #         if test_case.get("hidden", False):
-                #             continue
-                #         try:
-                #             result = user_func(*test_case["input"])
-                #             if result != test_case['expected_output']:
-                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":None}
-                #                 all_results.append(result_dict) 
-                #                 # Last param indicates if it passed the test or not
-                #             else:
-                #                 result_dict={"input":escape_brackets(str(test_case["input"])), "output":escape_brackets(str(result)), "expected":escape_brackets(str(test_case["expected_output"])), "passed":True, "error":None}
-                #                 all_results.append(result_dict)
-                #         except Exception as e:
-                #             all_results.append({"input":escape_brackets(str(test_case["input"])), "output":None, "expected":escape_brackets(str(test_case["expected_output"])), "passed":False, "error":str(e)})
-                # except Exception as e:
-                #     all_results.append({"input":None, "output":None, "expected":None, "passed":None, "error":str(e)})
-                # formatted_results = [format_result(result) for result in all_results]
-                # self.all_view.update_content(self.challenge, formatted_results)
-                # formatted_results = [format_result(result) for result in results]
+                self.notify(
+                    title="Hey... I started running your code!",
+                    message=f"{DAEMON_USER} Wait a sec as I finish!",
+                    severity="information",
+                    timeout=3,
+                    markup=True
+                    )
                 self.all_view.update_submit_content(self.challenge, results)
                 self.notify(
                     title="Hey... I finished running your code!",
@@ -785,75 +656,15 @@ try {{
                     markup=True
                     )
             case 'js':
-                for test_case in self.challenge['tests']:
-                    args = ", ".join(json.dumps(arg) for arg in test_case["input"])
-                    wrapped_code = f"""
-// --- USER CODE START ---
-{code}
-// --- USER CODE END ---
-
-try {{
-    const result = {self.func_name}({args});
-    console.log(JSON.stringify(result));
-}} catch (err) {{
-    console.error("ERROR:", err.message);
-    process.exit(1);
-}}
-"""
-                    with tempfile.NamedTemporaryFile("w", delete=False, suffix=".js") as f:
-                        f.write(wrapped_code)
-                        js_file = f.name
-
-                    try:
-                        proc = await asyncio.create_subprocess_exec(
-                        "node", js_file,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
-                    )
-
-                        stdout, stderr = await proc.communicate()
-                        if proc.returncode != 0:
-                            all_results.append({
-                                "input": (str(test_case["input"])),
-                                "output": None,
-                                "expected": (str(test_case["expected_output"])),
-                                "passed": False,
-                                "error": stderr.decode().strip()
-                            })
-                            self.all_view.update_submit_content(self.challenge, all_results)
-                            return
-                        else:
-                            result = json.loads(stdout.decode().strip())
-                            all_results.append({
-                                "input": (str(test_case["input"])),
-                                "output": (str(result)),
-                                "expected": (str(test_case["expected_output"])),
-                                "passed": result == test_case["expected_output"],
-                                "error": None
-                            })
-                    except subprocess.TimeoutExpired:
-                        all_results.append({
-                            "input": (str(test_case["input"])),
-                            "output": None,
-                            "expected": (str(test_case["expected_output"])),
-                            "passed": False,
-                            "error": "Execution timed out"
-                        })
+                all_results = await run_js_code(code, self.challenge, True)
                 self.notify(
                     title="Hey mortal...I finished running your code!",
-                    message=f"{DAEMON_USER} Check your 'All Tests' tab, or check the specific tabs for passes/fails! See ya~",
+                    message=f"{DAEMON_USER} Check ur submit tab!",
                     severity="information",
                     timeout=3,
                     markup=True
                 )
-                ret_results=[]
-                for result in all_results:
-                    if not result.get("passed", False):
-                        ret_results.append(result)
-                        break
-                    else:
-                        ret_results.append(result)
-                self.all_view.update_submit_content(self.challenge, ret_results)
+                self.all_view.update_submit_content(self.challenge, all_results)
             case 'cpp':
                 self.app.push_screen(self.CompilationStandardPopup(self.challenge, 
                     self.textarea.text, 
@@ -996,11 +807,32 @@ try {{
                 if value and isinstance(value, str):
                     if self.lang == "cpp":
                         results = await run_cpp_code(self.code, self.func_name, self.tests, value)
+                        self.notify(
+                            title="Hey... I started running your code!",
+                            message=f"{DAEMON_USER} Wait a sec as I finish!",
+                            severity="information",
+                            timeout=3,
+                            markup=True
+                        )
                         formatted_results = [format_result(result) for result in results]
                         if self.is_submission:
                             self.all_view.update_submit_content(self.chall, results)
+                            self.notify(
+                                title="Hey... I finished running your code!",
+                                message=f"{DAEMON_USER} Check ur submit tab!",
+                                severity="information",
+                                timeout=3,
+                                markup=True
+                            )
                         else:
                             self.all_view.update_content(self.chall, formatted_results)
+                            self.notify(
+                                title="Hey mortal...I finished running your code!",
+                                message=f"{DAEMON_USER} Check your 'All Tests' tab! See ya~",
+                                severity="information",
+                                timeout=3,
+                                markup=True
+                            )
 
                     elif self.lang == "java":
                         # Ensure 'value' is a key for a discovered JDK path
@@ -1010,30 +842,41 @@ try {{
                             return
 
                         results = await run_java_code(self.code, self.func_name, self.tests, jdk_path, self.is_submission)
+                        self.notify(
+                            title="Hey... I started running your code!",
+                            message=f"{DAEMON_USER} Wait a sec as I finish!",
+                            severity="information",
+                            timeout=3,
+                            markup=True
+                        )
                         formatted_results = [format_result(result) for result in results]
                         if self.is_submission:
                             self.all_view.update_submit_content(self.chall, results)
+                            self.notify(
+                                title="Hey... I finished running your code!",
+                                message=f"{DAEMON_USER} Check ur submit tab!",
+                                severity="information",
+                                timeout=3,
+                                markup=True
+                            )
                         else:
                             self.all_view.update_content(self.chall, formatted_results)
+                            self.notify(
+                                title="Hey mortal...I finished running your code!",
+                                message=f"{DAEMON_USER} Check your 'All Tests' tab! See ya~",
+                                severity="information",
+                                timeout=3,
+                                markup=True
+                            )
                     self.app.pop_screen()
                 else:
                     self.notify(
                         title="Really?",
-                        message=f"{DAEMON_USER} Choose an option, stupid! How do you want me to compile if you won't tell me how?",
+                        message=f"{DAEMON_USER} Choose an option! How do you want me to compile if you won't tell me how?",
                         severity="error",
                         timeout=3,
                         markup=True
                     )
-        # @on(CustomPathSelected)
-        # async def handle_custom_path(self, event: CustomPathSelected):
-        #     if self.lang == "java":
-        #         results = await run_java_code(self.code, self.func_name, self.tests, event.path, self.is_submission)
-        #         formatted_results = [format_result(result) for result in results]
-        #         if self.is_submission:
-        #             self.all_view.update_submit_content(self.chall, results)
-        #         else:
-        #             self.all_view.update_content(self.chall, formatted_results)
-        #         self.app.pop_screen() 
 
         def scan_jdks(self) -> dict:
             system = platform.system()
@@ -1133,16 +976,6 @@ try {{
                         placeholder_text = r"C:\Program Files\Java\jdk-21"
                     else:
                         placeholder_text = "Enter JDK root path"
-                # if self.language == "cpp":
-                #     yield Label("Insert custom path (Should be your compiler executable!)", id="reset_text")
-                #     if system == "Darwin":
-                #         placeholder_text = "/usr/bin/clang++"
-                #     elif system == "Linux":
-                #         placeholder_text = "/usr/bin/g++"
-                #     elif system == "Windows":
-                #         placeholder_text = r"C:\MinGW\bin\g++.exe"
-                #     else:
-                #         placeholder_text = "Enter C++ compiler path"
                 else:
                     yield Label("Insert custom path", id="reset_text")
                 yield Input(placeholder=placeholder_text, id="custom_path_input")
@@ -1178,11 +1011,32 @@ try {{
                     self.app.pop_screen()
                     self.app.pop_screen() #We do it twice since we know there are two layers of screens
                     results = await run_java_code(self.editor.text, self.func_name, self.tests, current_path_value, self.is_submission)
+                    self.notify(
+                        title="Hey... I started running your code!",
+                        message=f"{DAEMON_USER} Wait a sec as I finish!",
+                        severity="information",
+                        timeout=3,
+                        markup=True
+                    )
                     formatted_results = [format_result(result) for result in results]
                     if self.is_submission:
                         self.all_view.update_submit_content(self.chall, results)
+                        self.notify(
+                            title="Hey... I finished running your code!",
+                            message=f"{DAEMON_USER} Check ur submit tab!",
+                            severity="information",
+                            timeout=3,
+                            markup=True
+                        )
                     else:
                         self.all_view.update_content(self.chall, formatted_results)
+                        self.notify(
+                            title="Hey mortal...I finished running your code!",
+                            message=f"{DAEMON_USER} Check your 'All Tests' tab! See ya~",
+                            severity="information",
+                            timeout=3,
+                            markup=True
+                        )
                 case "no_custom_button":
                     self.app.pop_screen()
     class EditorResetConfirm(ModalScreen):

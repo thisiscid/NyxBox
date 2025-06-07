@@ -1,7 +1,7 @@
 {
   "name": "three-sum",
   "difficulty": "medium",
-  "description": "Given a list of integers and a target value, return the indices of the first trio of numbers that add up to the target. Search the array from left to right and always choose the earliest valid combination (i < j < k). Return the indices as a list of three integers or null if no such trio exists.",
+  "description": "Given a list of integers and a target value, return the indices of the first trio of numbers that add up to the target. Search the array from left to right and always choose the earliest valid combination (i < j < k). Return the indices as a list of three integers or None (or the equivalent indicator in your language) if no such trio exists.",
   "function_name": "three_sum",
   "type": "function",
   "inputs": ["arr","target"],
@@ -43,6 +43,11 @@
     {
       "input": [[-5, 0, 5, -2, 2], 0],
       "expected_output": [0, 1, 2],
+      "hidden": true
+    },
+    {
+      "input": [[1, 2, 3], 20],
+      "expected_output": null,
       "hidden": true
     }
   ]
