@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Header
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import session, Session
 import sqlalchemy
@@ -14,6 +14,8 @@ import os
 from typing import Optional
 import secrets
 
+oauth_state = {}
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -23,16 +25,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="NyxBox API", lifespan=lifespan)
 
 @app.get("/auth/google") # Start Google OAuth flow
-def begin_google_oauth():
+def begin_google_oauth(session_id: str):
+    redirect_uri = f"{settings.GOOGLE_REDIRECT_URI}?session_id={session_id}"
     oauth = OAuth2Session(
         client_id=settings.GOOGLE_CLIENT_ID,
-        redirect_uri=settings.GOOGLE_REDIRECT_URI,
+        redirect_uri=redirect_uri,
         scope=['openid', 'email', 'profile'])
     auth_url, state = oauth.create_authorization_url('https://accounts.google.com/o/oauth2/v2/auth')
+    oauth_state[session_id] = state
     return {"auth_url": auth_url, "state": state}
 
 @app.get("/auth/google/callback")
-def redirect_google_oauth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db)): 
+def redirect_google_oauth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db), session_id: str = ""): 
     oauth = OAuth2Session(
         client_id=settings.GOOGLE_CLIENT_ID,
         redirect_uri=settings.GOOGLE_REDIRECT_URI,
@@ -46,7 +50,11 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
-
+    if state != oauth_state[session_id]:
+        oauth_state.pop(session_id)
+        raise HTTPException(status_code=400, detail=f"Invalid state.")
+    else:
+        oauth_state.pop(session_id)
     # Get user info from Google
     try:
         user_info_resp = oauth.get('https://www.googleapis.com/oauth2/v3/userinfo')
@@ -54,8 +62,6 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         user_info = user_info_resp.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user info: {str(e)}")
-    #
-    # TODO: Create/find user in database using user_info['sub'] (Google's unique ID) or email
     existing_user = db.query(User).filter(
         (User.google_id == str(user_info['sub'])) | 
         (User.email == user_info['email'])
@@ -66,6 +72,10 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
             setattr(existing_user, 'google_id', str(user_info['sub']))
             db.commit()
         user = existing_user
+        new_refresh_jwt=str(secrets.token_hex(32))
+        user.refresh_jwt=new_refresh_jwt
+        user.refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30)
+        db.commit()
     else:
         user = User(
             email=user_info['email'],
@@ -85,16 +95,20 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
     return {"message": "Google login successful", "jwt": user_jwt, "refresh": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 @app.get("/auth/github") # Start Github OAuth flow
-def begin_github_auth():
+def begin_github_auth(session_id: str):
+    global oauth_state
+    redirect_uri = f"{settings.GITHUB_REDIRECT_URI}?session_id={session_id}"
     oauth = OAuth2Session(
         client_id=settings.GITHUB_CLIENT_ID,
-        redirect_uri=settings.GITHUB_REDIRECT_URI,
+        redirect_uri=redirect_uri,
         scope=['user:email', 'user:user'])
     auth_url, state = oauth.create_authorization_url('https://github.com/login/oauth/authorize')
+    oauth_state[session_id] = state
     return {"auth_url": auth_url, "state": state}
 
 @app.get("/auth/github/callback")
-def redirect_github_auth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db)): 
+def redirect_github_auth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db), session_id: str = ""): 
+    global oauth_state
     oauth = OAuth2Session(
         client_id=settings.GITHUB_CLIENT_ID,
         redirect_uri=settings.GITHUB_REDIRECT_URI,
@@ -108,7 +122,11 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
-
+    if state != oauth_state[session_id]:
+        oauth_state.pop(session_id)
+        raise HTTPException(status_code=400, detail=f"Invalid state.")
+    else:
+        oauth_state.pop(session_id)
     # Get user info from Google
     try:
         user_info_resp = oauth.get('https://api.github.com/user')
@@ -132,12 +150,16 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
             setattr(existing_user, 'github_id', str(user_info['id']))
             db.commit()
         user = existing_user
+        new_refresh_jwt=str(secrets.token_hex(32))
+        user.refresh_jwt=new_refresh_jwt
+        user.refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30)
+        db.commit()
     else:
         user = User(
             email=user_info['email'],
             name=user_info.get('name') or user_info['login'],  
             github_id=str(user_info['id']),
-            refresh_jw=refresh_jwt
+            refresh_jwt=refresh_jwt,
         )
         db.add(user)       # Add to database
         db.commit()        # Save changes
@@ -150,9 +172,36 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
     )
     return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
-@app.post("/auth/refresh") # To get a new JWT with a valid refresh jwt
+@app.get("/auth/refresh") # To get a new JWT with a valid refresh jwt
+def refresh_jwt(request: Request, refresh_jwt: str, db: Session = Depends(get_db)):
+    jwt_user = db.query(User).filter(
+        (User.refresh_jwt == refresh_jwt)
+    ).first()
+    now = datetime.now(timezone.utc)
+    if not jwt_user:
+        raise HTTPException(status_code=401, detail="Invalid refresh token.")
+    if not refresh_jwt:
+        raise HTTPException(status_code=401, detail="Invalid refresh token.")
+    expiry_timestamp: Optional[datetime] = jwt_user.refresh_jwt_expiry # type:ignore
+    if expiry_timestamp is not None and expiry_timestamp.tzinfo is None:
+        expiry_timestamp = expiry_timestamp.replace(tzinfo=timezone.utc)
+    if expiry_timestamp is None or expiry_timestamp < now:
+        raise HTTPException(status_code=401, detail="Invalid refresh token.")
+    else:
+        new_refresh_jwt=str(secrets.token_hex(32))
+        jwt_user.refresh_jwt=new_refresh_jwt
+        jwt_user.refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30)
+        db.commit()
+        if not settings.JWT_SECRET:
+            raise HTTPException(status_code=500, detail="No JWT Secret found")
+        user_jwt=jwt.encode(
+            claims={"user_id": jwt_user.id, "exp": datetime.now(timezone.utc)+timedelta(hours=1), "iat": datetime.now(timezone.utc)},
+            key=settings.JWT_SECRET
+        )
+        return {"message": "Refresh JWT generated", "refresh_jwt": new_refresh_jwt, "user_jwt": user_jwt}
 
 @app.post("/auth/logout") # Log User Out
+
 @app.get("/auth/me") # Get user info
 def user_info():
     pass

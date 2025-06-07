@@ -27,6 +27,7 @@ except PackageNotFoundError:
 class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 
+#TODO: Remember to send a session id! Check your API for what you need to send!
 class LoginPage(ModalScreen):
      def compose(self) -> ComposeResult:
         with Vertical(id="quit_screen"):
