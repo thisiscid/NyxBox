@@ -7,6 +7,7 @@ import re
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
+from .plugins.utils import DAEMON_USER
 from rich.text import Text
 from textual import on
 from textual.screen import Screen, ModalScreen
@@ -16,8 +17,6 @@ from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from importlib.resources import files
 from importlib.metadata import version, PackageNotFoundError
-
-DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 
 try:
     nyxbox_version = version("nyxbox")

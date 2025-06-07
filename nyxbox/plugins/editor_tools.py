@@ -61,21 +61,30 @@ class UserCodeError(Exception):
 
 # moreof a template than anything, i gotta fix it
 # do this later, you need to get the main flow working first
-# class ResultModal(ModalScreen):
-#     def __init__(self, results, message: str, severity: str = "info"):
-#         super().__init__()
-#         self.results = results
+class ResultModal(ModalScreen):
+    def __init__(self, results, challenge: dict, is_success=False):
+        super().__init__()
+        self.results = results
+        self.chall = challenge
+        self.is_success = is_success
+    
+    def compose(self) -> ComposeResult:
+        CONGRATULATION_MESSAGE=[
+            f"{DAEMON_USER}"
+        ]
+        if self.is_success:
+            pass
+            
 
+    # def compose(self) -> ComposeResult:
+    #     with Vertical(id="result_modal"):
+    #         yield Label(self.message, id="result_modal_text")
+    #         with Horizontal():
+    #             yield Button("OK", id="close_result_modal", variant="primary")
 
-#     def compose(self) -> ComposeResult:
-#         with Vertical(id="result_modal"):
-#             # yield Label(self.message, id="result_modal_text")
-#             with Horizontal():
-#                 yield Button("OK", id="close_result_modal", variant="primary")
-
-#     @on(Button.Pressed, "#close_result_modal")
-#     def close_modal(self):
-#         self.app.pop_screen()
+    @on(Button.Pressed, "#close_result_modal")
+    def close_modal(self):
+        self.app.pop_screen()
 
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""

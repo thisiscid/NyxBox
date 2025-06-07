@@ -1,6 +1,11 @@
-# NyxBox
-
-A Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and C (not yet...) Also, just who is Nyx?
+```
+███    ██ ██    ██ ██   ██ ██████   ██████  ██   ██ 
+████   ██  ██  ██   ██ ██  ██   ██ ██    ██  ██ ██  
+██ ██  ██   ████     ███   ██████  ██    ██   ███   
+██  ██ ██    ██     ██ ██  ██   ██ ██    ██  ██ ██  
+██   ████    ██    ██   ██ ██████   ██████  ██   ██ 
+```
+Nyxbox is a Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and ~~C (this is never getting added)~~ Meant to help people learn and practice their coding. Also, who's Nyx?
 
 ## What's new?
 Latest - 0.1.2
@@ -50,14 +55,15 @@ Then, run as a module.
 python3 -m nyxbox.main
 ```
 ## Adding challenges
-Add new challenges in the form of a JSON in the challenges directory. Challenges will not work if they do not follow the style of pre-made challenges.
+~~Add new challenges in the form of a JSON in the challenges directory. Challenges will not work if they do not follow the style of pre-made challenges.~~
+This is temporarily no longer recommended as I work on a backend. 
 
 ## Notes
 - Python 3.10+ recommended (The dev is running 3.12.1)
-- C++, C, and Java runners require system dependencies. If they error out, make sure you have those installed first. (look above dummy)
+- C++ (clang++ or g++), JS (node.js), and Java (JDKs) runners require system dependencies. If they error out, make sure that you have them installed before adding 
 - Run in a terminal supporting Unicode and colors like [Ghostty](https://ghostty.org), [Alacritty](https://alacritty.org), or others.
 
 ## Credits
-1. ChatGPT + Copilot for helping me debug
-2. Textual for providing the underlying framework for the Tui
-3. you! for using it!
+1. Copilot for helping me debug
+2. Textual for providing the underlying framework for the TUI
+3. You! For using it! Thank you!
