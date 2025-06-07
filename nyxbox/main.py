@@ -1,9 +1,11 @@
-import os, random
+import os
+import random
 import json
 import sys
 import time
 import pathlib
 import re
+import requests
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
@@ -25,6 +27,13 @@ except PackageNotFoundError:
 class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 
+class LoginPage(ModalScreen):
+     def compose(self) -> ComposeResult:
+        with Vertical(id="quit_screen"):
+            yield Label("Are you sure you want to quit?", id="quit_text")
+            with Horizontal(id="quit_buttons"):
+                yield Button.success("Yes", id="yes_button")
+                yield Button.error("No", id="no_button")
 class SearchComplete(Message):
     """Message passed upon the user selecting a challenge in SearchForProblem"""
     def __init__(self, challenge):
