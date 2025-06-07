@@ -70,21 +70,41 @@ class ResultModal(ModalScreen):
     
     def compose(self) -> ComposeResult:
         CONGRATULATION_MESSAGE=[
-            f"{DAEMON_USER}"
+            f"{DAEMON_USER} Well, well... I didn't think you had it in you!",
+            f"{DAEMON_USER} Impressive! You've earned my respect... for now.",
+            f"{DAEMON_USER} Not bad. Ready for the next challenge?",
+            f"{DAEMON_USER} Excellent work! Even I'm impressed.",
+            f"{DAEMON_USER} Flawless execution! Don't let it go to your head.",
+        ]
+        IS_SUCCESS_FALSE_MESSAGE=[
+            f"{DAEMON_USER} It's okay, we can go back to the drawing board!",
+            f"{DAEMON_USER} Failure is not the end! Keep trying!"
         ]
         if self.is_success:
-            pass
+            yield Label(f"{random.choice(CONGRATULATION_MESSAGE)}\nThere were {len(self.results)} tests and you passed them all for {self.chall.get("name")}!", id="message_tutle")
+            with Horizontal(id="action_buttons"):
+                yield Button("Exit to Menu", id="exit_to_menu", variant="error")
+                yield Button("Keep Coding", id="keep_coding", variant="primary")
+                yield Button("Next Challenge!", id="next_challenge", variant="success")
+        else:
+            yield Label(f"{random.choice(IS_SUCCESS_FALSE_MESSAGE)}", id="message_title")
+            with Horizontal(id="action_buttons"):
+                yield Button("Exit to Menu", id="exit_to_menu", variant="error")
+                yield Button("Keep Coding", id="keep_coding_not_success", variant="primary")
+                yield Button("Show me the results!", id="show_results", variant="success")
             
-
-    # def compose(self) -> ComposeResult:
-    #     with Vertical(id="result_modal"):
-    #         yield Label(self.message, id="result_modal_text")
-    #         with Horizontal():
-    #             yield Button("OK", id="close_result_modal", variant="primary")
-
-    @on(Button.Pressed, "#close_result_modal")
-    def close_modal(self):
-        self.app.pop_screen()
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "exit_to_menu":
+                self.app.pop_screen()
+                self.app.pop_screen()
+                self.app.post_message(EditorClosed())
+            case "keep_coding":
+                self.app.pop_screen()
+            case "keep_coding_not_success":
+                self.app.pop_screen()
+            case "next_challenge":
+                pass
 
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
