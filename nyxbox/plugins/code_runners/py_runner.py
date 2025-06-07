@@ -51,11 +51,11 @@ for i, test_case in enumerate(tests):
                 await process.wait()
             except:
                 pass
-            return [{"input": "Execution", "output": None, "expected": None, "passed": False, "error": f"Execution timed out, Timeout = {TIMEOUT}"}]
+            return [{"input": "Execution", "output": None, "expected_output": None, "passed": False, "error": f"Execution timed out, Timeout = {TIMEOUT}"}]
         
         if stderr:
             stderr_text = stderr.decode('utf-8', errors='replace').strip()
-            return [{"input": None, "output": None, "expected": None, "passed": False, "error": stderr_text}]
+            return [{"input": None, "output": None, "expected_output": None, "passed": False, "error": stderr_text}]
         
         # Parse results
         output_lines = stdout.decode('utf-8', errors='replace').strip().split('\n')
@@ -69,7 +69,7 @@ for i, test_case in enumerate(tests):
                     all_results.append({
                         "input": str(test_case["input"]),
                         "output": str(test_case["expected_output"]),
-                        "expected": str(test_case["expected_output"]),
+                        "expected_output": str(test_case["expected_output"]),
                         "passed": True,
                         "error": None
                     })
@@ -80,7 +80,7 @@ for i, test_case in enumerate(tests):
                         all_results.append({
                             "input": str(test_case["input"]),
                             "output": actual_output,
-                            "expected": expected_output,
+                            "expected_output": expected_output,
                             "passed": False,
                             "error": None
                         })
@@ -88,7 +88,7 @@ for i, test_case in enumerate(tests):
                         all_results.append({
                             "input": str(test_case["input"]),
                             "output": None,
-                            "expected": str(test_case["expected_output"]),
+                            "expected_output": str(test_case["expected_output"]),
                             "passed": False,
                             "error": "Failed to parse test output"
                         })
@@ -100,7 +100,7 @@ for i, test_case in enumerate(tests):
                     all_results.append({
                         "input": str(test_case["input"]),
                         "output": None,
-                        "expected": str(test_case["expected_output"]),
+                        "expected_output": str(test_case["expected_output"]),
                         "passed": False,
                         "error": error_message
                     })

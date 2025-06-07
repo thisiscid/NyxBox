@@ -249,7 +249,7 @@ class TestResultsWidget(Widget):
         ]
         if failed:
             last_failed = failed[-1]
-            summary += f"{random.choice(FAIL_MESSAGE)}\nInput: {escape_brackets(last_failed.get('input'))}\nOutput: {escape_brackets(last_failed.get('output'))}\nExpected: {escape_brackets(last_failed.get('expected'))}\n\n"
+            summary += f"{random.choice(FAIL_MESSAGE)}\nInput: {escape_brackets(last_failed.get('input'))}\nOutput: {escape_brackets(last_failed.get('output'))}\nExpected: {escape_brackets(last_failed.get('expected_output', last_failed.get('expected', None)))}\n\n"
         elif errors:
             last_error = errors[-1]
             summary += f"{random.choice(ERROR_MESSAGE)}\nInput: {escape_brackets(last_error.get('input'))}\nError: {escape_brackets(last_error.get('error'))}\n\n"
@@ -547,8 +547,7 @@ using namespace std;
                 param_str = ", ".join(f"{ptype} param{i}" for i, ptype in enumerate(param_types))
                 expected_output = example_test.get("expected_output", None)
                 return_type = infer_java_type(expected_output)
-                template = f"""
-public static {return_type} {self.challenge['function_name']}({param_str}) {{
+                template = f"""public static {return_type} {self.challenge['function_name']}({param_str}) {{
     // Your code here.
     // Don't use System.out.println(), return the result instead!
     // Tests will FAIL if you print.
@@ -815,9 +814,9 @@ try {{
                         stdout, stderr = await proc.communicate()
                         if proc.returncode != 0:
                             all_results.append({
-                                "input": escape_brackets(str(test_case["input"])),
+                                "input": (str(test_case["input"])),
                                 "output": None,
-                                "expected": escape_brackets(str(test_case["expected_output"])),
+                                "expected": (str(test_case["expected_output"])),
                                 "passed": False,
                                 "error": stderr.decode().strip()
                             })
@@ -826,17 +825,17 @@ try {{
                         else:
                             result = json.loads(stdout.decode().strip())
                             all_results.append({
-                                "input": escape_brackets(str(test_case["input"])),
-                                "output": escape_brackets(str(result)),
-                                "expected": escape_brackets(str(test_case["expected_output"])),
+                                "input": (str(test_case["input"])),
+                                "output": (str(result)),
+                                "expected": (str(test_case["expected_output"])),
                                 "passed": result == test_case["expected_output"],
                                 "error": None
                             })
                     except subprocess.TimeoutExpired:
                         all_results.append({
-                            "input": escape_brackets(str(test_case["input"])),
+                            "input": (str(test_case["input"])),
                             "output": None,
-                            "expected": escape_brackets(str(test_case["expected_output"])),
+                            "expected": (str(test_case["expected_output"])),
                             "passed": False,
                             "error": "Execution timed out"
                         })

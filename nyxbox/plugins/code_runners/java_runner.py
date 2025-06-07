@@ -24,6 +24,7 @@ def generate_java_program(user_code, func_name, test_cases, is_submission=False)
     program_template = """
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Arrays;
 
 public class Solution {{
     // ===== USER CODE START =====
@@ -38,6 +39,15 @@ public class Solution {{
 }}
 """
     return program_template.format(user_code=user_code, test_code=test_code)
+
+def generate_comparison_code(expected_type, result_var, expected_var):
+    """
+    Generate appropriate comparison code based on the type.
+    """
+    if expected_type.endswith("[]"):
+        return f"Arrays.equals({result_var}, {expected_var})"
+    else:
+        return f"{result_var}.equals({expected_var})" if expected_type in ["String"] else f"{result_var} == {expected_var}"
 
 def generate_test_code(func_name, test_cases, is_submission=False):
     """
@@ -72,11 +82,11 @@ def generate_test_code(func_name, test_cases, is_submission=False):
             {expected_type} result = {func_name}({", ".join(input_args)});
 
             // Compare result with expected output
-            if (result == {expected_var}) {{
+            if ({generate_comparison_code(expected_type, "result", expected_var)}) {{
                 System.out.println("PASS");
             }} else {{
                 all_passed = false;
-                System.out.println("FAIL - Got: " + result + ", Expected: " + {expected_var});
+                System.out.println("FAIL - Got: " + {get_display_string(expected_type, "result")} + ", Expected: " + {get_display_string(expected_type, expected_var)});
             }}
         }} catch (Exception e) {{
             all_passed = false;
@@ -114,17 +124,18 @@ def generate_test_code(func_name, test_cases, is_submission=False):
             {expected_type} result = {func_name}({", ".join(input_args)});
 
             // Compare result with expected output
-            if (result == {expected_var}) {{
+            if ({generate_comparison_code(expected_type, "result", expected_var)}) {{
                 System.out.println("PASS");
             }} else {{
                 all_passed = false;
-                System.out.println("FAIL - Got: " + result + ", Expected: " + {expected_var});
+                System.out.println("FAIL - Got: " + {get_display_string(expected_type, "result")} + ", Expected: " + {get_display_string(expected_type, expected_var)});
             }}
         }} catch (Exception e) {{
             all_passed = false;
             System.out.println("ERROR - " + e.getMessage());
         }}
 """
+            test_code_blocks.append(test_block)
 
     return "\n".join(test_code_blocks)
 
@@ -250,8 +261,8 @@ async def compile_and_run(java_code, test_cases, jdk_path, is_submission):
                     test_index=int(new1_test[1].split(":")[0])-1
                     if "PASS" in test:
                         results.append({"input": test_cases[test_index]["input"], 
-                                        "output": test_cases[test_index]['expected_output'], 
-                                        "expected_output": test_cases[test_index]['expected_output'],
+                                        "output": python_to_java_value(test_cases[test_index]['expected_output']), 
+                                        "expected_output": python_to_java_value(test_cases[test_index]['expected_output']),
                                         "passed": True,
                                         "error": None})
                     elif "FAIL" in test:
@@ -259,7 +270,7 @@ async def compile_and_run(java_code, test_cases, jdk_path, is_submission):
                         actual_output, expected_output = fail_str.split(", Expected: ")
                         results.append({"input": test_cases[test_index]["input"], 
                                         "output": actual_output, 
-                                        "expected_output": expected_output,
+                                        "expected_output": expected_output,  # This is already correct from Java output
                                         "passed": False,
                                         "error": None})
     finally:
@@ -269,3 +280,10 @@ async def compile_and_run(java_code, test_cases, jdk_path, is_submission):
         except Exception as e:
             print(f"Error cleaning up temp files: {e}")
     return results
+
+def get_display_string(java_type, var_name):
+    """Generate appropriate string representation for display."""
+    if java_type.endswith("[]"):
+        return f"Arrays.toString({var_name})"
+    else:
+        return var_name
