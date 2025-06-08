@@ -6,10 +6,12 @@ import time
 import pathlib
 import re
 import requests
+import secrets
+import webbrowser
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
-from .plugins.utils import DAEMON_USER
+from .plugins.utils import DAEMON_USER, SERVER_URL
 from rich.text import Text
 from textual import on
 from textual.screen import Screen, ModalScreen
@@ -28,20 +30,65 @@ class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 
 #TODO: Remember to send a session id! Check your API for what you need to send!
-class LoginPage(Screen):
-     def compose(self) -> ComposeResult:
-        with Vertical(id="quit_screen"):
-            yield Label(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!", id="quit_text")
+class LoginPage(ModalScreen):
+    BINDINGS = [
+        ("ctrl+q", "quit", "Quit")]
+    def on_mount(self):
+        self.is_login = False
+        self.session_id = secrets.token_hex(16)
+    def compose(self) -> ComposeResult:
+        with Vertical(id="login_screen"):
+            yield Label(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!", id="log_quit_text")
             with Horizontal(id="sign_up_buttons"):
-                yield Button.success("Sign up with Google", id="sign_google_button")
-                yield Button.warning("Sign up with Github", id="sign_github_button")
-                yield Label("Have an account?", id="have_account")
-                yield Button("Switch to Login", id="switch_button")
+                yield Button.success("Sign up with Google", id="google_button")
+                yield Button.warning("Sign up with Github", id="github_button")
+            yield Label("Have an account?", id="have_account")
+            yield Button("Switch to Login", id="switch_button")
+        yield Footer()
         
-        def on_button_pressed(event: Button.Pressed):
-            match event.button.id:
-                case 'sign_google_button':
-                    pass
+    def on_button_pressed(self, event: Button.Pressed):
+        match event.button.id:
+            case 'switch_button':
+                google_button = self.query_one("#google_button", Button)
+                github_button = self.query_one("#github_button", Button)
+                switch_button = self.query_one("#switch_button", Button)
+                have_account = self.query_one("#have_account", Label)
+                top_label = self.query_one("#log_quit_text", Label)
+                if not self.is_login:
+                    google_button.label = "Log in with Google"
+                    github_button.label = "Log in with Github"
+                    switch_button.label = "Switch to Signup"
+                    have_account.update("Need an account?")
+                    top_label.update(f"{DAEMON_USER} Heya, welcome back!")
+                    self.is_login = True
+                else:
+                    google_button.label = "Sign up with Google"
+                    github_button.label = "Sign up with Github"
+                    switch_button.label = "Switch to Login"
+                    have_account.update("Have an account?")
+                    top_label.update(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!")
+                    self.is_login = False
+            case 'sign_google_button':
+                try:
+                    data=requests.get(f"{SERVER_URL}/auth/google?session_id={self.session_id}").json()
+                except Exception as e:
+                    self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]",
+                        severity="warning",
+                        timeout=5,
+                        markup=True
+                    )
+                    log_dir = pathlib.Path.home() / ".nyxbox"
+                    log_dir.mkdir(exist_ok=True)
+                    log_path = log_dir / "login.log"
+                    with log_path.open("a") as f:
+                        f.write(f"ERROR: {e}\n")
+                    return
+                google_link = data.get("auth_url")
+                webbrowser.open(google_link)
+    def action_quit(self):
+        exit()
 class SearchComplete(Message):
     """Message passed upon the user selecting a challenge in SearchForProblem"""
     def __init__(self, challenge):
@@ -191,6 +238,7 @@ class NyxBox(App):
         self.editor_opened = False
         self.has_vended = False
         self.current_challenge = None
+        self.app.push_screen(LoginPage()) #TODO: Check if there is already a token
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
