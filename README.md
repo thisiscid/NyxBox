@@ -64,6 +64,6 @@ This is temporarily no longer recommended as I work on a backend.
 - Run in a terminal supporting Unicode and colors like [Ghostty](https://ghostty.org), [Alacritty](https://alacritty.org), or others.
 
 ## Credits
-1. Copilot for helping me debug
+1. Copilot for helping me debug (and with the html for the authentication stuff, lifesaver bcs I don't know frontend...)
 2. Textual for providing the underlying framework for the TUI
 3. You! For using it! Thank you!

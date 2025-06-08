@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, Header
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import session, Session
 import sqlalchemy
 from database import create_tables, get_db
@@ -16,6 +17,32 @@ import secrets
 
 oauth_state = {}
 pending_auth: dict[str, dict] = {}
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token") 
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        if not settings.JWT_SECRET:
+            # This is a server configuration error
+            raise HTTPException(status_code=500, detail="JWT_SECRET not configured on server")
+        
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        user_id_from_payload: Optional[int] = payload.get("user_id")
+        if user_id_from_payload is None:
+            raise credentials_exception
+    except JWTError: # Handles expired tokens, invalid signatures, etc.
+        raise credentials_exception
+    
+    user = db.query(User).filter(User.id == user_id_from_payload).first()
+    if user is None:
+        # User ID from a valid token not found in DB (e.g., user deleted after token issuance)
+        raise credentials_exception
+    return user
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -404,18 +431,19 @@ def logout_user(refresh_jwt: str, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Logged out successfully"}
 
+# Change to use JWT
 @app.get("/auth/me") # Get user info
-def user_info(refresh_jwt: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.refresh_jwt == refresh_jwt).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
-    return {"id": user.id, 
-            "email": user.email, 
-            "name": user.name, 
-            "google_id": user.google_id, 
-            "github_id": user.github_id, 
-            "avatar": user.avatar_url
-            }
+async def user_info(current_user: User = Depends(get_current_user)): # Changed signature
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "google_id": current_user.google_id,
+        "github_id": current_user.github_id,
+        "avatar_url": current_user.avatar_url,
+        "bio": current_user.bio,
+        "created_at": current_user.created_at
+    }
 
 @app.get("/auth/check-status/{session_id}")
 async def check_auth_status(session_id: str):
@@ -434,6 +462,7 @@ async def check_auth_status(session_id: str):
             return result
     
     return {"status": "pending"}
+
 #Challenge related things
 @app.get("/challenges") # List challenges  
 def list_available_challs():
