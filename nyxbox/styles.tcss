@@ -226,59 +226,54 @@ ResultModal {
   content-align: center middle
 }
 
-#LoginPage {
-  width: 10%;           /* increase width */
-  height: 10%;    
-  align: center middle;
-  content-align: center middle;
-  border: tall #3b82f6;
-  background: #222; /* solid box */
-  padding: 2;
-}
-
-LoginPage {
-  width: 10%;           /* increase width */
-  height: 10%;    
-  align: center middle;
-  content-align: center middle;
-  background: #222; /* solid box */
-  padding: 2;
-}
-
-
 #login_screen {
     align: center middle;
     content-align: center middle;
-    width: 60;
-    min-height: 12;
+    width: 75;
+    min-width: 70;
     max-width: 80;
+    min-height: 20;
+    max-height: 30;
     border: tall #3b82f6;
     background: #222;
     padding: 2 4;
 }
 
-#switch_button {
+#sign_up_buttons {
     align: center middle;
-    margin-top: 1;
+    content-align: center middle;
+    margin-bottom: 0;
+    width: 100%
+}
+#sign_up_buttons Button {
+    width: 22;
+    min-width: 20;
+    max-width: 24;
+    height: 3;
+}
+
+#switch_choice {
+    align: center middle;
+    content-align: center middle;
+    width: 100%;
+    /*max-width: 60;
+    min-width: 30;*/
+    margin-top: 0;
+    margin-bottom: 0;
+    padding: 0;
 }
 
 #have_account {
     align: center middle;
-    width: 100%;
-    margin-top: 1;
-}
-/*#sign_up_buttons {
-    align: center middle;
     content-align: center middle;
-    width: 80%;
-    min-width: 40;
-    max-width: 80;
-    padding: 1 0
+    margin-bottom: 0;
+    margin-top: 0;
 }
 
-#have_account {
+#switch_button, #quit_app_login {
     align: center middle;
-    content-align: center middle;
     width: 100%;
-    padding-top: 1;
-}*/
+    margin-top: 0;
+    margin-bottom: 0;
+    height: 3;
+}

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, Header
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import session, Session
 import sqlalchemy
 from database import create_tables, get_db
@@ -15,6 +15,7 @@ from typing import Optional
 import secrets
 
 oauth_state = {}
+pending_auth: dict[str, dict] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -99,7 +100,27 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         claims={"user_id": user.id, "exp": datetime.now(timezone.utc)+timedelta(hours=1), "iat": datetime.now(timezone.utc)},
         key=settings.JWT_SECRET
     )
-    return {"message": "Google login successful", "jwt": user_jwt, "refresh": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
+    pending_auth[original_session_id] = {
+        "completed": True,
+        "access_token": user_jwt,
+        "refresh_token": refresh_jwt,
+        "user_data": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email
+        }
+    }
+    return HTMLResponse("""
+    <html>
+        <head><title>Authentication Successful</title></head>
+        <body>
+            <h1>✅ Authentication Successful!</h1>
+            <p>You can now close this window and return to NyxBox.</p>
+            <script>window.close();</script>
+        </body>
+    </html>
+    """) 
+    # return {"message": "Google login successful", "jwt": user_jwt, "refresh": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 @app.get("/auth/github") # Start Github OAuth flow
 def begin_github_auth(session_id: str):
@@ -232,6 +253,22 @@ def user_info(refresh_jwt: str, db: Session = Depends(get_db)):
             "avatar": user.avatar_url
             }
 
+@app.get("/auth/check-status/{session_id}")
+async def check_auth_status(session_id: str):
+    """Check if authentication is complete for this session"""
+    if session_id in pending_auth:
+        auth_data = pending_auth[session_id]
+        if auth_data.get("completed"):
+            # Return tokens and clean up
+            result = {
+                "status": "completed",
+                "access_token": auth_data["access_token"],
+                "user_data": auth_data["user_data"]
+            }
+            del pending_auth[session_id]  # Clean up
+            return result
+    
+    return {"status": "pending"}
 #Challenge related things
 @app.get("/challenges") # List challenges  
 def list_available_challs():

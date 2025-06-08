@@ -39,15 +39,18 @@ class LoginPage(ModalScreen):
     def compose(self) -> ComposeResult:
         with Vertical(id="login_screen"):
             yield Label(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!", id="log_quit_text")
-            with Horizontal(id="sign_up_buttons"):
-                yield Button.success("Sign up with Google", id="google_button")
-                yield Button.warning("Sign up with Github", id="github_button")
-            yield Label("Have an account?", id="have_account")
-            yield Button("Switch to Login", id="switch_button")
-        yield Footer()
-        
+            with Vertical(id="switch_choice"):
+                with Horizontal(id="sign_up_buttons"):
+                    yield Button.success("Sign up with Google", id="google_button")
+                    yield Button.warning("Sign up with Github", id="github_button")
+                yield Label("Have an account?", id="have_account")
+                yield Button("Switch to Login", id="switch_button")
+                yield Button("Quit app", id="quit_app_login")
+
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
+            case "quit_app_login":
+                self.action_quit()
             case 'switch_button':
                 google_button = self.query_one("#google_button", Button)
                 github_button = self.query_one("#github_button", Button)
@@ -68,7 +71,7 @@ class LoginPage(ModalScreen):
                     have_account.update("Have an account?")
                     top_label.update(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!")
                     self.is_login = False
-            case 'sign_google_button':
+            case 'google_button':
                 try:
                     data=requests.get(f"{SERVER_URL}/auth/google?session_id={self.session_id}").json()
                 except Exception as e:
@@ -88,7 +91,7 @@ class LoginPage(ModalScreen):
                 google_link = data.get("auth_url")
                 webbrowser.open(google_link)
     def action_quit(self):
-        exit()
+        self.app.exit()
 class SearchComplete(Message):
     """Message passed upon the user selecting a challenge in SearchForProblem"""
     def __init__(self, challenge):
