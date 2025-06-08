@@ -100,6 +100,8 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         claims={"user_id": user.id, "exp": datetime.now(timezone.utc)+timedelta(hours=1), "iat": datetime.now(timezone.utc)},
         key=settings.JWT_SECRET
     )
+    if not original_session_id:
+        raise HTTPException(status_code=400, detail="Invalid or expired state")
     pending_auth[original_session_id] = {
         "completed": True,
         "access_token": user_jwt,
@@ -110,16 +112,85 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
             "email": user.email
         }
     }
-    return HTMLResponse("""
+    return HTMLResponse(f"""
     <html>
-        <head><title>Authentication Successful</title></head>
+        <head>
+            <title>Authentication Successful</title>
+            <style>
+                body {{
+                    display: flex;
+                    justify-content: center; /* Horizontally center the .terminal-window */
+                    align-items: center;    /* Vertically center the .terminal-window */
+                    min-height: 100vh;
+                    margin: 0;
+                    background-color: #282c34; /* A slightly different page background */
+                    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+                    color: #d0d0d0; /* Default light text color for the page */
+                }}
+                .terminal-window {{
+                    background-color: #1e1e1e; /* Dark terminal background */
+                    border: 1px solid #000;
+                    border-radius: 6px;
+                    padding: 25px;
+                    width: 90%;
+                    max-width: 650px;
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+                    /* The content inside will be block, text-align left handles the rest */
+                }}
+                .terminal-window .checkmark {{
+                    font-size: 2.5em; /* Adjusted size */
+                    color: #98c379;
+                    margin-bottom: 15px;
+                    text-align: left; /* Checkmark also to the left */
+                }}
+                .terminal-window h1 {{
+                    color: #61afef;
+                    margin-top: 0;
+                    margin-bottom: 15px;
+                    font-size: 1.4em;
+                    text-align: left;
+                }}
+                .terminal-window p {{
+                    font-size: 1em;
+                    line-height: 1.6;
+                    text-align: left;
+                    margin-bottom: 10px;
+                }}
+                .terminal-window p.small-text {{
+                    font-size: 0.85em;
+                    color: #888; /* Dimmer color for the auto-close message */
+                    text-align: left;
+                }}
+                .daemon-user-nyx {{
+                    color: #B3507D;
+                    font-weight: bold;
+                }}
+                .daemon-user-hackclub {{
+                    color: #A3C9F9;
+                }}
+            </style>
+        </head>
         <body>
-            <h1>✅ Authentication Successful!</h1>
-            <p>You can now close this window and return to NyxBox.</p>
-            <script>window.close();</script>
+            <div class="terminal-window">
+                <div class="checkmark">✓</div>
+                <h1>
+                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
+                    Authentication Successful!
+                </h1>
+                <p>
+                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
+                    You can now close this window and return to NyxBox.
+                </p>
+                <p class="small-text">(This window should close automatically shortly.)</p>
+            </div>
+            <script>
+                setTimeout(function() {{
+                    window.close();
+                }}, 2000); // Slightly longer delay
+            </script>
         </body>
     </html>
-    """) 
+    """)
     # return {"message": "Google login successful", "jwt": user_jwt, "refresh": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 @app.get("/auth/github") # Start Github OAuth flow
@@ -167,7 +238,6 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         emails = email_resp.json()
         primary_email = next((email['email'] for email in emails if email['primary']), None)
         user_info['email'] = primary_email
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user info: {str(e)}")
     refresh_jwt=str(secrets.token_hex(32))
@@ -200,7 +270,101 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         claims={"user_id": user.id, "exp": datetime.now(timezone.utc)+timedelta(hours=1), "iat": datetime.now(timezone.utc)},
         key=settings.JWT_SECRET
     )
-    return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
+    if not original_session_id:
+        raise HTTPException(status_code=400, detail="Invalid or expired state")
+    
+    pending_auth[original_session_id] = {
+        "completed": True,
+        "access_token": user_jwt,
+        "refresh_token": refresh_jwt,
+        "user_data": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email
+        }
+    }
+
+    return HTMLResponse(f"""
+    <html>
+        <head>
+            <title>Authentication Successful</title>
+            <style>
+                body {{
+                    display: flex;
+                    justify-content: center; /* Horizontally center the .terminal-window */
+                    align-items: center;    /* Vertically center the .terminal-window */
+                    min-height: 100vh;
+                    margin: 0;
+                    background-color: #282c34; /* A slightly different page background */
+                    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+                    color: #d0d0d0; /* Default light text color for the page */
+                }}
+                .terminal-window {{
+                    background-color: #1e1e1e; /* Dark terminal background */
+                    border: 1px solid #000;
+                    border-radius: 6px;
+                    padding: 25px;
+                    width: 90%;
+                    max-width: 650px;
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+                    /* The content inside will be block, text-align left handles the rest */
+                }}
+                .terminal-window .checkmark {{
+                    font-size: 2.5em; /* Adjusted size */
+                    color: #98c379;
+                    margin-bottom: 15px;
+                    text-align: left; /* Checkmark also to the left */
+                }}
+                .terminal-window h1 {{
+                    color: #61afef;
+                    margin-top: 0;
+                    margin-bottom: 15px;
+                    font-size: 1.4em;
+                    text-align: left;
+                }}
+                .terminal-window p {{
+                    font-size: 1em;
+                    line-height: 1.6;
+                    text-align: left;
+                    margin-bottom: 10px;
+                }}
+                .terminal-window p.small-text {{
+                    font-size: 0.85em;
+                    color: #888; /* Dimmer color for the auto-close message */
+                    text-align: left;
+                }}
+                .daemon-user-nyx {{
+                    color: #B3507D;
+                    font-weight: bold;
+                }}
+                .daemon-user-hackclub {{
+                    color: #A3C9F9;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="terminal-window">
+                <div class="checkmark">✓</div>
+                <h1>
+                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
+                    Authentication Successful!
+                </h1>
+                <p>
+                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
+                    You can now close this window and return to NyxBox.
+                </p>
+                <p class="small-text">(This window should close automatically shortly.)</p>
+            </div>
+            <script>
+                setTimeout(function() {{
+                    window.close();
+                }}, 2000); // Slightly longer delay
+            </script>
+        </body>
+    </html>
+    """)
+# ...existing code...
+    # return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 @app.get("/auth/refresh") # To get a new JWT with a valid refresh jwt
 def refresh_jwt(request: Request, refresh_jwt: str, db: Session = Depends(get_db)):
@@ -263,7 +427,8 @@ async def check_auth_status(session_id: str):
             result = {
                 "status": "completed",
                 "access_token": auth_data["access_token"],
-                "user_data": auth_data["user_data"]
+                "user_data": auth_data["user_data"],
+                "refresh_token": auth_data.get("refresh_token")
             }
             del pending_auth[session_id]  # Clean up
             return result

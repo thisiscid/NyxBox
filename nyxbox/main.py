@@ -29,6 +29,79 @@ except PackageNotFoundError:
 class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 
+class WaitingForAuthScreen(ModalScreen):
+    def __init__(self, session_id: str):
+        super().__init__()
+        self.session_id = session_id
+        self.polling = True
+        
+    BINDINGS = [
+            ("ctrl+q", "quit", "Quit")]
+    def compose(self) -> ComposeResult:
+        with Vertical(id="waiting_for_login_container"):
+            yield Label(f"{DAEMON_USER} Waiting for authentication...", id="log_auth_wait_text")
+            yield Label(f"{DAEMON_USER} Complete logging in in your browser!", id="log_auth_wait_text2")
+            yield Button("Cancel", id="cancel_auth")
+
+
+    def on_button_pressed(self, event: Button.Pressed):
+        match event.button.id:
+            case "quit_app_login":
+                self.action_quit()
+            case "cancel_auth":
+                self.polling = False
+                self.dismiss()
+    def action_quit(self):
+        self.app.exit()
+    def on_mount(self):
+        self.set_timer(2.0, self.check_auth_status)
+
+    async def check_auth_status(self):
+        if not self.polling:
+            return
+        
+        try:
+            response = requests.get(f"{SERVER_URL}/auth/check-status/{self.session_id}").json()
+            if response["status"] == "completed":
+                self.polling = False
+                self.save_tokens(response["access_token"], response["user_data"], response["refresh_token"])
+                self.dismiss()
+                return
+            else:
+                self.set_timer(2.0, self.check_auth_status)
+        except Exception as e:
+            self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]",
+                        severity="warning",
+                        timeout=5,
+                        markup=True
+                    )
+            log_dir = pathlib.Path.home() / ".nyxbox"
+            log_dir.mkdir(exist_ok=True)
+            log_path = pathlib.Path.joinpath(log_dir, "login.log")
+            with log_path.open("a") as f:
+                f.write(f"ERROR: {e}\n")
+            if self.polling:
+                self.set_timer(2.0, self.check_auth_status)
+
+    def save_tokens(self, access_token: str, user_data: dict, refresh_token):
+        # Save to local storage
+        auth_dir = pathlib.Path.home() / ".nyxbox"
+        auth_dir.mkdir(exist_ok=True)
+        
+        auth_data = {
+            "access_token": access_token,
+            "user_data": user_data,
+            "refresh_token": refresh_token,
+            "timestamp": time.time()
+        }
+        
+        with open(auth_dir / "auth.json", "w") as f:
+            json.dump(auth_data, f)
+        
+        self.notify(f"Welcome, {user_data.get('name', 'User')}!", severity="information")
+    
 #TODO: Remember to send a session id! Check your API for what you need to send!
 class LoginPage(ModalScreen):
     BINDINGS = [
@@ -90,6 +163,27 @@ class LoginPage(ModalScreen):
                     return
                 google_link = data.get("auth_url")
                 webbrowser.open(google_link)
+                self.app.push_screen(WaitingForAuthScreen(self.session_id))
+            case 'github_button':
+                try:
+                    data=requests.get(f"{SERVER_URL}/auth/github?session_id={self.session_id}").json()
+                except Exception as e:
+                    self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]",
+                        severity="warning",
+                        timeout=5,
+                        markup=True
+                    )
+                    log_dir = pathlib.Path.home() / ".nyxbox"
+                    log_dir.mkdir(exist_ok=True)
+                    log_path = log_dir / "login.log"
+                    with log_path.open("a") as f:
+                        f.write(f"ERROR: {e}\n")
+                    return
+                github_link = data.get("auth_url")
+                webbrowser.open(github_link)
+                self.app.push_screen(WaitingForAuthScreen(self.session_id))
     def action_quit(self):
         self.app.exit()
 class SearchComplete(Message):

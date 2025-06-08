@@ -277,3 +277,30 @@ ResultModal {
     margin-bottom: 0;
     height: 3;
 }
+
+#waiting_for_login_container {
+    align: center middle;
+    content-align: center middle;
+    width: 70;
+    min-width: 70;
+    max-width: 75;
+    min-height: 13;
+    max-height: 15;
+    border: tall #3b82f6;
+    background: #222;
+    padding: 2 4;
+}
+
+#waiting_for_login_container Label {
+    align: center middle;
+    content-align: center middle;
+    margin-bottom: 1;
+}
+
+#waiting_for_login_container Button {
+    align: center middle;
+    width: 20;
+    min-width: 12;
+    height: 3;
+    margin-top: 1;
+}
