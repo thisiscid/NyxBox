@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import session, Session
 import sqlalchemy
 from database import create_tables, get_db
-from models import User, Challenges
+from models import User, Challenges, UserSolve, UserLike
 from contextlib import asynccontextmanager
 import typing
 from authlib.integrations.requests_client import OAuth2Session
@@ -36,7 +36,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     )
     try:
         if not settings.JWT_SECRET:
-            # This is a server configuration error
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured on server")
         
         payload = jwt.decode(token, settings.JWT_SECRET)
@@ -48,7 +47,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     
     user = db.query(User).filter(User.id == user_id_from_payload).first()
     if user is None:
-        # User ID from a valid token not found in DB (e.g., user deleted after token issuance)
         raise credentials_exception
     return user
 
@@ -510,8 +508,8 @@ def list_available_challs(db: Session = Depends(get_db)):
     return ret_challs
 # When the user access a challenge, the frontend should call /challenges/id and cache it locally
 
-@app.get("/challenges/{id}", response_model=ChallengeDetailSchema) # Get challenge
-def get_chall_by_id(id: int, db: Session = Depends(get_db)):
+@app.get("/challenges/{chall_id}", response_model=ChallengeDetailSchema) # Get challenge
+def get_chall_by_id(chall_id: int, db: Session = Depends(get_db)):
     chall = db.query(Challenges).filter(Challenges.id == id, Challenges.flagged == False).first()
     if chall:
         return chall
@@ -520,15 +518,79 @@ def get_chall_by_id(id: int, db: Session = Depends(get_db)):
 
 # @app.get("/challenges/{id}/approve") This might not be needed? We can make an interface to approve it locally
 
-@app.post("/challenges/{id}/submit") # Submit solution
-def submit_solution_by_id(id: int, db: Session = Depends(get_db)):
-    chall = db.query(Challenges).filter(Challenges.id == id).first()
+@app.post("/challenges/{chall_id}/submit") # Submit solution
+def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # We dont need to evaluate code locally bcs:
+    # 1. We already have the user evaluate code
+    # 2. It's very hard to secure
+    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()
     if not chall:
         raise HTTPException(404, detail="No such challenge")
-    if chall.solves is None:
-        chall.solves = 1 #type: ignore
+    
+    # Check if user already solved this (prevent duplicate counting)
+    existing_solve = db.query(UserSolve).filter(
+        UserSolve.user_id == current_user.id, 
+        UserSolve.challenge_id == chall_id
+    ).first()
+    
+    if not existing_solve:
+        # Create solve record
+        user_solve = UserSolve(user_id=current_user.id, challenge_id=chall_id)
+        db.add(user_solve)
+        
+        # Increment solve count
+        chall.solves = (chall.solves or 0) + 1 # type: ignore
         db.commit()
-    else:
-        chall.solves+=1 #type: ignore
-        db.commit()
-    return {"id": id, "solves": chall.solves} #type: ignore
+    
+    return {"id": chall_id, "solves": chall.solves, "already_solved": bool(existing_solve)}
+
+# I forgot but we probably should authenticate to prevent mass spam?
+@app.post("/challenges/{chall_id}/like")
+def like_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()
+    if not chall:
+        raise HTTPException(404, detail="No such challenge")
+    
+    existing_like = db.query(UserLike).filter(
+        UserLike.user_id == current_user.id,
+        UserLike.challenge_id == chall_id
+    ).first()
+    
+    if existing_like:
+        raise HTTPException(400, detail="Already liked this challenge")
+    
+    user_like = UserLike(user_id=current_user.id, challenge_id=chall_id)
+    db.add(user_like)
+    
+    chall.likes = (chall.likes or 0) + 1 # type: ignore
+    db.commit()
+    
+    return {"id": chall_id, "likes": chall.likes}
+
+@app.delete("/challenges/{chall_id}/unlike")
+def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()
+    if not chall:
+        raise HTTPException(404, detail="No such challenge")
+    existing_like = db.query(UserLike).filter(
+        UserLike.user_id == current_user.id,
+        UserLike.challenge_id == chall_id
+    ).first()
+
+    if not existing_like:
+        raise HTTPException(400, detail="User has not liked challenge")
+    
+    if chall.likes == 0 or None: # type: ignore
+        raise HTTPException(500, detail="No likes on challenge")
+
+    user_like = UserLike(user_id=current_user.id, challenge_id=chall_id)
+    db.delete(user_like)
+    
+    chall.likes = (chall.likes)-1 # type: ignore
+    db.commit()
+
+    return {"id": chall_id, "likes": chall.likes}
+
+@app.post("/challenges")
+def create_challenge(challenge_data: dict, jwt: str, db: Session = Depends(get_db)):
+    pass

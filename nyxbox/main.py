@@ -24,7 +24,7 @@ from textual.message import Message
 from importlib.resources import files
 from importlib.metadata import version, PackageNotFoundError
 from datetime import datetime
-
+#TODO: Make sure all calls that need authentication actually use the JWT OR try to get a new one
 try:
     nyxbox_version = version("nyxbox")
 except PackageNotFoundError:
@@ -32,6 +32,13 @@ except PackageNotFoundError:
 class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 #TODO: Move most of this auth stuff to a seperate file (auth_utils.py)
+
+class NewToken(Message):
+    def __init__(self, access_token, refresh_token):
+        super().__init__()
+        self.access_token = access_token
+        self.refresh_token = refresh_token
+        
 class AuthComplete(Message):
     def __init__(self, auth_data, user_data):
         super().__init__()
@@ -542,6 +549,7 @@ class NyxBox(App):
     def authentication_complete(self, message: AuthComplete):
         self.auth_data = message.auth_data
         self.user_data = message.user_data
+        self.jwt_token = self.auth_data.get('access_token')
 
     @on(LanguageSelected)
     def handle_language_selection(self, message: LanguageSelected):
