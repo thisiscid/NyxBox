@@ -37,7 +37,7 @@ class Challenges(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     description = Column(String, unique=True, nullable=False)
-    tests = Column(JSON)
+    tests = Column(JSON, nullable=False)
     points = Column(Integer, default=0)  # Points/score for solving
     author = Column(String, nullable=True)  # Who created the challenge
     difficulty = Column(String, nullable=False)

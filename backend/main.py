@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import session, Session
 import sqlalchemy
 from database import create_tables, get_db
-from models import User
+from models import User, Challenges
 from contextlib import asynccontextmanager
 from authlib.integrations.requests_client import OAuth2Session
 from jose import JWTError, jwt
@@ -31,7 +31,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
             # This is a server configuration error
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured on server")
         
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.JWT_SECRET)
         user_id_from_payload: Optional[int] = payload.get("user_id")
         if user_id_from_payload is None:
             raise credentials_exception

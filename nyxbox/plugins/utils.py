@@ -1,5 +1,6 @@
 import random
-
+import pathlib
+import time
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 SERVER_URL="http://localhost:8000"
 def escape_brackets(s):
@@ -49,3 +50,13 @@ def format_result(result):
             f"{DAEMON_USER} [red][bold]Oops, this is unusual! A bug report would be super helpful.[/bold][/red]"
         ]
         return f"{random.choice(FALLBACK_MESSAGES)} Attempted to input {result}"
+
+def create_log(path, severity, message):
+     if pathlib.Path.exists(path):
+        with open(path, 'a') as f:
+            if severity == "error":
+                f.write(f"{time.time()} ERROR: {message}")
+            elif severity == "warning":
+                f.write(f"{time.time()} WARNING: {message}")
+            else:
+                f.write(f"{time.time()} INFO: {message}")

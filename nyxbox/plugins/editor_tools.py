@@ -20,7 +20,7 @@ from .code_runners.cpp_runner import run_cpp_code
 from .code_runners.java_runner import run_java_code
 from .code_runners.py_runner import run_python_code
 from .code_runners.js_runner import run_js_code
-from .utils import escape_brackets, format_result, DAEMON_USER
+from .utils import escape_brackets, format_result, create_log, DAEMON_USER
 import tree_sitter_cpp
 from tree_sitter import Language
 # TODO:
@@ -33,6 +33,7 @@ from tree_sitter import Language
 
 # Most of the below are messages that are sent when something happens that the app has to handle
 # It's bcs u cant just return somehting
+# Wait, i should've just done self.dismiss() </3
 class EditorClosed(Message):
     """Message passed when user has closed editor"""
     pass
@@ -58,9 +59,6 @@ class UserCodeError(Exception):
     """Custom exception for user code errors."""
     pass # Man is this even used??
 
-
-# moreof a template than anything, i gotta fix it
-# do this later, you need to get the main flow working first
 class ResultModal(ModalScreen):
     def __init__(self, results, challenge: dict, test_widget_instance, is_success=False):
         super().__init__()
@@ -68,7 +66,15 @@ class ResultModal(ModalScreen):
         self.chall = challenge
         self.is_success = is_success
         self.test_widget_instance = test_widget_instance
-        self.passed=[r for r in results if r.get("passed")]
+        # passed = True
+        self.passed=[]
+        # while passed:
+        for result in self.results:
+            if result.get("passed", False):
+                self.passed.append(result)
+            else:
+                # passed = False
+                break
     
     def compose(self) -> ComposeResult:
         CONGRATULATION_MESSAGE=[
@@ -84,7 +90,7 @@ class ResultModal(ModalScreen):
         ]
         if self.is_success:
             with Vertical(id="result_container"):
-                yield Label(f"{random.choice(CONGRATULATION_MESSAGE)}\nThere were {len(self.results)} tests and you passed them all for {self.chall.get("name")}!", id="message_title")
+                yield Label(f"{random.choice(CONGRATULATION_MESSAGE)}\nThere were {len(self.chall.get('tests', []))} tests and you passed them all for {self.chall.get("name")}!", id="message_title")
                 with Horizontal(id="action_buttons"):
                     yield Button("Exit to Menu", id="exit_to_menu", variant="error")
                     yield Button("Keep Coding", id="keep_coding", variant="primary")
@@ -92,7 +98,7 @@ class ResultModal(ModalScreen):
         else:
             with Vertical(id="result_container"):
                 yield Label(f"{random.choice(IS_SUCCESS_FALSE_MESSAGE)}", id="message_title")
-                yield Label(f"There were {len(self.results)} tests! Unfortuantely, you only passed {len(self.passed)} tests.", id="amount_failed")
+                yield Label(f"There were {len(self.chall.get('tests', []))} tests! Unfortuantely, you only passed {len(self.passed)} tests.", id="amount_failed")
                 with Horizontal(id="action_buttons"):
                     yield Button("Exit to Menu", id="exit_to_menu", variant="error")
                     yield Button("Keep Coding", id="keep_coding_not_success", variant="primary")
@@ -112,7 +118,7 @@ class ResultModal(ModalScreen):
                 sumbit_tabs.active = "submit_tabs"
                 self.app.pop_screen()
             case "next_challenge":
-                pass
+                pass #maybe do by ID? i'm unsure how to sort this)
 
 class TestResultsWidget(Widget):
     """Custom widget to implement tabbed view of chall + tests"""
@@ -137,12 +143,10 @@ class TestResultsWidget(Widget):
     def compose(self) -> ComposeResult:
         """TODO: List of messages to pick out of """
         with TabbedContent(id="results_tabs"):
-            with TabPane("Challenge", id="challenge_tab_pane"): #Remember: random list!
+            with TabPane("Challenge", id="challenge_tab_pane"): 
                 with ScrollableContainer():
                     yield Static(f"{DAEMON_USER} Working on getting your challenge...", id="challenge_content_static")
             with TabPane("Submit Results", id="submit_tabs"): 
-                # IT SEEMS TO WORK WITH SCROLLABLE CONTAINER BUT NOT TABBED CONTENT??
-                # I'm gonna crash \ fr though, i'll keep debugging bcs thats weird?
                 with ScrollableContainer():
                     self.PRE_SUBMIT_MESSAGES=[
                         f"{DAEMON_USER} The best things start from nothing. Keep at it and submit when you're ready!",
@@ -151,9 +155,6 @@ class TestResultsWidget(Widget):
                         f"{DAEMON_USER} Hack the planet!"
                     ]
                     yield Static(random.choice(self.PRE_SUBMIT_MESSAGES), id="submit_static")
-                # with TabbedContent(id="submit_inner_tabs"):                    
-                #     with TabPane("Summary"):
-                #         yield Static(f"{DAEMON_USER} Psst...you might want to click that submit button...", id="submit_summary_static")
             with TabPane("All Tests", id="all_tests_tab_pane"):
                 with ScrollableContainer():
                     self.PRE_RUN_MESSAGES=[
@@ -292,7 +293,7 @@ class TestResultsWidget(Widget):
             summary += f"{random.choice(ERROR_MESSAGE)}\nInput: {escape_brackets(last_error.get('input'))}\nError: {escape_brackets(last_error.get('error'))}\n\n"
         elif passed:
             summary += random.choice(ALL_PASSED_MESSAGE)
-        self.app.push_screen(ResultModal(self.results, chall, self, len(failed) == 0))
+        self.app.push_screen(ResultModal(results, chall, self, len(failed) == 0))
         submit_static.update(summary)
         self.refresh()
 

@@ -27,20 +27,44 @@ Latest - 0.1.2
 ---
 
 ## Getting Started
+## Backend
+To run the backend, do the following.
+### 1. Create a .env file
+A .env file in the folder of the backend must be created. Here's what it should look like.
+```bash
+GOOGLE_CLIENT_ID=your-google-client.id.here
+GOOGLE_CLIENT_SECRET=GOCSPX-your-google-oauth-secret-here
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+GITHUB_CLIENT_ID=your-github-client-id-here
+GITHUB_CLIENT_SECRET=your-github-oauth-secret-here
+GITHUB_REDIRECT_URI=http://localhost:8000/auth/github/callback
+JWT_SECRET=your-jwt-secret-here
+DATABASE_URL=sqlite:///./nyxbox.db
+API_BASE_URL = http://localhost:8000
+```
+JWT_SECRET is just a random combination of letters, you can just random SHA256 hash something potentially (i'm unsure about the max length of JWT_SECRET). Yes, this will involve grabbing your own OAuth secrets and clients.
 
-## Method 1: Install via pip
-### 1. Install Requirements
+### 2. Run via uvicorn
+Inside of the backend folder, run 
+```bash
+uvicorn main:app
+```
+Make sure that it is running on port 8000. **Furthermore, set your redirects inside of Google and Github OAuth to localhost:8000/auth/github/callback or localhost:8000/auth/google/callback.**
+
+## Frontend
+### Method 1: Install via pip
+#### 1. Install Requirements
 Install nyxbox via pip.
 ```bash
 pip install nyxbox
 ```
 Make sure you have clang++ or g++ installed, or Node.js for JavaScript if planning on using these langs, as NyxBox uses these to run your challenges written in C++ or JS. Same goes for Java (any jdk works! working on adding custom paths so it doesn't matter where you install it)
 
-### 2. Run the App
+#### 2. Run the App
 ```bash
 nyxbox
 ```
-## Method 2: Install via git
+### Method 2: Install via git
 
 Clone git repo and cd.
 
