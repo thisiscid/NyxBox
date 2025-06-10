@@ -17,6 +17,8 @@ from typing import Optional
 import secrets
 import redis
 import json
+from .models import Challenges
+from .schemas import ChallengeListItemSchema, ChallengeDetailSchema
 
 # oauth_state = {}
 # pending_auth: dict[str, dict] = {}
@@ -57,17 +59,6 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="NyxBox API", lifespan=lifespan)
-
-# @app.post('/redirect') # Create a link for redirect
-# def set_redirect_link(link: str, session_id: str):
-#     redis_client.setex(
-#         "redirect_url:{session_id}",
-#         600,  # expires in 10 minutes
-#         json.dumps({
-#             "url": link,
-#         })
-#         )
-#     return
 
 @app.get('/redirect')
 def redirect_user(token: str):
@@ -165,7 +156,7 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         raise HTTPException(status_code=400, detail="Invalid or expired state")
     redis_client.setex(
     f"pending_auth:{original_session_id}",
-    600,  # expires in 10 minutes
+    180,
     json.dumps({
         "completed": True,
         "access_token": user_jwt,
@@ -346,7 +337,7 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         raise HTTPException(status_code=400, detail="Invalid or expired state")
     redis_client.setex(
         f"pending_auth:{original_session_id}",
-        600,  # expires in 10 minutes
+        180,
         json.dumps({
             "completed": True,
             "access_token": user_jwt,
@@ -513,15 +504,21 @@ def check_auth_status(session_id: str):
         return {"status": "expired"}
 
 #Challenge related things
-@app.get("/challenges") # List challenges  
-def list_available_challs():
-    pass
+@app.get("/challenges", response_model=typing.List[ChallengeListItemSchema]) # List challenges  
+def list_available_challs(db: Session = Depends(get_db)):
+    ret_challs = db.query(Challenges).filter(Challenges.flagged == False).all()
+    return ret_challs
+# When the user access a challenge, the frontend should call /challenges/id and cache it locally
 
-@app.get("/challenges/{id}") # Get challenge
-def get_chall_by_id():
-    pass
+@app.get("/challenges/{id}", response_model=ChallengeDetailSchema) # Get challenge
+def get_chall_by_id(db: Session = Depends(get_db)):
+    chall = db.query(Challenges).filter(Challenges.id == id).first()
+    if chall:
+        return chall
+    else:
+        return HTTPException(404, detail="No such challenge")
 
-@app.get("/challenges/{id}/approve")
+# @app.get("/challenges/{id}/approve") This might not be needed? We can make an interface to approve it locally
 
 @app.post("/challenges/{id}/submit") # Submit solution
 def submit_solution_by_id():

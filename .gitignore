@@ -212,3 +212,7 @@ backend/nyxbox.db
 
 # Admin stuff
 backend/admin_tools.py
+
+#Redis stuff
+*.rdb
+dump.rdb

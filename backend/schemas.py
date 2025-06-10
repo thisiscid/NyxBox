@@ -1,9 +1,7 @@
-# ... (near other imports and model imports)
-from typing import List, Optional # Add List if not already there
+from typing import List, Optional 
 from pydantic import BaseModel
-from datetime import datetime # Ensure datetime is imported
-
-# ... (your existing User model and other Pydantic schemas if any) ...
+from datetime import datetime 
+from sqlalchemy import Column, Integer, String, JSON, DateTime, create_engine, UniqueConstraint
 
 # Schema for author information (if you add it later)
 class ChallengeAuthorSchema(BaseModel):
@@ -19,9 +17,10 @@ class ChallengeListItemSchema(BaseModel):
     id: int
     name: str
     difficulty: Optional[str] = None
+    description: str
     tags: Optional[List[str]] = None
     created_at: datetime
-    # Future/Optional fields
+    points: Optional[int] = None
     solves: Optional[int] = None
     likes: Optional[int] = None
     author: Optional[ChallengeAuthorSchema] = None # Will be null if not implemented
@@ -29,15 +28,12 @@ class ChallengeListItemSchema(BaseModel):
     class Config:
         orm_mode = True
 
-# Schema for the full details of a single challenge
+# Probably unneded
 class ChallengeDetailSchema(ChallengeListItemSchema): # Inherits from ListItem
-    description: Optional[str] = None
-    # Test cases are essential as per your last message
-    test_cases_python: Optional[str] = None
-    test_cases_javascript: Optional[str] = None
-    test_cases_cpp: Optional[str] = None
-    test_cases_java: Optional[str] = None
+    # description: Optional[str] = None
     updated_at: datetime
+    tests: JSON
+
 
 # Schema for the response when listing multiple challenges
 class PaginatedChallengeListResponse(BaseModel):

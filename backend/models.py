@@ -42,10 +42,13 @@ class Challenges(Base):
     author = Column(String, nullable=True)  # Who created the challenge
     difficulty = Column(String, nullable=False)
     function_name = Column(String, nullable=False)
-    type = Column(String, nullable=False)
-    inputs = Column(JSON, nullable=False)
+    category = Column(String, nullable=False)
+    params = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    constraints = Column(String, nullable=False)
+    notes = Column(String, nullable=True)
+    hints = Column(JSON, nullable=True)
     is_active = Column(Integer, default=1)  # 1 for active, 0 for hidden/archived
     is_approved = Column(Integer, default=0) # 0 for approved, 1 for not approved
     submitted_by = Column(Integer, sqlalchemy.ForeignKey("users.id"), nullable=True)  # User ID of submitter
