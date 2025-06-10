@@ -12,6 +12,7 @@ from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
 from .plugins.utils import create_log, DAEMON_USER, SERVER_URL
+from .plugins.auth_utils import read_user_data
 from rich.text import Text
 from textual import on
 from textual.screen import Screen, ModalScreen
@@ -30,11 +31,52 @@ except PackageNotFoundError:
 class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 
+def read_user_data():
+        auth_dir = pathlib.Path.home() / ".nyxbox"
+        try:
+            auth_dir = pathlib.Path.home() / ".nyxbox"
+            if pathlib.Path.is_dir(auth_dir):
+                with open(auth_dir / "auth.json", "r") as f:
+                    return json.load(f)
+        except Exception as e:
+            create_log(auth_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
 class AuthComplete(Message):
     def __init__(self, auth_data, user_data):
         super().__init__()
         self.auth_data = auth_data
         self.user_data = user_data
+
+class ProfileDetailsScreen(ModalScreen):
+    def __init__(self) -> None:
+        super().__init__()
+        self.user_data = read_user_data()
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="profile_details_container"):
+            MESSAGE_CHOICES=[
+                f"{DAEMON_USER} Let's see what I have on you...",
+                f"{DAEMON_USER} What have we got here?",
+                f"{DAEMON_USER} Maybe theres something juicy in here?",
+                f"{DAEMON_USER} Pulling up your information now!"
+            ]
+            if self.user_data and not self.user_data.get('error', None):
+                user_info = self.user_data.get('user_data', {})
+                yield Label(random.choice(MESSAGE_CHOICES))
+                yield Rule()
+                yield Label(f"Name: {user_info.get('name', 'N/A')}")
+                yield Label(f"Email: {user_info.get('email', 'N/A')}")
+                yield Label(f"Provider: {user_info.get('provider', 'N/A')}")
+            else:
+                yield Label(f"{DAEMON_USER} Uh oh, failed to get user data!")
+            # Add more fields as needed
+            yield Rule()
+            yield Button("Close", id="close_profile")
+    
+    def on_button_pressed(self, event: Button.Pressed):
+        match event.button.id:
+            case "close_profile":
+                self.app.pop_screen()
+
 class WaitingForAuthScreen(ModalScreen):
     def __init__(self, session_id: str):
         super().__init__()
@@ -205,16 +247,7 @@ class LoginPage(ModalScreen):
     def action_quit(self):
         self.app.exit()
     
-    @staticmethod
-    def read_user_data():
-        auth_dir = pathlib.Path.home() / ".nyxbox"
-        try:
-            auth_dir = pathlib.Path.home() / ".nyxbox"
-            if pathlib.Path.is_dir(auth_dir):
-                with open(auth_dir / "auth.json", "r") as f:
-                    return json.load(f)
-        except Exception as e:
-            create_log(auth_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+    
 class SearchComplete(Message):
     """Message passed upon the user selecting a challenge in SearchForProblem"""
     def __init__(self, challenge):
@@ -352,7 +385,11 @@ class SearchForProblem(Screen):
             datatable.add_row("No challenges found matching your search.")
 class NyxBox(App):
     CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
-    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), ("e", "edit_solution", "Edit solution"), ("s", "search_button", "Search"), ("ctrl+q", "quit_app", "Quit app")]
+    BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), 
+                ("e", "edit_solution", "Edit solution"), 
+                ("s", "search_button", "Search"), 
+                ("ctrl+q", "quit_app", "Quit app"),
+                ("p", "view_profile", "View Profile")]
     TITLE = f"NyxBox {nyxbox_version}" if nyxbox_version else f"NyxBox"
     # Define some consts so we don't have to do this every time we want to show or hide a widget
     BUTTON_PANEL_ID = "button_panel"
@@ -370,13 +407,15 @@ class NyxBox(App):
                 nyx_path = pathlib.Path.home() / ".nyxbox"
                 auth_path = nyx_path / "auth.json"
                 user_path = nyx_path / "user.json"
-                with open(auth_path / "auth.json") as f:
+                with open(auth_path) as f:
                     self.auth_data = json.load(f)
                 with open(user_path) as f:
                     self.user_data = json.load(f)
                 self.notify(
-                f"{DAEMON_USER} Welcome, {self.auth_data.get('name', 'User')}!", 
+                f"{DAEMON_USER} Welcome, {self.user_data.get('name', 'User')}!", 
                 severity="information")
+            else:
+                self.app.push_screen(LoginPage()) 
         except Exception as e:
             log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
             if log:
@@ -388,8 +427,7 @@ class NyxBox(App):
                     markup=True
                 )
             self.app.push_screen(LoginPage())
-        else:
-            self.app.push_screen(LoginPage()) 
+    
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -403,6 +441,7 @@ class NyxBox(App):
                 yield Label("Price (in brownie points):")
                 yield Digits("0.00")
                 yield Button.warning("Search for item", id="search_button")
+                yield Button("View Profile", id="profile_button")
                 yield Button.success("Vend item", id="vend_button")
                 button_edit = Button.success("Begin coding!", id="edit_button")
                 button_edit.display = False
@@ -418,12 +457,18 @@ class NyxBox(App):
                 self.action_vend_challenge()
             case "edit_button":
                 self.action_edit_solution()
+            case "profile_button":
+                self.action_view_profile()
+
 
     def on_editor_closed(self, message: EditorClosed) -> None:
         self.pop_screen()
         self.get_widget_by_id('button_panel').display = True
         self.editor_opened = False
-        
+
+    def action_view_profile(self) -> None:
+        self.push_screen(ProfileDetailsScreen())
+
     def action_quit_app(self) -> None:
         self.push_screen(ConfirmExit())
 

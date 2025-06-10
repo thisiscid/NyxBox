@@ -335,3 +335,16 @@ Rule {
     height: 3;
     margin-top: 1;
 }
+
+#profile_details_container {
+    align: center middle;
+    content-align: center middle;
+    width: 60;
+    min-width: 50;
+    max-width: 70;
+    min-height: 20;
+    max-height: 25;
+    border: tall #3b82f6;
+    background: #222;
+    padding: 2;
+}
