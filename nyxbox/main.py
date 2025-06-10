@@ -16,7 +16,7 @@ from rich.text import Text
 from textual import on
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits, Input, ListView, DataTable
+from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits, Input, ListView, DataTable, Rule
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from importlib.resources import files
@@ -40,6 +40,7 @@ class WaitingForAuthScreen(ModalScreen):
         super().__init__()
         self.session_id = session_id
         self.polling = True
+        self.has_notified=False
         
     BINDINGS = [
             ("ctrl+q", "quit", "Quit")]
@@ -65,7 +66,6 @@ class WaitingForAuthScreen(ModalScreen):
     async def check_auth_status(self):
         if not self.polling:
             return
-        
         try:
             response = requests.get(f"{SERVER_URL}/auth/check-status/{self.session_id}").json()
             if response["status"] == "completed":
@@ -77,18 +77,21 @@ class WaitingForAuthScreen(ModalScreen):
             else:
                 self.set_timer(2.0, self.check_auth_status)
         except Exception as e:
-            self.notify(
+            if not self.has_notified:
+                self.notify(
                         title="Uh oh, something went wrong!",
                         message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]",
                         severity="warning",
                         timeout=5,
                         markup=True
                     )
+            else:
+                pass
+            self.has_notified=True
             log_dir = pathlib.Path.home() / ".nyxbox"
             log_dir.mkdir(exist_ok=True)
-            log_path = pathlib.Path.joinpath(log_dir, "login.log")
-            with log_path.open("a") as f:
-                f.write(f"ERROR: {e}\n")
+            log_path = pathlib.Path.joinpath(log_dir, f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log")
+            create_log(log_path, severity="error", message=e)
             if self.polling:
                 self.set_timer(2.0, self.check_auth_status)
 
@@ -122,14 +125,18 @@ class LoginPage(ModalScreen):
         self.session_id = secrets.token_hex(16)
     def compose(self) -> ComposeResult:
         with Vertical(id="login_screen"):
-            yield Label(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!", id="log_quit_text")
+            yield Label(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in \n{DAEMON_USER} (preferably with the same account as last time!)", id="log_quit_text")
             with Vertical(id="switch_choice"):
+                yield Rule()
                 with Horizontal(id="sign_up_buttons"):
                     yield Button.success("Sign up with Google", id="google_button")
                     yield Button.warning("Sign up with Github", id="github_button")
-                yield Label("Have an account?", id="have_account")
-                yield Button("Switch to Login", id="switch_button")
-                yield Button("Quit app", id="quit_app_login")
+                yield Rule()
+                yield Label(f"{DAEMON_USER} Have an account?", id="have_account")
+                with Vertical(id="login_buttons"):
+                    yield Button("Switch to Login", id="switch_button")
+                    yield Button("Use as guest", id="guest_button")
+                    yield Button("Quit app", id="quit_app_login")
 
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
@@ -146,14 +153,14 @@ class LoginPage(ModalScreen):
                     github_button.label = "Log in with Github"
                     switch_button.label = "Switch to Signup"
                     have_account.update("Need an account?")
-                    top_label.update(f"{DAEMON_USER} Heya, welcome back!")
+                    top_label.update(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in (preferably with the same account as last time!)")
                     self.is_login = True
                 else:
                     google_button.label = "Sign up with Google"
                     github_button.label = "Sign up with Github"
                     switch_button.label = "Switch to Login"
                     have_account.update("Have an account?")
-                    top_label.update(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n Click an option to sign in!")
+                    top_label.update(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n{DAEMON_USER} Click an option to sign in!")
                     self.is_login = False
             case 'google_button':
                 try:
@@ -168,9 +175,8 @@ class LoginPage(ModalScreen):
                     )
                     log_dir = pathlib.Path.home() / ".nyxbox"
                     log_dir.mkdir(exist_ok=True)
-                    log_path = log_dir / "login.log"
-                    with log_path.open("a") as f:
-                        f.write(f"ERROR: {e}\n")
+                    # log_path = log_dir / "login.log"
+                    create_log(log_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
                     return
                 google_link = data.get("auth_url")
                 webbrowser.open(google_link)
@@ -188,9 +194,10 @@ class LoginPage(ModalScreen):
                     )
                     log_dir = pathlib.Path.home() / ".nyxbox"
                     log_dir.mkdir(exist_ok=True)
-                    log_path = log_dir / "login.log"
-                    with log_path.open("a") as f:
-                        f.write(f"ERROR: {e}\n")
+                    create_log(log_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+                    # log_path = log_dir / "login.log"
+                    # with log_path.open("a") as f:
+                    #     f.write(f"ERROR: {e}\n")
                     return
                 github_link = data.get("auth_url")
                 webbrowser.open(github_link)
@@ -371,7 +378,15 @@ class NyxBox(App):
                 f"{DAEMON_USER} Welcome, {self.auth_data.get('name', 'User')}!", 
                 severity="information")
         except Exception as e:
-            create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+            log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+            if log:
+                self.notify(
+                    title="Uh oh!",
+                    message=f"{DAEMON_USER} [b]Encountered critical error: {log}[/b]",
+                    severity="information",
+                    timeout=5,
+                    markup=True
+                )
             self.app.push_screen(LoginPage())
         else:
             self.app.push_screen(LoginPage()) 
@@ -487,6 +502,12 @@ def main():
     if "--version" in sys.argv:
         print(f"NyxBox {nyxbox_version}")
         return
+    elif "--test-login" in sys.argv: # TODO: REMOVE FOR PROD
+        try:
+            os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "auth.json"))
+            os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "user.json"))
+        except Exception as e:
+            print(f"{datetime.today().strftime('%Y-%m-%d')} ERROR: {str(e)}")
     app = NyxBox()
     app.run()
 

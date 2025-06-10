@@ -52,11 +52,15 @@ def format_result(result):
         return f"{random.choice(FALLBACK_MESSAGES)} Attempted to input {result}"
 
 def create_log(path, severity, message):
-     if pathlib.Path.exists(path):
-        with open(path, 'a') as f:
-            if severity == "error":
-                f.write(f"{time.time()} ERROR: {message}")
-            elif severity == "warning":
-                f.write(f"{time.time()} WARNING: {message}")
-            else:
-                f.write(f"{time.time()} INFO: {message}")
+    try:
+        if pathlib.Path.exists(path):
+            with open(path, 'a') as f:
+                if severity == "error":
+                    f.write(f"{time.time()} ERROR: {message}")
+                elif severity == "warning":
+                    f.write(f"{time.time()} WARNING: {message}")
+                else:
+                    f.write(f"{time.time()} INFO: {message}")
+    except Exception as e:
+        return str(e)
+
