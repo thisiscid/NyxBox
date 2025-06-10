@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NyxBox API", lifespan=lifespan)
 
+# @app.get('/auth/redirect'
 # Account related things
 @app.get("/auth/google") # Start Google OAuth flow
 def begin_google_oauth(session_id: str):

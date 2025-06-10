@@ -15,8 +15,10 @@ dependencies = [
     "tree-sitter-python>=0.23.6",
     "tree-sitter-java>=0.23.5",
     "typing-extensions>=4.12.2",
-    "textual[syntax]"
-    "qrcode"
+    "textual[syntax]",
+    "qrcode",
+    "rich-pixels",
+    "Pillow"
 ]
 
 [project.scripts]

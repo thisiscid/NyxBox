@@ -2,6 +2,11 @@ import random
 import pathlib
 import time
 import qrcode
+from qrcode.image.pil import PilImage
+from rich_pixels import Pixels
+from io import BytesIO
+from qrcode.constants import ERROR_CORRECT_L
+
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 SERVER_URL="http://localhost:8000"
 def escape_brackets(s):
@@ -65,13 +70,54 @@ def create_log(path, severity, message):
     except Exception as e:
         return str(e)
 
-def make_qr_ascii(data: str) -> str:
-    qr = qrcode.QRCode(version=1, border=1)
-    qr.add_data(data)
-    qr.make(fit=True)
-    matrix = qr.get_matrix()
-    lines = []
-    for row in matrix:
-        line = "".join("█" if cell else " " for cell in row)
-        lines.append(line)
-    return "\n".join(lines)
+def make_qr_pixels(data: str) -> Pixels | None:
+    """
+    Generates a QR code for the given data and returns it as a rich_pixels.Pixels object.
+    Returns None if QR code generation fails.
+    """
+    try:
+        qr = qrcode.QRCode(
+            box_size=1, # For pixels, box_size=1 is usually best
+            border=0,   # Small border
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+        img = qr.make_image(image_factory=PilImage)
+        pil_img = img.get_image()  # Convert PilImage to PIL.Image.Image
+        return Pixels.from_image(pil_img) 
+    except Exception as e:
+        # Optionally log the error e
+        print(f"Error generating QR pixels: {e}")
+        return None
+
+# If you still need the old ASCII version for some reason, keep it or remove it.
+# For this example, I'm assuming we're replacing it.
+# def make_qr_ascii(data: str) -> str:
+# ... (old implementation)
+
+
+# ...existing code...
+# def make_qr_ascii(data: str) -> str:
+#     qr = qrcode.QRCode(version=1, border=1)
+#     qr.add_data(data)
+#     qr.make(fit=True)
+#     matrix = qr.get_matrix()
+#     lines = []
+#     for row in matrix:
+#         line_chars = []
+#         for i in range(0, len(row), 2):
+#             cell1 = row[i]
+#             # Handle the case where the row has an odd number of cells
+#             # The last cell will be paired with a "white" cell
+#             cell2 = row[i+1] if (i+1) < len(row) else False
+            
+#             if cell1 and cell2:
+#                 line_chars.append("█")  # Both black: Full block
+#             elif cell1 and not cell2:
+#                 line_chars.append("▌")  # Left black, Right white: Left half block
+#             elif not cell1 and cell2:
+#                 line_chars.append("▐")  # Left white, Right black: Right half block
+#             else:
+#                 line_chars.append(" ")  # Both white: Space
+#         lines.append("".join(line_chars))
+#     return "\\n".join(lines)

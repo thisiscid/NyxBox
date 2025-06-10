@@ -12,7 +12,7 @@ import webbrowser
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
-from .plugins.utils import create_log, make_qr_ascii, DAEMON_USER, SERVER_URL
+from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL
 from .plugins.auth_utils import read_user_data
 from rich.text import Text
 from textual import on
@@ -70,14 +70,16 @@ class ProfileDetailsScreen(ModalScreen):
                 self.app.pop_screen()
 
 class WaitingForAuthScreen(ModalScreen):
-    def __init__(self, session_id: str, is_qr: bool = False, qr_ascii: str = ""):
+    def __init__(self, session_id: str, is_qr: bool = False, qr_image: str = ""):
         super().__init__()
         self.session_id = session_id
         self.polling = True
         self.has_notified=False
         self.is_qr = is_qr
-        if qr_ascii:
-            self.qr_ascii = qr_ascii
+        if qr_image: # Check for the new parameter name
+            self.qr_image = qr_image
+        else:
+            self.qr_image = None 
         
     BINDINGS = [
             ("ctrl+q", "quit", "Quit")]
@@ -91,8 +93,8 @@ class WaitingForAuthScreen(ModalScreen):
             with Vertical(id="waiting_for_login_container"):
                 yield Label(f"{DAEMON_USER} Waiting for authentication...", id="log_auth_wait_text")
                 yield Label(f"{DAEMON_USER} Complete logging in by scanning the QR code!", id="log_auth_wait_text2")
-                if self.is_qr and self.qr_ascii:
-                    yield Label(self.qr_ascii)
+                if self.is_qr and self.qr_image:
+                    yield Static(self.qr_image) #TODO: Switch to using rich-pixels
                 else:
                     yield Label(f"{DAEMON_USER} Failed to generate QR code! Try cancelling!")
                 yield Button("Cancel", id="cancel_auth")
@@ -227,10 +229,15 @@ class LoginPage(ModalScreen):
                     return
                 google_link = data.get("auth_url")
                 state=webbrowser.open(google_link)
-                if not state:
-                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(google_link)))
-                elif os.environ.get("CODESPACES"):
-                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(google_link)))
+                if not state or os.environ.get("CODESPACES"): 
+                    qr_pixels_obj = make_qr_pixels(google_link)
+                    if qr_pixels_obj:
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, True, qr_pixels_obj)) # type: ignore
+                    else:
+                        self.notify(title="Shoot...", 
+                            message=f"{DAEMON_USER} Could not generate QR code.", 
+                            severity="error")
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
                 else:
                     self.app.push_screen(WaitingForAuthScreen(self.session_id))
             case 'github_button':
@@ -253,10 +260,13 @@ class LoginPage(ModalScreen):
                     return
                 github_link = data.get("auth_url")
                 state=webbrowser.open(github_link)
-                if not state:
-                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(github_link)))
-                elif os.environ.get("CODESPACES"):
-                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(github_link)))
+                if not state or os.environ.get("CODESPACES"): # Simplified condition
+                    qr_pixels_obj = make_qr_pixels(github_link)
+                    if qr_pixels_obj:
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, True, qr_pixels_obj)) # type: ignore
+                    else:
+                        self.notify(title="QR Error", message="Could not generate QR code.", severity="error")
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
                 else:
                     self.app.push_screen(WaitingForAuthScreen(self.session_id))
     def action_quit(self):
