@@ -393,7 +393,7 @@ class NyxBox(App):
         self.has_vended = False
         self.current_challenge = None
         self.nyx_path = pathlib.Path.home() / ".nyxbox"
-        try:
+        try: #TODO: Implement checking for 1. if JWT expired, 2. if refresh token is expired, 3. force reauth if both of those two are met
             if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / "auth.json"):
                 nyx_path = pathlib.Path.home() / ".nyxbox"
                 auth_path = nyx_path / "auth.json"
