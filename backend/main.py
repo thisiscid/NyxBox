@@ -6,6 +6,7 @@ import sqlalchemy
 from database import create_tables, get_db
 from models import User, Challenges
 from contextlib import asynccontextmanager
+import typing
 from authlib.integrations.requests_client import OAuth2Session
 from jose import JWTError, jwt
 import httpx
@@ -14,9 +15,14 @@ from config import settings
 import os
 from typing import Optional
 import secrets
+import redis
+import json
 
-oauth_state = {}
-pending_auth: dict[str, dict] = {}
+# oauth_state = {}
+# pending_auth: dict[str, dict] = {}
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token") 
 
@@ -52,14 +58,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NyxBox API", lifespan=lifespan)
 
-@app.get('/redirect') # Create a link for redirect
-def redirect_to_link(link: str):
-    pass
+# @app.post('/redirect') # Create a link for redirect
+# def set_redirect_link(link: str, session_id: str):
+#     redis_client.setex(
+#         "redirect_url:{session_id}",
+#         600,  # expires in 10 minutes
+#         json.dumps({
+#             "url": link,
+#         })
+#         )
+#     return
+
+@app.get('/redirect')
+def redirect_user(redirect_token: str):
+    try:
+        url_data = redis_client.get(f"redirect_url:{redirect_token}")
+        if url_data:
+            url = json.loads(str(url_data)).get("url")
+            return RedirectResponse(url)
+        else:
+            raise HTTPException(status_code=404, detail="URL not found for this session")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Account related things
 @app.get("/auth/google") # Start Google OAuth flow
 def begin_google_oauth(session_id: str):
-    global oauth_state
+    # global oauth_state
     # redirect_uri = f"{settings.GOOGLE_REDIRECT_URI}?session_id={session_id}"
     random_state_value = secrets.token_urlsafe(32)
     oauth = OAuth2Session(
@@ -69,8 +94,11 @@ def begin_google_oauth(session_id: str):
     auth_url, _ = oauth.create_authorization_url(
         'https://accounts.google.com/o/oauth2/v2/auth',
         state=random_state_value)
-    oauth_state[random_state_value]=session_id
-    return {"auth_url": auth_url}
+    redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
+    redirect_token = secrets.token_urlsafe(16)
+    redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
+    qr_redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
+    return {"auth_url": qr_redirect_url}
 
 @app.get("/auth/google/callback")
 def redirect_google_oauth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db), session_id: str = ""): 
@@ -89,7 +117,9 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
-    original_session_id = oauth_state.pop(state, None)
+    original_session_id = redis_client.get(f"oauth_state:{state}")
+    if original_session_id:
+        redis_client.delete(f"oauth_state:{state}")    
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")
     if not original_session_id:
@@ -133,7 +163,10 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
     )
     if not original_session_id:
         raise HTTPException(status_code=400, detail="Invalid or expired state")
-    pending_auth[original_session_id] = {
+    redis_client.setex(
+    f"pending_auth:{original_session_id}",
+    600,  # expires in 10 minutes
+    json.dumps({
         "completed": True,
         "access_token": user_jwt,
         "refresh_token": refresh_jwt,
@@ -142,7 +175,9 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
             "name": user.name,
             "email": user.email
         }
-    }
+    })
+)
+
     return HTMLResponse(f"""
     <html>
         <head>
@@ -226,7 +261,7 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
 
 @app.get("/auth/github") # Start Github OAuth flow
 def begin_github_auth(session_id: str):
-    global oauth_state
+    # global oauth_state
     random_state_value = secrets.token_urlsafe(32)
     oauth = OAuth2Session(
         client_id=settings.GITHUB_CLIENT_ID,
@@ -235,7 +270,7 @@ def begin_github_auth(session_id: str):
     auth_url, state = oauth.create_authorization_url(
         'https://github.com/login/oauth/authorize',
         state=random_state_value)
-    oauth_state[random_state_value] = session_id
+    redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
     return {"auth_url": auth_url}
 
 @app.get("/auth/github/callback")
@@ -254,7 +289,10 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
-    original_session_id = oauth_state.pop(state, None)
+    original_session_id = redis_client.get(f"oauth_state:{state}")
+    if original_session_id:
+        redis_client.delete(f"oauth_state:{state}") 
+
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")
     if not original_session_id:
@@ -303,18 +341,20 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
     )
     if not original_session_id:
         raise HTTPException(status_code=400, detail="Invalid or expired state")
-    
-    pending_auth[original_session_id] = {
-        "completed": True,
-        "access_token": user_jwt,
-        "refresh_token": refresh_jwt,
-        "user_data": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email
-        }
-    }
-
+    redis_client.setex(
+        f"pending_auth:{original_session_id}",
+        600,  # expires in 10 minutes
+        json.dumps({
+            "completed": True,
+            "access_token": user_jwt,
+            "refresh_token": refresh_jwt,
+            "user_data": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email
+            }
+        })
+    )
     return HTMLResponse(f"""
     <html>
         <head>
@@ -450,22 +490,24 @@ async def user_info(current_user: User = Depends(get_current_user)): # Changed s
     }
 
 @app.get("/auth/check-status/{session_id}")
-async def check_auth_status(session_id: str):
-    """Check if authentication is complete for this session"""
-    if session_id in pending_auth:
-        auth_data = pending_auth[session_id]
+def check_auth_status(session_id: str):
+    auth_data_raw = redis_client.get(f"pending_auth:{session_id}")
+    if auth_data_raw:
+        auth_data = json.loads(typing.cast(str, auth_data_raw))
         if auth_data.get("completed"):
-            # Return tokens and clean up
             result = {
+                "status": "completed",
                 "status": "completed",
                 "access_token": auth_data["access_token"],
                 "user_data": auth_data["user_data"],
                 "refresh_token": auth_data.get("refresh_token")
             }
-            del pending_auth[session_id]  # Clean up
+            redis_client.delete(f"pending_auth:{session_id}")  # Clean up
             return result
-    
-    return {"status": "pending"}
+        else:
+            return {"status": "pending"}
+    else:
+        return {"status": "expired"}
 
 #Challenge related things
 @app.get("/challenges") # List challenges  
