@@ -125,7 +125,7 @@ class LoginPage(ModalScreen):
         self.session_id = secrets.token_hex(16)
     def compose(self) -> ComposeResult:
         with Vertical(id="login_screen"):
-            yield Label(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in \n{DAEMON_USER} (preferably with the same account as last time!)", id="log_quit_text")
+            yield Label(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in \n(preferably with the same account as last time!)", id="log_quit_text")
             with Vertical(id="switch_choice"):
                 yield Rule()
                 with Horizontal(id="sign_up_buttons"):
@@ -152,14 +152,14 @@ class LoginPage(ModalScreen):
                     google_button.label = "Log in with Google"
                     github_button.label = "Log in with Github"
                     switch_button.label = "Switch to Signup"
-                    have_account.update("Need an account?")
+                    have_account.update(f"{DAEMON_USER} Need an account?")
                     top_label.update(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in (preferably with the same account as last time!)")
                     self.is_login = True
                 else:
                     google_button.label = "Sign up with Google"
                     github_button.label = "Sign up with Github"
                     switch_button.label = "Switch to Login"
-                    have_account.update("Have an account?")
+                    have_account.update(f"{DAEMON_USER} Have an account?")
                     top_label.update(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n{DAEMON_USER} Click an option to sign in!")
                     self.is_login = False
             case 'google_button':

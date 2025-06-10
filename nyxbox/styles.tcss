@@ -226,6 +226,21 @@ ResultModal {
   content-align: center middle
 }
 
+# Button:focus {
+#     outline:heavy #ad1457; /* Keep original border or adjust */
+# }
+
+#login_buttons {
+    width: 100%;
+    align-horizontal: center;
+    content-align: center middle;
+}
+
+#login_buttons Button {
+    align-horizontal: center;
+    content-align: center middle;
+}
+
 #login_screen {
     align: center middle;
     content-align: center middle;
@@ -270,6 +285,14 @@ ResultModal {
     padding: 0 0;
 }
 
+Rule {
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    height: 1;
+}
+
 #have_account {
     align: center middle;
     content-align: center middle;
@@ -277,14 +300,14 @@ ResultModal {
     margin-top: 0;
 }
 
-#switch_button, #quit_app_login, #guest_button, #github_button, #google_button {
-    align: center middle;
-    content-align: center middle;
-    width: 22;
-    min-width: 20;
-    max-width: 24;
-    height: 3;
-}
+# #switch_button, #quit_app_login, #guest_button, #github_button, #google_button {
+#     align: center middle;
+#     content-align: center middle;
+#     width: 22;
+#     min-width: 20;
+#     max-width: 24;
+#     height: 3;
+# }
 
 #waiting_for_login_container {
     align: center middle;
