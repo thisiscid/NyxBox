@@ -70,9 +70,9 @@ app = FastAPI(title="NyxBox API", lifespan=lifespan)
 #     return
 
 @app.get('/redirect')
-def redirect_user(redirect_token: str):
+def redirect_user(token: str):
     try:
-        url_data = redis_client.get(f"redirect_url:{redirect_token}")
+        url_data = redis_client.get(f"redirect_url:{token}")
         if url_data:
             url = json.loads(str(url_data)).get("url")
             return RedirectResponse(url)
@@ -95,10 +95,10 @@ def begin_google_oauth(session_id: str):
         'https://accounts.google.com/o/oauth2/v2/auth',
         state=random_state_value)
     redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
-    redirect_token = secrets.token_urlsafe(16)
+    redirect_token = secrets.token_urlsafe(12)
     redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
-    qr_redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
-    return {"auth_url": qr_redirect_url}
+    redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
+    return {"auth_url": redirect_url}
 
 @app.get("/auth/google/callback")
 def redirect_google_oauth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db), session_id: str = ""): 
@@ -271,11 +271,14 @@ def begin_github_auth(session_id: str):
         'https://github.com/login/oauth/authorize',
         state=random_state_value)
     redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
-    return {"auth_url": auth_url}
+    redirect_token = secrets.token_urlsafe(12)
+    redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
+    redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
+    return {"auth_url": redirect_url}
 
 @app.get("/auth/github/callback")
 def redirect_github_auth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db)): 
-    global oauth_state
+    # global oauth_state
     oauth = OAuth2Session(
         client_id=settings.GITHUB_CLIENT_ID,
         redirect_uri=settings.GITHUB_REDIRECT_URI,
