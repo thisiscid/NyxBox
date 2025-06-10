@@ -52,7 +52,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NyxBox API", lifespan=lifespan)
 
-# @app.get('/auth/redirect'
+@app.get('/redirect') # Create a link for redirect
+def redirect_to_link(link: str):
+    pass
+
 # Account related things
 @app.get("/auth/google") # Start Google OAuth flow
 def begin_google_oauth(session_id: str):
@@ -214,7 +217,7 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
             <script>
                 setTimeout(function() {{
                     window.close();
-                }}, 2000); // Slightly longer delay
+                }}, 4000); // Slightly longer delay
             </script>
         </body>
     </html>
@@ -386,7 +389,7 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
             <script>
                 setTimeout(function() {{
                     window.close();
-                }}, 2000); // Slightly longer delay
+                }}, 4000); // Slightly longer delay
             </script>
         </body>
     </html>
