@@ -16,6 +16,7 @@ dependencies = [
     "tree-sitter-java>=0.23.5",
     "typing-extensions>=4.12.2",
     "textual[syntax]"
+    "qrcode"
 ]
 
 [project.scripts]

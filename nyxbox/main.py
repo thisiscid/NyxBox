@@ -8,10 +8,11 @@ import re
 import requests
 import secrets
 import webbrowser
+# import qrcode
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
-from .plugins.utils import create_log, DAEMON_USER, SERVER_URL
+from .plugins.utils import create_log, make_qr_ascii, DAEMON_USER, SERVER_URL
 from .plugins.auth_utils import read_user_data
 from rich.text import Text
 from textual import on
@@ -69,19 +70,32 @@ class ProfileDetailsScreen(ModalScreen):
                 self.app.pop_screen()
 
 class WaitingForAuthScreen(ModalScreen):
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, is_qr: bool = False, qr_ascii: str = ""):
         super().__init__()
         self.session_id = session_id
         self.polling = True
         self.has_notified=False
+        self.is_qr = is_qr
+        if qr_ascii:
+            self.qr_ascii = qr_ascii
         
     BINDINGS = [
             ("ctrl+q", "quit", "Quit")]
     def compose(self) -> ComposeResult:
-        with Vertical(id="waiting_for_login_container"):
-            yield Label(f"{DAEMON_USER} Waiting for authentication...", id="log_auth_wait_text")
-            yield Label(f"{DAEMON_USER} Complete logging in in your browser!", id="log_auth_wait_text2")
-            yield Button("Cancel", id="cancel_auth")
+        if not self.is_qr:
+            with Vertical(id="waiting_for_login_container"):
+                yield Label(f"{DAEMON_USER} Waiting for authentication...", id="log_auth_wait_text")
+                yield Label(f"{DAEMON_USER} Complete logging in in your browser!", id="log_auth_wait_text2")
+                yield Button("Cancel", id="cancel_auth")
+        else:
+            with Vertical(id="waiting_for_login_container"):
+                yield Label(f"{DAEMON_USER} Waiting for authentication...", id="log_auth_wait_text")
+                yield Label(f"{DAEMON_USER} Complete logging in by scanning the QR code!", id="log_auth_wait_text2")
+                if self.is_qr and self.qr_ascii:
+                    yield Label(self.qr_ascii)
+                else:
+                    yield Label(f"{DAEMON_USER} Failed to generate QR code! Try cancelling!")
+                yield Button("Cancel", id="cancel_auth")
 
 
     def on_button_pressed(self, event: Button.Pressed):
@@ -212,8 +226,13 @@ class LoginPage(ModalScreen):
                     create_log(log_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
                     return
                 google_link = data.get("auth_url")
-                webbrowser.open(google_link)
-                self.app.push_screen(WaitingForAuthScreen(self.session_id))
+                state=webbrowser.open(google_link)
+                if not state:
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(google_link)))
+                elif os.environ.get("CODESPACES"):
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(google_link)))
+                else:
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id))
             case 'github_button':
                 try:
                     data=requests.get(f"{SERVER_URL}/auth/github?session_id={self.session_id}").json()
@@ -233,8 +252,13 @@ class LoginPage(ModalScreen):
                     #     f.write(f"ERROR: {e}\n")
                     return
                 github_link = data.get("auth_url")
-                webbrowser.open(github_link)
-                self.app.push_screen(WaitingForAuthScreen(self.session_id))
+                state=webbrowser.open(github_link)
+                if not state:
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(github_link)))
+                elif os.environ.get("CODESPACES"):
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id, True, make_qr_ascii(github_link)))
+                else:
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id))
     def action_quit(self):
         self.app.exit()
     

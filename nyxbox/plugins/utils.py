@@ -1,6 +1,7 @@
 import random
 import pathlib
 import time
+import qrcode
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 SERVER_URL="http://localhost:8000"
 def escape_brackets(s):
@@ -64,3 +65,13 @@ def create_log(path, severity, message):
     except Exception as e:
         return str(e)
 
+def make_qr_ascii(data: str) -> str:
+    qr = qrcode.QRCode(version=1, border=1)
+    qr.add_data(data)
+    qr.make(fit=True)
+    matrix = qr.get_matrix()
+    lines = []
+    for row in matrix:
+        line = "".join("█" if cell else " " for cell in row)
+        lines.append(line)
+    return "\n".join(lines)

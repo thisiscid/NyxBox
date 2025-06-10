@@ -313,10 +313,10 @@ Rule {
     align: center middle;
     content-align: center middle;
     width: 70;
-    min-width: 70;
-    max-width: 75;
-    min-height: 13;
-    max-height: 15;
+    min-width: 80;
+    max-width: 90;
+    min-height: 15;
+    max-height: 80;
     border: tall #3b82f6;
     background: #222;
     padding: 2 4;
