@@ -30,16 +30,7 @@ except PackageNotFoundError:
     nyxbox_version = None
 class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
-
-def read_user_data():
-        auth_dir = pathlib.Path.home() / ".nyxbox"
-        try:
-            auth_dir = pathlib.Path.home() / ".nyxbox"
-            if pathlib.Path.is_dir(auth_dir):
-                with open(auth_dir / "auth.json", "r") as f:
-                    return json.load(f)
-        except Exception as e:
-            create_log(auth_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+#TODO: Move most of this auth stuff to a seperate file (auth_utils.py)
 class AuthComplete(Message):
     def __init__(self, auth_data, user_data):
         super().__init__()
