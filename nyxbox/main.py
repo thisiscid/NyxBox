@@ -423,7 +423,7 @@ class NyxBox(App):
     EDITOR_ID = "editor"
 
     def on_mount(self) -> None:
-        """Initialize variables to be used later and other stuff"""
+        """Contains things to be run on launch"""
         self.editor_opened = False
         self.has_vended = False
         self.current_challenge = None

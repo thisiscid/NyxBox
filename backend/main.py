@@ -17,8 +17,8 @@ from typing import Optional
 import secrets
 import redis
 import json
-from .models import Challenges
-from .schemas import ChallengeListItemSchema, ChallengeDetailSchema
+from models import Challenges
+from schemas import ChallengeListItemSchema, ChallengeDetailSchema
 
 # oauth_state = {}
 # pending_auth: dict[str, dict] = {}
@@ -511,15 +511,24 @@ def list_available_challs(db: Session = Depends(get_db)):
 # When the user access a challenge, the frontend should call /challenges/id and cache it locally
 
 @app.get("/challenges/{id}", response_model=ChallengeDetailSchema) # Get challenge
-def get_chall_by_id(db: Session = Depends(get_db)):
-    chall = db.query(Challenges).filter(Challenges.id == id).first()
+def get_chall_by_id(id: int, db: Session = Depends(get_db)):
+    chall = db.query(Challenges).filter(Challenges.id == id, Challenges.flagged == False).first()
     if chall:
         return chall
     else:
-        return HTTPException(404, detail="No such challenge")
+        raise HTTPException(404, detail="No such challenge")
 
 # @app.get("/challenges/{id}/approve") This might not be needed? We can make an interface to approve it locally
 
 @app.post("/challenges/{id}/submit") # Submit solution
-def submit_solution_by_id():
-    pass
+def submit_solution_by_id(id: int, db: Session = Depends(get_db)):
+    chall = db.query(Challenges).filter(Challenges.id == id).first()
+    if not chall:
+        raise HTTPException(404, detail="No such challenge")
+    if chall.solves is None:
+        chall.solves = 1 #type: ignore
+        db.commit()
+    else:
+        chall.solves+=1 #type: ignore
+        db.commit()
+    return {"id": id, "solves": chall.solves} #type: ignore

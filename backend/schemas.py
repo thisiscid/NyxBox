@@ -1,4 +1,4 @@
-from typing import List, Optional 
+from typing import List, Optional, Any
 from pydantic import BaseModel
 from datetime import datetime 
 from sqlalchemy import Column, Integer, String, JSON, DateTime, create_engine, UniqueConstraint
@@ -10,7 +10,7 @@ class ChallengeAuthorSchema(BaseModel):
     avatar_url: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schema for a single challenge item in a list
 class ChallengeListItemSchema(BaseModel):
@@ -26,13 +26,13 @@ class ChallengeListItemSchema(BaseModel):
     author: Optional[ChallengeAuthorSchema] = None # Will be null if not implemented
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Probably unneded
 class ChallengeDetailSchema(ChallengeListItemSchema): # Inherits from ListItem
     # description: Optional[str] = None
     updated_at: datetime
-    tests: JSON
+    tests: List[Any]
 
 
 # Schema for the response when listing multiple challenges
