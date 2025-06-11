@@ -304,6 +304,7 @@ class ConfirmExit(ModalScreen):
 
 class SearchForProblem(Screen):
     async def grab_challenges(self) -> None:
+        fetch_error = None
         url = f"{SERVER_URL}/challenges"
         terminal_width = self.app.size.width
         reserved_space = 45
@@ -313,20 +314,44 @@ class SearchForProblem(Screen):
             async with httpx.AsyncClient() as client:
                 response = await client.get(url)
                 chall_list = response.json()
+                if not chall_list:
+                    chall_list=[{"id": "temp_1", "name": "Temporary Challenge 1", "description": "This is a hardcoded challenge for testing.", "difficulty": "Easy", "category": "General"},
+                {"id": "temp_2", "name": "Another Temp Chall", "description": "A second challenge to make the list look fuller. This one has a slightly longer description to test truncation.", "difficulty": "Medium", "category": "Logic"},
+                {"id": "temp_3", "name": "Test Challenge III", "description": "Short and sweet.", "difficulty": "Hard", "category": "Puzzles"},
+                {"id": "temp_4", "name": "The Final Temp Frontier", "description": "The last of the temporary Mohicans, designed to see how things wrap and if the scrollbar appears when needed.", "difficulty": "Varies", "category": "Misc"},
+            ]
         except Exception as e:
-            return
-        if chall_list is not None:
-            for chall in chall_list:
-                # file_dict = self.grab_metadata(file)
-                name = chall.get("name") or ""
-                description = chall.get("description") or ""
-                difficulty = chall.get("difficulty") or ""
-                if len(description) > available_description_space:
-                    truncated_description = description[:available_description_space-3] + "..."
-                else:
-                    truncated_description = description
-                
-                challenges.add_row(name, truncated_description, difficulty)
+            chall_list=[{"id": "temp_1", "name": "Temporary Challenge 1", "description": "This is a hardcoded challenge for testing.", "difficulty": "Easy", "category": "General"},
+                {"id": "temp_2", "name": "Another Temp Chall", "description": "A second challenge to make the list look fuller. This one has a slightly longer description to test truncation.", "difficulty": "Medium", "category": "Logic"},
+                {"id": "temp_3", "name": "Test Challenge III", "description": "Short and sweet.", "difficulty": "Hard", "category": "Puzzles"},
+                {"id": "temp_4", "name": "The Final Temp Frontier", "description": "The last of the temporary Mohicans, designed to see how things wrap and if the scrollbar appears when needed.", "difficulty": "Varies", "category": "Misc"},
+            ]
+        self.chall_list = chall_list
+        for chall in chall_list:
+            # file_dict = self.grab_metadata(file)
+            name = chall.get("name") or ""
+            description = chall.get("description") or ""
+            difficulty = chall.get("difficulty") or ""
+            if len(description) > available_description_space:
+                truncated_description = description[:available_description_space-3] + "..."
+            else:
+                truncated_description = description
+            
+            challenges.add_row(name, truncated_description, difficulty)
+            # else:
+            #     #TODO: Remove this because its a test thing
+            #     #TODO: Or change this to an error message?
+            #     self.notify(f"Using temporary dummy challenges. {fetch_error if fetch_error else 'Server returned no challenges.'}", severity="warning", timeout=6)
+            #     chall_list = [
+            #         {"id": "temp_1", "name": "Temporary Challenge 1", "description": "This is a hardcoded challenge for testing.", "difficulty": "Easy", "category": "General"},
+            #         {"id": "temp_2", "name": "Another Temp Chall", "description": "A second challenge to make the list look fuller. This one has a slightly longer description to test truncation.", "difficulty": "Medium", "category": "Logic"},
+            #         {"id": "temp_3", "name": "Test Challenge III", "description": "Short and sweet.", "difficulty": "Hard", "category": "Puzzles"},
+            #         {"id": "temp_4", "name": "The Final Temp Frontier", "description": "The last of the temporary Mohicans, designed to see how things wrap and if the scrollbar appears when needed.", "difficulty": "Varies", "category": "Misc"},
+            #     ]
+            #     self.chall_list = chall_list
+            #     for chall in chall_list:
+            #         name = chall.get("name", "")
+            #         description = chall.get("description", "")
         # return chall_list
 
 
@@ -338,7 +363,7 @@ class SearchForProblem(Screen):
             challenges.add_column("Description")
             challenges.add_column("Difficulty")
         self.added_columns=True
-        self.chall_list = self.run_worker(self.grab_challenges())
+        self.run_worker(self.grab_challenges())
         # challenge_dir = files("..challenges")
         # files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
         # self.files_list = files_list
@@ -390,10 +415,9 @@ class SearchForProblem(Screen):
                 current_row = datatable.get_row_at(datatable.cursor_row)
                 challenge_name = current_row[0]
                 if current_row:
-                    for file in self.files_list:
+                    for chall in self.chall_list:
                         try:
-                            file_dict = self.grab_metadata(file)
-                            if file_dict.get("name") == challenge_name:
+                            if chall.get("name") == challenge_name:
                                 self.app.pop_screen()
                                 self.notify(
                                 title="I got you!",
@@ -402,19 +426,18 @@ class SearchForProblem(Screen):
                                 timeout=5,
                                 markup=True
                             )
-                                self.post_message(SearchComplete(file_dict))
+                                self.post_message(SearchComplete(chall))
                         except:
                             pass
-
+    #TODO: Fix these errors
     def on_data_table_row_highlighted(self, Message) -> None:
         datatable = self.query_one("#chall_list", DataTable)
         if datatable.cursor_row is not None:
             selected_data = datatable.get_row_at(datatable.cursor_row)
             challenge_name = selected_data[0]
-            for file in self.files_list:
-                file_dict = self.grab_metadata(file)
-                if file_dict.get("name") == challenge_name:
-                    self.challenge_widget.update_chall(file_dict)
+            for chall in self.chall_list:
+                if chall.get("name") == challenge_name:
+                    self.challenge_widget.update_chall(chall)
                     break
         return
     
@@ -429,11 +452,10 @@ class SearchForProblem(Screen):
         reserved_space = 45
         available_description_space = max(20, terminal_width - reserved_space)
         
-        for file in self.files_list:
-            file_dict = self.grab_metadata(file)
-            name = file_dict.get("name", "")
-            description = file_dict.get("description", "")
-            difficulty = file_dict.get("difficulty", "")
+        for chall in self.chall_list:
+            name = chall.get("name", "")
+            description = chall.get("description", "")
+            difficulty = chall.get("difficulty", "")
             
             if len(description) > available_description_space:
                 truncated_description = description[:available_description_space-3] + "..."
@@ -458,7 +480,6 @@ class NyxBox(App):
     BUTTON_PANEL_ID = "button_panel"
     CHALLENGE_VIEW_ID = "challengeview"
     EDITOR_ID = "editor"
-
     def on_mount(self) -> None:
         """Contains things to be run on launch"""
         self.editor_opened = False
@@ -466,7 +487,10 @@ class NyxBox(App):
         self.current_challenge = None
         self.nyx_path = pathlib.Path.home() / ".nyxbox"
         os.makedirs(self.nyx_path,exist_ok=True)
-        try: #TODO: Implement checking for 1. if JWT expired, 2. if refresh token is expired, 3. force reauth if both of those two are met
+        try: #TODO: Implement checking for 
+            # 1. if JWT expired, 
+            # 2. if refresh token is expired, 
+            # 3. force reauth if both of those two are met
             if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / "auth.json"):
                 nyx_path = pathlib.Path.home() / ".nyxbox"
                 auth_path = nyx_path / "auth.json"
