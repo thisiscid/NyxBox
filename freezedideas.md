@@ -4,25 +4,26 @@ Cool features. But please add them after you actually finish the core.
 
 ---
 ## Core
-- Fully working vend → solve → verdict loop (kind of? unsure)
+- Fully working vend → solve → verdict loop (Done)
 - Python runner complete (Done)
 - JavaScript (Node.js subprocess) basic support (Done)
 - Java (wrapper + subprocess) basic support (Done)
 - C (wrapper + subprocess) basic support (scrapped)
 - C++ (wrapper + subprocess) basic support (done)
-- UI tabs update properly (Done? i forgot what this is supposed to mean)
+- UI tabs update properly (Done)
+- Backend polished and integrates into frontend 
 ### Polished Experience:
 
-- Daemon text system w/ random + per-challenge messages (In progress)
-- Challenge structure supports flavor + hidden tests (Mostly done)
-- Errors never crash the UI (hopefully)
-- Output is safe, escaped, and readable
+- Daemon text system w/ random + per-challenge messages (Done)
+- Challenge structure supports flavor + hidden tests (Done)
+- Errors never crash the UI (Done)
+- Output is safe, escaped, and readable (Done (and if the user tries anything it executes locally))
 
 ### Packaging:
 
 - textual run . or CLI launcher (Done)
 - Sample challenge set included (Done (need more challs))
-- README.md with install + demo instructions (Mostly done)
+- README.md with install + demo instructions (Done)
 
 ##  Delayed Features
 - **User defined text editor**
