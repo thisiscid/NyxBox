@@ -590,6 +590,6 @@ def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_use
 
     return {"id": chall_id, "likes": chall.likes}
 
-@app.post("/challenges")
+@app.post("/challenges/create")
 def create_challenge(challenge_data: dict, jwt: str, db: Session = Depends(get_db)):
     pass

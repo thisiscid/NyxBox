@@ -8,6 +8,7 @@ import re
 import requests
 import secrets
 import webbrowser
+import httpx
 # import qrcode
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
@@ -15,7 +16,7 @@ from .plugins.code_runners.java_runner import run_java_code
 from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL
 from .plugins.auth_utils import read_user_data
 from rich.text import Text
-from textual import on
+from textual import on, worker
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits, Input, ListView, DataTable, Rule
@@ -302,6 +303,33 @@ class ConfirmExit(ModalScreen):
                 self.app.pop_screen()
 
 class SearchForProblem(Screen):
+    async def grab_challenges(self) -> None:
+        url = f"{SERVER_URL}/challenges"
+        terminal_width = self.app.size.width
+        reserved_space = 45
+        available_description_space = max(20, terminal_width - reserved_space)
+        challenges = self.query_one("#chall_list", DataTable)
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url)
+                chall_list = response.json()
+        except Exception as e:
+            return
+        if chall_list is not None:
+            for chall in chall_list:
+                # file_dict = self.grab_metadata(file)
+                name = chall.get("name") or ""
+                description = chall.get("description") or ""
+                difficulty = chall.get("difficulty") or ""
+                if len(description) > available_description_space:
+                    truncated_description = description[:available_description_space-3] + "..."
+                else:
+                    truncated_description = description
+                
+                challenges.add_row(name, truncated_description, difficulty)
+        # return chall_list
+
+
     def on_mount(self) -> None:
         self.added_columns=False
         challenges=self.query_one("#chall_list", DataTable)
@@ -310,26 +338,28 @@ class SearchForProblem(Screen):
             challenges.add_column("Description")
             challenges.add_column("Difficulty")
         self.added_columns=True
-        challenge_dir = files("..challenges")
-        files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
-        self.files_list = files_list
+        self.chall_list = self.run_worker(self.grab_challenges())
+        # challenge_dir = files("..challenges")
+        # files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
+        # self.files_list = files_list
         self.placeholder = ["Start typing to search for a challenge."]
-        
+
         terminal_width = self.app.size.width
         reserved_space = 45
         available_description_space = max(20, terminal_width - reserved_space)
-        
-        for file in files_list:
-            file_dict = self.grab_metadata(file)
-            name = file_dict.get("name") or ""
-            description = file_dict.get("description") or ""
-            difficulty = file_dict.get("difficulty") or ""
-            if len(description) > available_description_space:
-                truncated_description = description[:available_description_space-3] + "..."
-            else:
-                truncated_description = description
-            
-            challenges.add_row(name, truncated_description, difficulty)
+
+        # if self.chall_list.result is not None:
+        #     for chall in self.chall_list.result:
+        #         # file_dict = self.grab_metadata(file)
+        #         name = chall.get("name") or ""
+        #         description = chall.get("description") or ""
+        #         difficulty = chall.get("difficulty") or ""
+        #         if len(description) > available_description_space:
+        #             truncated_description = description[:available_description_space-3] + "..."
+        #         else:
+        #             truncated_description = description
+                
+        #         challenges.add_row(name, truncated_description, difficulty)
             # rows.append((str(name).title(), str(description), str(difficulty)))
         self.refresh()
         
@@ -348,9 +378,9 @@ class SearchForProblem(Screen):
                 yield Button("Select Challenge", variant="success", id="search_select")
         yield Footer()
 
-    def grab_metadata(self, file) -> dict:
-        with file.open("r") as file_content:
-            return json.load(file_content)
+    # def grab_metadata(self, file) -> dict:
+    #     with file.open("r") as file_content:
+    #         return json.load(file_content)
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "search_quit":
@@ -435,6 +465,7 @@ class NyxBox(App):
         self.has_vended = False
         self.current_challenge = None
         self.nyx_path = pathlib.Path.home() / ".nyxbox"
+        os.makedirs(self.nyx_path,exist_ok=True)
         try: #TODO: Implement checking for 1. if JWT expired, 2. if refresh token is expired, 3. force reauth if both of those two are met
             if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / "auth.json"):
                 nyx_path = pathlib.Path.home() / ".nyxbox"

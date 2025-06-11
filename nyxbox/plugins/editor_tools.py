@@ -255,7 +255,6 @@ class TestResultsWidget(Widget):
             passed_tests_static.update("\n\n".join([r for r in results if "[green]" in r]))
         self.refresh()
     def update_submit_content(self, chall, results=None):
-        #TODO: Expand this bcs its very basic rn
         submit_static = self.query_one("#submit_static", Static)
         results = results or []
         passed = [r for r in results if r.get("passed")]
