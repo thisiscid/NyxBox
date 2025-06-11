@@ -18,6 +18,7 @@ Cool features. But please add them after you actually finish the core.
 - Challenge structure supports flavor + hidden tests (Done)
 - Errors never crash the UI (Done)
 - Output is safe, escaped, and readable (Done (and if the user tries anything it executes locally))
+- Update UI (In editor for example, editor on right, results tab on left top, buttons on left bottom)
 
 ### Packaging:
 

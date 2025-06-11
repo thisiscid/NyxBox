@@ -17,8 +17,9 @@ from textual import on
 class ChallengeListScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
-        
+        yield DataTable(id="challenge_table", cursor_type="row")
         yield Footer()
+
 class DBManagement(App):
     def compose(self) -> ComposeResult:
         yield Header()

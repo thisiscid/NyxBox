@@ -63,8 +63,7 @@ def redirect_user(token: str):
     try:
         url_data = redis_client.get(f"redirect_url:{token}")
         if url_data:
-            url = json.loads(str(url_data)).get("url")
-            return RedirectResponse(url)
+            return RedirectResponse(url_data) #type: ignore
         else:
             raise HTTPException(status_code=404, detail="URL not found for this session")
     except Exception as e:

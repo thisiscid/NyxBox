@@ -310,7 +310,7 @@ class SearchForProblem(Screen):
             challenges.add_column("Description")
             challenges.add_column("Difficulty")
         self.added_columns=True
-        challenge_dir = files("nyxbox.challenges")
+        challenge_dir = files("..challenges")
         files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
         self.files_list = files_list
         self.placeholder = ["Start typing to search for a challenge."]
