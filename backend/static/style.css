@@ -5,6 +5,7 @@ img {
 body {
     text-align: center;
     font-family: 'Arial';
+    font-size: medium;
     /* border: solid;
     border-radius: 15px; */
     /* width: 500px;
@@ -19,9 +20,6 @@ body {
     background: magenta;
     border: solid;
     border-radius: 25px;
-}
-
-.floating_thing div {
     box-shadow: 10px 10px 20px;
     height: auto;
     width: 500px;
@@ -30,9 +28,21 @@ body {
     top: 50%;
     -webkit-transform: translate(-50%, -50%);
     transform: translate(-50%, -50%);
-    /* height: 100%; */
-    background: magenta;
     overflow: auto;
+}
+
+.floating_thing div {
+    /* box-shadow: 10px 10px 20px;
+    height: auto;
+    width: 500px;
+    /* position: absolute; */
+    /* left: 50%;
+    top: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);*/
+    /* height: 100%; 
+    background: magenta;
+    overflow: auto;  */
 }
 
 #orpheus_img {
