@@ -428,7 +428,8 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
 # ...existing code...
     # return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
-@app.get("/auth/refresh") # To get a new JWT with a valid refresh jwt
+#TODO: Update these params
+@app.post("/auth/refresh") # To get a new JWT with a valid refresh jwt
 def refresh_jwt(request: Request, refresh_jwt: str, db: Session = Depends(get_db)):
     jwt_user = db.query(User).filter(
         (User.refresh_jwt == refresh_jwt)
