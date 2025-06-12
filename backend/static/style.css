@@ -5,4 +5,36 @@ img {
 body {
     text-align: center;
     font-family: 'Arial';
+    /* border: solid;
+    border-radius: 15px; */
+    /* width: 500px;
+    height: 440px; */
+    margin: 0 auto;
+}
+
+.floating_thing {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: magenta;
+    border: solid;
+    border-radius: 25px;
+}
+
+.floating_thing div {
+    box-shadow: 10px 10px 20px;
+    height: auto;
+    width: 500px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+    /* height: 100%; */
+    background: magenta;
+    overflow: auto;
+}
+
+#orpheus_img {
+    float: right;
 }
