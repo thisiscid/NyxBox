@@ -4,6 +4,7 @@ import json
 import base64
 import httpx
 import requests
+import asyncio
 from .utils import create_log, SERVER_URL
 
 def read_user_data() -> dict:
@@ -23,8 +24,30 @@ class ValidateAuth():
         self.token = token
         self.app_instance = app_instance
         self.root_path = root_path
-    async def check_refresh_token(self):
+    async def check_refresh_token(self, refresh_token) -> dict:
         refresh_url = SERVER_URL + "/auth/refresh"
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(refresh_url, data={'refresh_jwt': refresh_token})
+            except Exception as e:
+                return {"access_token": None,
+                "jwt": None,
+                "error": e,
+                "failed": True}
+            if response.status_code == 200:
+                response_data = response.json()
+                return {"access_token": response_data.get("refresh_jwt"), 
+                        "jwt": response_data.get("user_jwt"), 
+                        "failed": False}
+            else:
+                log_path = self.root_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log"
+                create_log(log_path, 
+                           message=f"Server returned {response.status_code} while refreshing token",
+                           severity="error")
+                return {"access_token": None,
+                "jwt": None,
+                "failed": True,
+                "error": response}
     async def perform_auth_check(self, app_instance, root_path):
         """Check whether the user is authenticated or not"""
         auth_path = root_path / "auth.json"
@@ -44,6 +67,6 @@ class ValidateAuth():
             current_time = datetime.now(timezone.utc).timestamp()
             if expiration <= current_time:
                 valid_refresh = await self.check_refresh_token(auth_data.get('refresh_token'))
-
+                return valid_refresh
 
 

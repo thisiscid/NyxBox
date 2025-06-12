@@ -13,7 +13,7 @@ import httpx
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
-from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL
+from .plugins.utils import create_log, make_qr_pixels, return_log_path, DAEMON_USER, SERVER_URL
 from .plugins.auth_utils import read_user_data
 from rich.text import Text
 from textual import on, worker
@@ -145,10 +145,7 @@ class WaitingForAuthScreen(ModalScreen):
             else:
                 pass
             self.has_notified=True
-            log_dir = pathlib.Path.home() / ".nyxbox"
-            log_dir.mkdir(exist_ok=True)
-            log_path = pathlib.Path.joinpath(log_dir, f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log")
-            create_log(log_path, severity="error", message=e)
+            create_log(return_log_path(), severity="error", message=e)
             if self.polling:
                 self.set_timer(2.0, self.check_auth_status)
 
@@ -233,7 +230,7 @@ class LoginPage(ModalScreen):
                     log_dir = pathlib.Path.home() / ".nyxbox"
                     log_dir.mkdir(exist_ok=True)
                     # log_path = log_dir / "login.log"
-                    create_log(log_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+                    create_log(return_log_path(), severity = "error", message=e)
                     return
                 google_link = data.get("auth_url")
                 state=webbrowser.open(google_link)
@@ -261,7 +258,7 @@ class LoginPage(ModalScreen):
                     )
                     log_dir = pathlib.Path.home() / ".nyxbox"
                     log_dir.mkdir(exist_ok=True)
-                    create_log(log_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+                    create_log(return_log_path(), severity = "error", message=e)
                     # log_path = log_dir / "login.log"
                     # with log_path.open("a") as f:
                     #     f.write(f"ERROR: {e}\n")
@@ -505,7 +502,7 @@ class NyxBox(App):
             else:
                 self.app.push_screen(LoginPage()) 
         except Exception as e:
-            log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+            log=create_log(return_log_path(), severity = "error", message=e)
             if log:
                 self.notify(
                     title="Uh oh!",

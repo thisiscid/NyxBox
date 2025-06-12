@@ -20,7 +20,7 @@ from .code_runners.cpp_runner import run_cpp_code
 from .code_runners.java_runner import run_java_code
 from .code_runners.py_runner import run_python_code
 from .code_runners.js_runner import run_js_code
-from .utils import escape_brackets, format_result, create_log, DAEMON_USER
+from .utils import escape_brackets, format_result, create_log, return_log_path, DAEMON_USER
 import tree_sitter_cpp
 from tree_sitter import Language
 # TODO:

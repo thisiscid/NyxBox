@@ -2,6 +2,7 @@ import random
 import pathlib
 import time
 import qrcode
+from datetime import datetime
 from qrcode.image.pil import PilImage
 from rich_pixels import Pixels
 from io import BytesIO
@@ -69,7 +70,12 @@ def create_log(path, severity, message):
                     f.write(f"{time.time()} INFO: {message}")
     except Exception as e:
         return str(e)
-
+    
+def return_log_path() -> pathlib.Path:
+    log_dir = pathlib.Path.home() / ".nyxbox"
+    log_dir.mkdir(exist_ok=True)
+    log_path = pathlib.Path.joinpath(log_dir, f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log")
+    return log_path
 def make_qr_pixels(data: str) -> Pixels | None:
     """
     Generates a QR code for the given data and returns it as a rich_pixels.Pixels object.
