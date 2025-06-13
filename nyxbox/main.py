@@ -8,15 +8,14 @@ import re
 import requests
 import secrets
 import webbrowser
-import httpx
 # import qrcode
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
-from .plugins.utils import create_log, return_log_path, DAEMON_USER, SERVER_URL
-from .plugins.auth_utils import read_user_data, ValidateAuth, WaitingForAuthScreen, AuthComplete, LoginPage
+from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL
+from .plugins.auth_utils import read_user_data
 from rich.text import Text
-from textual import on, worker
+from textual import on
 from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits, Input, ListView, DataTable, Rule
@@ -25,7 +24,7 @@ from textual.message import Message
 from importlib.resources import files
 from importlib.metadata import version, PackageNotFoundError
 from datetime import datetime
-#TODO: Make sure all calls that need authentication actually use the JWT OR try to get a new one
+
 try:
     nyxbox_version = version("nyxbox")
 except PackageNotFoundError:
@@ -33,18 +32,11 @@ except PackageNotFoundError:
 class VendAnimation(Static):
     pass # I don't think this is getting done for a good while
 #TODO: Move most of this auth stuff to a seperate file (auth_utils.py)
-
-class NewToken(Message):
-    def __init__(self, access_token, refresh_token):
+class AuthComplete(Message):
+    def __init__(self, auth_data, user_data):
         super().__init__()
-        self.access_token = access_token
-        self.refresh_token = refresh_token
-        
-# class AuthComplete(Message):
-#     def __init__(self, auth_data, user_data):
-#         super().__init__()
-#         self.auth_data = auth_data
-#         self.user_data = user_data
+        self.auth_data = auth_data
+        self.user_data = user_data
 
 class ProfileDetailsScreen(ModalScreen):
     def __init__(self) -> None:
@@ -76,6 +68,209 @@ class ProfileDetailsScreen(ModalScreen):
         match event.button.id:
             case "close_profile":
                 self.app.pop_screen()
+
+class WaitingForAuthScreen(ModalScreen):
+    def __init__(self, session_id: str, is_qr: bool = False, qr_image: str = ""):
+        super().__init__()
+        self.session_id = session_id
+        self.polling = True
+        self.has_notified=False
+        self.is_qr = is_qr
+        if qr_image: # Check for the new parameter name
+            self.qr_image = qr_image
+        else:
+            self.qr_image = None 
+        
+    BINDINGS = [
+            ("ctrl+q", "quit", "Quit")]
+    def compose(self) -> ComposeResult:
+        if not self.is_qr:
+            with Vertical(id="waiting_for_login_container"):
+                yield Label(f"{DAEMON_USER} Waiting for authentication...", id="log_auth_wait_text")
+                yield Label(f"{DAEMON_USER} Complete logging in in your browser!", id="log_auth_wait_text2")
+                yield Button("Cancel", id="cancel_auth")
+        else:
+            with Vertical(id="waiting_for_login_container"):
+                yield Label(f"{DAEMON_USER} Waiting for authentication...", id="log_auth_wait_text")
+                yield Label(f"{DAEMON_USER} Complete logging in by scanning the QR code!", id="log_auth_wait_text2")
+                if self.is_qr and self.qr_image:
+                    yield Static(self.qr_image) #TODO: Switch to using rich-pixels
+                else:
+                    yield Label(f"{DAEMON_USER} Failed to generate QR code! Try cancelling!")
+                yield Button("Cancel", id="cancel_auth")
+
+
+    def on_button_pressed(self, event: Button.Pressed):
+        match event.button.id:
+            case "quit_app_login":
+                self.action_quit()
+            case "cancel_auth":
+                self.polling = False
+                self.dismiss()
+    def action_quit(self):
+        self.app.exit()
+    def on_mount(self):
+        self.set_timer(2.0, self.check_auth_status)
+
+    async def check_auth_status(self):
+        if not self.polling:
+            return
+        try:
+            response = requests.get(f"{SERVER_URL}/auth/check-status/{self.session_id}").json()
+            if response["status"] == "completed":
+                self.polling = False
+                self.save_tokens(response["access_token"], response["user_data"], response["refresh_token"])
+                self.app.pop_screen()
+                self.app.pop_screen()
+                return
+            else:
+                self.set_timer(2.0, self.check_auth_status)
+        except Exception as e:
+            if not self.has_notified:
+                self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]",
+                        severity="warning",
+                        timeout=5,
+                        markup=True
+                    )
+            else:
+                pass
+            self.has_notified=True
+            log_dir = pathlib.Path.home() / ".nyxbox"
+            log_dir.mkdir(exist_ok=True)
+            log_path = pathlib.Path.joinpath(log_dir, f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log")
+            create_log(log_path, severity="error", message=e)
+            if self.polling:
+                self.set_timer(2.0, self.check_auth_status)
+
+    def save_tokens(self, access_token: str, user_data: dict, refresh_token):
+        # Save to local storage
+        auth_dir = pathlib.Path.home() / ".nyxbox"
+        auth_dir.mkdir(exist_ok=True)
+        
+        auth_data = {
+            "access_token": access_token,
+            "user_data": user_data,
+            "refresh_token": refresh_token,
+            "timestamp": time.time()
+        }
+        
+        with open(auth_dir / "auth.json", "w") as f:
+            json.dump(auth_data, f)
+        with open(auth_dir / "user.json", "w") as f:
+            json.dump(user_data, f)
+        self.notify(
+            f"{DAEMON_USER} Welcome, {user_data.get('name', 'User')}!", 
+            severity="information")
+        self.app.post_message(AuthComplete(auth_data, user_data))
+    
+#TODO: Remember to send a session id! Check your API for what you need to send!
+class LoginPage(ModalScreen):
+    BINDINGS = [
+        ("ctrl+q", "quit", "Quit")]
+    def on_mount(self):
+        self.is_login = False
+        self.session_id = secrets.token_hex(16)
+    def compose(self) -> ComposeResult:
+        with Vertical(id="login_screen"):
+            yield Label(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in \n(preferably with the same account as last time!)", id="log_quit_text")
+            with Vertical(id="switch_choice"):
+                yield Rule()
+                with Horizontal(id="sign_up_buttons"):
+                    yield Button.success("Sign up with Google", id="google_button")
+                    yield Button.warning("Sign up with Github", id="github_button")
+                yield Rule()
+                yield Label(f"{DAEMON_USER} Have an account?", id="have_account")
+                with Vertical(id="login_buttons"):
+                    yield Button("Switch to Login", id="switch_button")
+                    yield Button("Use as guest", id="guest_button")
+                    yield Button("Quit app", id="quit_app_login")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        match event.button.id:
+            case "quit_app_login":
+                self.action_quit()
+            case 'switch_button':
+                google_button = self.query_one("#google_button", Button)
+                github_button = self.query_one("#github_button", Button)
+                switch_button = self.query_one("#switch_button", Button)
+                have_account = self.query_one("#have_account", Label)
+                top_label = self.query_one("#log_quit_text", Label)
+                if not self.is_login:
+                    google_button.label = "Log in with Google"
+                    github_button.label = "Log in with Github"
+                    switch_button.label = "Switch to Signup"
+                    have_account.update(f"{DAEMON_USER} Need an account?")
+                    top_label.update(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in (preferably with the same account as last time!)")
+                    self.is_login = True
+                else:
+                    google_button.label = "Sign up with Google"
+                    github_button.label = "Sign up with Github"
+                    switch_button.label = "Switch to Login"
+                    have_account.update(f"{DAEMON_USER} Have an account?")
+                    top_label.update(f"{DAEMON_USER} Heya, I'm nyx, welcome to NyxBox!\n{DAEMON_USER} Click an option to sign in!")
+                    self.is_login = False
+            case 'google_button':
+                try:
+                    data=requests.get(f"{SERVER_URL}/auth/google?session_id={self.session_id}").json()
+                except Exception as e:
+                    self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    )
+                    log_dir = pathlib.Path.home() / ".nyxbox"
+                    log_dir.mkdir(exist_ok=True)
+                    # log_path = log_dir / "login.log"
+                    create_log(log_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+                    return
+                google_link = data.get("auth_url")
+                state=webbrowser.open(google_link)
+                if not state or os.environ.get("CODESPACES"): 
+                    qr_pixels_obj = make_qr_pixels(google_link)
+                    if qr_pixels_obj:
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, True, qr_pixels_obj)) # type: ignore
+                    else:
+                        self.notify(title="Shoot...", 
+                            message=f"{DAEMON_USER} Could not generate QR code.", 
+                            severity="error")
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
+                else:
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id))
+            case 'github_button':
+                try:
+                    data=requests.get(f"{SERVER_URL}/auth/github?session_id={self.session_id}").json()
+                except Exception as e:
+                    self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]. Try again in a few seconds!",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    )
+                    log_dir = pathlib.Path.home() / ".nyxbox"
+                    log_dir.mkdir(exist_ok=True)
+                    create_log(log_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+                    # log_path = log_dir / "login.log"
+                    # with log_path.open("a") as f:
+                    #     f.write(f"ERROR: {e}\n")
+                    return
+                github_link = data.get("auth_url")
+                state=webbrowser.open(github_link)
+                if not state or os.environ.get("CODESPACES"): # Simplified condition
+                    qr_pixels_obj = make_qr_pixels(github_link)
+                    if qr_pixels_obj:
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, True, qr_pixels_obj)) # type: ignore
+                    else:
+                        self.notify(title="QR Error", message="Could not generate QR code.", severity="error")
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
+                else:
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id))
+    def action_quit(self):
+        self.app.exit()
     
     
 class SearchComplete(Message):
@@ -100,58 +295,6 @@ class ConfirmExit(ModalScreen):
                 self.app.pop_screen()
 
 class SearchForProblem(Screen):
-    async def grab_challenges(self) -> None:
-        fetch_error = None
-        url = f"{SERVER_URL}/challenges"
-        terminal_width = self.app.size.width
-        reserved_space = 45
-        available_description_space = max(20, terminal_width - reserved_space)
-        challenges = self.query_one("#chall_list", DataTable)
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url)
-                chall_list = response.json()
-                if not chall_list:
-                    chall_list=[{"id": "temp_1", "name": "Temporary Challenge 1", "description": "This is a hardcoded challenge for testing.", "difficulty": "Easy", "category": "General"},
-                {"id": "temp_2", "name": "Another Temp Chall", "description": "A second challenge to make the list look fuller. This one has a slightly longer description to test truncation.", "difficulty": "Medium", "category": "Logic"},
-                {"id": "temp_3", "name": "Test Challenge III", "description": "Short and sweet.", "difficulty": "Hard", "category": "Puzzles"},
-                {"id": "temp_4", "name": "The Final Temp Frontier", "description": "The last of the temporary Mohicans, designed to see how things wrap and if the scrollbar appears when needed.", "difficulty": "Varies", "category": "Misc"},
-            ]
-        except Exception as e:
-            chall_list=[{"id": "temp_1", "name": "Temporary Challenge 1", "description": "This is a hardcoded challenge for testing.", "difficulty": "Easy", "category": "General"},
-                {"id": "temp_2", "name": "Another Temp Chall", "description": "A second challenge to make the list look fuller. This one has a slightly longer description to test truncation.", "difficulty": "Medium", "category": "Logic"},
-                {"id": "temp_3", "name": "Test Challenge III", "description": "Short and sweet.", "difficulty": "Hard", "category": "Puzzles"},
-                {"id": "temp_4", "name": "The Final Temp Frontier", "description": "The last of the temporary Mohicans, designed to see how things wrap and if the scrollbar appears when needed.", "difficulty": "Varies", "category": "Misc"},
-            ]
-        self.chall_list = chall_list
-        for chall in chall_list:
-            # file_dict = self.grab_metadata(file)
-            name = chall.get("name") or ""
-            description = chall.get("description") or ""
-            difficulty = chall.get("difficulty") or ""
-            if len(description) > available_description_space:
-                truncated_description = description[:available_description_space-3] + "..."
-            else:
-                truncated_description = description
-            
-            challenges.add_row(name, truncated_description, difficulty)
-            # else:
-            #     #TODO: Remove this because its a test thing
-            #     #TODO: Or change this to an error message?
-            #     self.notify(f"Using temporary dummy challenges. {fetch_error if fetch_error else 'Server returned no challenges.'}", severity="warning", timeout=6)
-            #     chall_list = [
-            #         {"id": "temp_1", "name": "Temporary Challenge 1", "description": "This is a hardcoded challenge for testing.", "difficulty": "Easy", "category": "General"},
-            #         {"id": "temp_2", "name": "Another Temp Chall", "description": "A second challenge to make the list look fuller. This one has a slightly longer description to test truncation.", "difficulty": "Medium", "category": "Logic"},
-            #         {"id": "temp_3", "name": "Test Challenge III", "description": "Short and sweet.", "difficulty": "Hard", "category": "Puzzles"},
-            #         {"id": "temp_4", "name": "The Final Temp Frontier", "description": "The last of the temporary Mohicans, designed to see how things wrap and if the scrollbar appears when needed.", "difficulty": "Varies", "category": "Misc"},
-            #     ]
-            #     self.chall_list = chall_list
-            #     for chall in chall_list:
-            #         name = chall.get("name", "")
-            #         description = chall.get("description", "")
-        # return chall_list
-
-
     def on_mount(self) -> None:
         self.added_columns=False
         challenges=self.query_one("#chall_list", DataTable)
@@ -160,28 +303,26 @@ class SearchForProblem(Screen):
             challenges.add_column("Description")
             challenges.add_column("Difficulty")
         self.added_columns=True
-        self.run_worker(self.grab_challenges())
-        # challenge_dir = files("..challenges")
-        # files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
-        # self.files_list = files_list
+        challenge_dir = files("nyxbox.challenges")
+        files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
+        self.files_list = files_list
         self.placeholder = ["Start typing to search for a challenge."]
-
+        
         terminal_width = self.app.size.width
         reserved_space = 45
         available_description_space = max(20, terminal_width - reserved_space)
-
-        # if self.chall_list.result is not None:
-        #     for chall in self.chall_list.result:
-        #         # file_dict = self.grab_metadata(file)
-        #         name = chall.get("name") or ""
-        #         description = chall.get("description") or ""
-        #         difficulty = chall.get("difficulty") or ""
-        #         if len(description) > available_description_space:
-        #             truncated_description = description[:available_description_space-3] + "..."
-        #         else:
-        #             truncated_description = description
-                
-        #         challenges.add_row(name, truncated_description, difficulty)
+        
+        for file in files_list:
+            file_dict = self.grab_metadata(file)
+            name = file_dict.get("name") or ""
+            description = file_dict.get("description") or ""
+            difficulty = file_dict.get("difficulty") or ""
+            if len(description) > available_description_space:
+                truncated_description = description[:available_description_space-3] + "..."
+            else:
+                tr# uncated_description = description
+#             
+            challenges.add_row(name, truncated_description, difficulty)
             # rows.append((str(name).title(), str(description), str(difficulty)))
         self.refresh()
         
@@ -200,9 +341,9 @@ class SearchForProblem(Screen):
                 yield Button("Select Challenge", variant="success", id="search_select")
         yield Footer()
 
-    # def grab_metadata(self, file) -> dict:
-    #     with file.open("r") as file_content:
-    #         return json.load(file_content)
+    def grab_metadata(self, file) -> dict:
+        with file.open("r") as file_content:
+            return json.load(file_content)
     def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "search_quit":
@@ -212,9 +353,10 @@ class SearchForProblem(Screen):
                 current_row = datatable.get_row_at(datatable.cursor_row)
                 challenge_name = current_row[0]
                 if current_row:
-                    for chall in self.chall_list:
+                    for file in self.files_list:
                         try:
-                            if chall.get("name") == challenge_name:
+                            file_dict = self.grab_metadata(file)
+                            if file_dict.get("name") == challenge_name:
                                 self.app.pop_screen()
                                 self.notify(
                                 title="I got you!",
@@ -223,18 +365,19 @@ class SearchForProblem(Screen):
                                 timeout=5,
                                 markup=True
                             )
-                                self.post_message(SearchComplete(chall))
+                                self.post_message(SearchComplete(file_dict))
                         except:
                             pass
-    #TODO: Fix these errors
+
     def on_data_table_row_highlighted(self, Message) -> None:
         datatable = self.query_one("#chall_list", DataTable)
         if datatable.cursor_row is not None:
             selected_data = datatable.get_row_at(datatable.cursor_row)
             challenge_name = selected_data[0]
-            for chall in self.chall_list:
-                if chall.get("name") == challenge_name:
-                    self.challenge_widget.update_chall(chall)
+            for file in self.files_list:
+                file_dict = self.grab_metadata(file)
+                if file_dict.get("name") == challenge_name:
+                    self.challenge_widget.update_chall(file_dict)
                     break
         return
     
@@ -249,10 +392,11 @@ class SearchForProblem(Screen):
         reserved_space = 45
         available_description_space = max(20, terminal_width - reserved_space)
         
-        for chall in self.chall_list:
-            name = chall.get("name", "")
-            description = chall.get("description", "")
-            difficulty = chall.get("difficulty", "")
+        for file in self.files_list:
+            file_dict = self.grab_metadata(file)
+            name = file_dict.get("name", "")
+            description = file_dict.get("description", "")
+            difficulty = file_dict.get("difficulty", "")
             
             if len(description) > available_description_space:
                 truncated_description = description[:available_description_space-3] + "..."
@@ -264,7 +408,6 @@ class SearchForProblem(Screen):
                 item_found=True
         if not item_found:
             datatable.add_row("No challenges found matching your search.")
-
 class NyxBox(App):
     CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
     BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), 
@@ -277,37 +420,31 @@ class NyxBox(App):
     BUTTON_PANEL_ID = "button_panel"
     CHALLENGE_VIEW_ID = "challengeview"
     EDITOR_ID = "editor"
-    async def on_mount(self) -> None:
-        """Contains things to be run on launch"""
+
+    def on_mount(self) -> None:
+        """Initialize variables to be used later and other stuff"""
         self.editor_opened = False
         self.has_vended = False
         self.current_challenge = None
         self.nyx_path = pathlib.Path.home() / ".nyxbox"
-        os.makedirs(self.nyx_path,exist_ok=True)
-        try: #TODO: Implement checking for 
-            # 1. if JWT expired, 
-            # 2. if refresh token is expired, 
-            # 3. force reauth if both of those two are met
-            if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / "auth.json"):
-                nyx_path = pathlib.Path.home() / ".nyxbox"
-                auth_path = nyx_path / "auth.json"
-                user_path = nyx_path / "user.json"
-                with open(auth_path) as f:
-                    self.auth_data = json.load(f)
-                with open(user_path) as f:
-                    self.user_data = json.load(f)
-                check_results = ValidateAuth(self, self.nyx_path)
-                await check_results.perform_auth_check()
-                if check_results:
-                    self.auth_data = {}
-                # check_results = await check_results.perform_auth_check()
-                # self.notify(
-                # f"{DAEMON_USER} Welcome, {self.user_data.get('name', 'User')}!", 
-                # severity="information")
-            else:
-                self.app.push_screen(LoginPage()) 
+        try: #TODO: Implement checking for 1. if JWT expired, 2. if refresh token is expired, 3. force reauth if both of those two are met
+            auth_validator = ValidateAuth(self, self.nyx_path)
+            self.run_worker(auth_validator.perform_auth_check(), exclusive=True)
+            # if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / "auth.json"):
+            #     nyx_path = pathlib.Path.home() / ".nyxbox"
+            #     auth_path = nyx_path / "auth.json"
+            #     user_path = nyx_path / "user.json"
+            #     with open(auth_path) as f:
+            #         self.auth_data = json.load(f)
+            #     with open(user_path) as f:
+            #         self.user_data = json.load(f)
+            #     self.notify(
+            #     f"{DAEMON_USER} Welcome, {self.user_data.get('name', 'User')}!", 
+            #     severity="information")
+            # else:
+            #     self.app.push_screen(LoginPage()) 
         except Exception as e:
-            log=create_log(return_log_path(), severity = "error", message=e)
+            log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
             if log:
                 self.notify(
                     title="Uh oh!",
@@ -406,7 +543,6 @@ class NyxBox(App):
     def authentication_complete(self, message: AuthComplete):
         self.auth_data = message.auth_data
         self.user_data = message.user_data
-        self.jwt_token = self.auth_data.get('access_token')
 
     @on(LanguageSelected)
     def handle_language_selection(self, message: LanguageSelected):

@@ -99,6 +99,7 @@ class WaitingForAuthScreen(ModalScreen):
                     response["refresh_token"],
                     response["access_exp"],
                     response["refresh_exp"])
+                self.app_instance.auth_data = {"auth:data"}
                 self.app.pop_screen()
                 self.app.pop_screen()
                 return
@@ -297,11 +298,15 @@ class ValidateAuth():
 
     async def perform_auth_check(self):
         """Check whether the user is authenticated or not"""
-        auth_path = self.root_path / "auth.json"
-        user_path = self.root_path / "user.json"
-        with open(user_path, 'r') as f:
+        auth_file = self.root_path / "auth.json"
+        user_file = self.root_path / "user.json"
+        if not auth_file.exists() or not user_file.exists():
+            create_log(return_log_path(), severity="info", message="auth.json or user.json not found. Pushing LoginPage.")
+            self.app_instance.push_screen(LoginPage())
+            return 
+        with open(user_file, 'r') as f:
             user_data = json.load(f)
-        if pathlib.Path.exists(auth_path) and pathlib.Path.exists(user_path):
+        if pathlib.Path.exists(auth_file) and pathlib.Path.exists(user_file):
             try:
                 with open(auth_path, 'r') as f:
                     auth_data = json.load(f)
