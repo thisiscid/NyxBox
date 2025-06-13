@@ -442,12 +442,12 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
 @app.post("/auth/refresh") # To get a new JWT with a valid refresh jwt
 def refresh_jwt(token_data: RefreshTokensRequest, db: Session = Depends(get_db)):
     jwt_user = db.query(User).filter(
-        (User.refresh_jwt == refresh_jwt)
+        (User.refresh_jwt == token_data.refresh_token)
     ).first()
     now = datetime.now(timezone.utc)
     if not jwt_user:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-    if not refresh_jwt:
+    if not token_data.refresh_token:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     expiry_timestamp: Optional[datetime] = jwt_user.refresh_jwt_expiry # type:ignore
     if expiry_timestamp is not None and expiry_timestamp.tzinfo is None:
@@ -471,8 +471,8 @@ def refresh_jwt(token_data: RefreshTokensRequest, db: Session = Depends(get_db))
             # "message": "Refresh JWT generated", 
             "refresh_jwt": new_refresh_jwt, 
             "user_jwt": user_jwt,
-            "refresh_expiry": refresh_expiry,
-            "user_jwt_expiry": user_expiry
+            "refresh_expiry": refresh_expiry.isoformat(),
+            "user_jwt_expiry": user_expiry.isoformat()
             }
 
 @app.post("/auth/logout") # Log User Out

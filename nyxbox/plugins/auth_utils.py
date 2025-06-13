@@ -99,7 +99,7 @@ class WaitingForAuthScreen(ModalScreen):
                     response["refresh_token"],
                     response["access_exp"],
                     response["refresh_exp"])
-                self.app_instance.auth_data = {"auth:data"}
+                # self.app.auth_data = {"auth:data"}
                 self.app.pop_screen()
                 self.app.pop_screen()
                 return
@@ -308,7 +308,7 @@ class ValidateAuth():
             user_data = json.load(f)
         if pathlib.Path.exists(auth_file) and pathlib.Path.exists(user_file):
             try:
-                with open(auth_path, 'r') as f:
+                with open(auth_file, 'r') as f:
                     auth_data = json.load(f)
             except Exception as e:
                 return {"error": e}

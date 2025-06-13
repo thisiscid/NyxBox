@@ -13,7 +13,7 @@ from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
 from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL
-from .plugins.auth_utils import read_user_data
+from .plugins.auth_utils import read_user_data, ValidateAuth
 from rich.text import Text
 from textual import on
 from textual.screen import Screen, ModalScreen
@@ -320,7 +320,7 @@ class SearchForProblem(Screen):
             if len(description) > available_description_space:
                 truncated_description = description[:available_description_space-3] + "..."
             else:
-                tr# uncated_description = description
+                truncated_description = description
 #             
             challenges.add_row(name, truncated_description, difficulty)
             # rows.append((str(name).title(), str(description), str(difficulty)))
@@ -366,7 +366,7 @@ class SearchForProblem(Screen):
                                 markup=True
                             )
                                 self.post_message(SearchComplete(file_dict))
-                        except:
+                        except Exception:
                             pass
 
     def on_data_table_row_highlighted(self, Message) -> None:
@@ -415,7 +415,7 @@ class NyxBox(App):
                 ("s", "search_button", "Search"), 
                 ("ctrl+q", "quit_app", "Quit app"),
                 ("p", "view_profile", "View Profile")]
-    TITLE = f"NyxBox {nyxbox_version}" if nyxbox_version else f"NyxBox"
+    TITLE = f"NyxBox {nyxbox_version}" if nyxbox_version else "NyxBox"
     # Define some consts so we don't have to do this every time we want to show or hide a widget
     BUTTON_PANEL_ID = "button_panel"
     CHALLENGE_VIEW_ID = "challengeview"
