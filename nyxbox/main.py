@@ -296,7 +296,10 @@ class NyxBox(App):
                     self.auth_data = json.load(f)
                 with open(user_path) as f:
                     self.user_data = json.load(f)
-                # check_results = ValidateAuth(self, self.nyx_path)
+                check_results = ValidateAuth(self, self.nyx_path)
+                await check_results.perform_auth_check()
+                if check_results:
+                    self.auth_data = {}
                 # check_results = await check_results.perform_auth_check()
                 # self.notify(
                 # f"{DAEMON_USER} Welcome, {self.user_data.get('name', 'User')}!", 

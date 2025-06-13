@@ -60,14 +60,15 @@ def format_result(result):
 
 def create_log(path, severity, message):
     try:
-        if pathlib.Path.exists(path):
-            with open(path, 'a') as f:
-                if severity == "error":
-                    f.write(f"{time.time()} ERROR: {message}")
-                elif severity == "warning":
-                    f.write(f"{time.time()} WARNING: {message}")
-                else:
-                    f.write(f"{time.time()} INFO: {message}")
+        # if pathlib.Path.exists(path):
+        with open(path, 'a') as f:
+            if severity == "error":
+                f.write(f"{time.time()} ERROR: {message}\n")
+            elif severity == "warning":
+                f.write(f"{time.time()} WARNING: {message}\n")
+            else:
+                f.write(f"{time.time()} INFO: {message}\n")
+
     except Exception as e:
         return str(e)
     

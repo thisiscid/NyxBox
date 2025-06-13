@@ -97,8 +97,8 @@ class WaitingForAuthScreen(ModalScreen):
                     response["access_token"], 
                     response["user_data"], 
                     response["refresh_token"],
-                    response["user_jwt_expiry"],
-                    response["refresh_expiry"])
+                    response["access_exp"],
+                    response["refresh_exp"])
                 self.app.pop_screen()
                 self.app.pop_screen()
                 return
@@ -280,10 +280,10 @@ class ValidateAuth():
                 "failed": True}
             if response.status_code == 200:
                 response_data = response.json()
-                return {"access_token": response_data.get("refresh_jwt"), 
-                        "jwt": response_data.get("user_jwt"), 
-                        "access_exp": response_data.get("refresh_expiry"),
-                        "jwt_exp": response_data.get("user_jwt_expiry"),
+                return {"access_token": response_data.get("user_jwt"),
+                        "refresh_token": response_data.get("refresh_jwt"), 
+                        "access_expiry": response_data.get("access_exp"),
+                        "refresh_expiry": response_data.get("refresh_exp"), 
                         "failed": False}
             else:
                 log_path = self.root_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log"
@@ -299,6 +299,8 @@ class ValidateAuth():
         """Check whether the user is authenticated or not"""
         auth_path = self.root_path / "auth.json"
         user_path = self.root_path / "user.json"
+        with open(user_path, 'r') as f:
+            user_data = json.load(f)
         if pathlib.Path.exists(auth_path) and pathlib.Path.exists(user_path):
             try:
                 with open(auth_path, 'r') as f:
@@ -320,6 +322,12 @@ class ValidateAuth():
                     timeout=5,
                     markup=True
                 )
+                create_log(return_log_path, severity="error", message=f"Error: {e}")
+                try:
+                    os.remove(self.root_path / "auth.json")
+                    os.remove(self.root_path / "auth.json")
+                except Exception as e:
+                    create_log(return_log_path, severity="error", message=f"Error: {e}")
                 self.app_instance.push_screen(LoginPage())
                 return
             expiration = auth_data.get("access_exp")
@@ -327,7 +335,22 @@ class ValidateAuth():
             if expiration <= current_time:
                 valid_refresh = await self.check_refresh_token(auth_data.get('refresh_token'))
                 if valid_refresh.get("failed", True):
-                    pass
-                    # self.app_instance.push_screen()
-                # return valid_refresh
+                    self.app_instance.notify(
+                    title="Hello!",
+                    message=f"{DAEMON_USER} [b]For your security, you've been logged out. Log in again![/]",
+                    severity="error",
+                    timeout=5,
+                    markup=True
+                )
+                    try:
+                        os.remove(self.root_path / "auth.json")
+                        os.remove(self.root_path / "auth.json")
+                    except Exception as e:
+                        create_log(return_log_path, severity="error", message=f"Error: {e}")
+                    self.app_instance.push_screen(LoginPage())
+                else:
+                    # self.app_instance.
+                    self.app_instance.notify(
+                    f"{DAEMON_USER} Welcome, {user_data.get('name', 'User')}!", 
+                    severity="information")
 

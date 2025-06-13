@@ -94,14 +94,15 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
     )
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")
-    # try:
-    #     token = oauth.fetch_token(
-    #         'https://oauth2.googleapis.com/token',
-    #         client_secret=settings.GOOGLE_CLIENT_SECRET,
-    #         authorization_response=str(request.url)
-    #     )
-    # except Exception as e:
-    #     raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
+    # DO NOT REMOVE, THIS ACTUALLY DOES SOMETHING
+    try:
+        token = oauth.fetch_token(
+            'https://oauth2.googleapis.com/token',
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            authorization_response=str(request.url)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
     original_session_id = redis_client.get(f"oauth_state:{state}")
     if original_session_id:
         redis_client.delete(f"oauth_state:{state}")    
@@ -162,8 +163,8 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
             "name": user.name,
             "email": user.email
         },
-        "access_exp": user_jwt_expiry,
-        "refresh_exp": refresh_jwt_expiry
+        "access_exp": user_jwt_expiry.isoformat(),
+        "refresh_exp": refresh_jwt_expiry.isoformat()
     })
 )
     #TODO: Switch this over to the file
@@ -280,8 +281,18 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")
     if not original_session_id:
-        raise HTTPException(status_code=400, detail="Invalid or expired state")
-    # Get user info from Google
+        raise HTTPException(status_code=400, 
+        detail="Invalid or expired state")
+    try:
+        # DO NOT REMOVE, THIS ACTUALLY DOES SOMETHING
+        token = oauth.fetch_token(  # noqa: F841
+            'https://github.com/login/oauth/access_token',
+            client_secret=settings.GITHUB_CLIENT_SECRET,
+            authorization_response=str(request.url)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
+    #Get user info from Github
     try:
         user_info_resp = oauth.get('https://api.github.com/user')
         user_info_resp.raise_for_status() 
@@ -311,7 +322,7 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         user = User(
             email=user_info['email'],
             name=user_info.get('name') or user_info['login'],  
-                    d=str(user_info['id']),
+                    id=str(user_info['id']),
             refresh_jwt=refresh_jwt,
             refresh_jwt_expiry=datetime.now(timezone.utc) + timedelta(days=30)
         )
@@ -339,8 +350,8 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
                 "name": user.name,
                 "email": user.email
             },
-            "access_exp": user_expiry,
-            "refresh_exp": refresh_jwt_expiry
+            "access_exp": user_expiry.isoformat(),
+            "refresh_exp": refresh_jwt_expiry.isoformat()
             
         })
     )
