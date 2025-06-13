@@ -1,15 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, Header
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import session, Session
-import sqlalchemy
+from sqlalchemy.orm import Session
 from database import create_tables, get_db
 from models import User, Challenges, UserSolve, UserLike
 from contextlib import asynccontextmanager
 import typing
 from authlib.integrations.requests_client import OAuth2Session
 from jose import JWTError, jwt
-import httpx
 from datetime import datetime, timedelta, timezone
 from config import settings
 import os
@@ -17,7 +15,6 @@ from typing import Optional
 import secrets
 import redis
 import json
-from models import Challenges
 from schemas import ChallengeListItemSchema, ChallengeDetailSchema, RefreshTokensRequest
 
 # oauth_state = {}
@@ -97,14 +94,14 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
     )
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")
-    try:
-        token = oauth.fetch_token(
-            'https://oauth2.googleapis.com/token',
-            client_secret=settings.GOOGLE_CLIENT_SECRET,
-            authorization_response=str(request.url)
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
+    # try:
+    #     token = oauth.fetch_token(
+    #         'https://oauth2.googleapis.com/token',
+    #         client_secret=settings.GOOGLE_CLIENT_SECRET,
+    #         authorization_response=str(request.url)
+    #     )
+    # except Exception as e:
+    #     raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
     original_session_id = redis_client.get(f"oauth_state:{state}")
     if original_session_id:
         redis_client.delete(f"oauth_state:{state}")    
@@ -124,13 +121,14 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         (User.email == user_info['email'])
     ).first()
     refresh_jwt=str(secrets.token_hex(32))
+    refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30)
     if existing_user:
         if existing_user.google_id is None:
             setattr(existing_user, 'google_id', str(user_info['sub']))
             db.commit()
         user = existing_user
         user.refresh_jwt=refresh_jwt # type: ignore
-        user.refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30) # type: ignore
+        user.refresh_jwt_expiry = refresh_jwt_expiry # type: ignore
         db.commit() 
     else:
         user = User(
@@ -145,8 +143,9 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         db.refresh(user)
     if not settings.JWT_SECRET:
         raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
+    user_jwt_expiry = datetime.now(timezone.utc)+timedelta(hours=1)
     user_jwt=jwt.encode(
-        claims={"user_id": user.id, "exp": datetime.now(timezone.utc)+timedelta(hours=1), "iat": datetime.now(timezone.utc)},
+        claims={"user_id": user.id, "exp": user_jwt_expiry, "iat": datetime.now(timezone.utc)},
         key=settings.JWT_SECRET
     )
     if not original_session_id:
@@ -162,7 +161,9 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
             "id": user.id,
             "name": user.name,
             "email": user.email
-        }
+        },
+        "access_exp": user_jwt_expiry,
+        "refresh_exp": refresh_jwt_expiry
     })
 )
     #TODO: Switch this over to the file
@@ -495,10 +496,11 @@ def check_auth_status(session_id: str):
         if auth_data.get("completed"):
             result = {
                 "status": "completed",
-                "access_token": auth_data["access_token"],
-                "user_data": auth_data["user_data"],
+                "access_token": auth_data.get("access_token"),
+                "user_data": auth_data.get("user_data"),
                 "refresh_token": auth_data.get("refresh_token"),
-                
+                "access_exp": auth_data.get("user_jwt_expiry"),
+                "refresh_exp": auth_data.get("refresh_jwt_expiry")
             }
             redis_client.delete(f"pending_auth:{session_id}")  # Clean up
             return result
