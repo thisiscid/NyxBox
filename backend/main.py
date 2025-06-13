@@ -18,7 +18,7 @@ import secrets
 import redis
 import json
 from models import Challenges
-from schemas import ChallengeListItemSchema, ChallengeDetailSchema
+from schemas import ChallengeListItemSchema, ChallengeDetailSchema, RefreshTokensRequest
 
 # oauth_state = {}
 # pending_auth: dict[str, dict] = {}
@@ -165,7 +165,7 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         }
     })
 )
-
+    #TODO: Switch this over to the file
     return HTMLResponse(f"""
     <html>
         <head>
@@ -244,7 +244,7 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
             </script>
         </body>
     </html>
-    """)
+    """)  # noqa: F541
     # return {"message": "Google login successful", "jwt": user_jwt, "refresh": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 @app.get("/auth/github") # Start Github OAuth flow
@@ -272,14 +272,6 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         redirect_uri=settings.GITHUB_REDIRECT_URI,
         state=state 
     )
-    try:
-        token = oauth.fetch_token(
-            'https://github.com/login/oauth/access_token',
-            client_secret=settings.GITHUB_CLIENT_SECRET,
-            authorization_response=str(request.url)
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
     original_session_id = redis_client.get(f"oauth_state:{state}")
     if original_session_id:
         redis_client.delete(f"oauth_state:{state}") 
@@ -301,6 +293,7 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch user info: {str(e)}")
     refresh_jwt=str(secrets.token_hex(32))
+    refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30)
     existing_user = db.query(User).filter(
         (User.github_id == str(user_info['id'])) | 
         (User.email == user_info['email'])
@@ -311,13 +304,13 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
             db.commit()
         user = existing_user
         user.refresh_jwt=refresh_jwt # type: ignore
-        user.refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30) # type: ignore
+        user.refresh_jwt_expiry = refresh_jwt_expiry # type: ignore
         db.commit()
     else:
         user = User(
             email=user_info['email'],
             name=user_info.get('name') or user_info['login'],  
-            github_id=str(user_info['id']),
+                    d=str(user_info['id']),
             refresh_jwt=refresh_jwt,
             refresh_jwt_expiry=datetime.now(timezone.utc) + timedelta(days=30)
         )
@@ -326,8 +319,9 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         db.refresh(user)
     if not settings.JWT_SECRET:
         raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
+    user_expiry = datetime.now(timezone.utc)+timedelta(hours=1)
     user_jwt=jwt.encode(
-        claims={"user_id": user.id, "exp": datetime.now(timezone.utc)+timedelta(hours=1), "iat": datetime.now(timezone.utc)},
+        claims={"user_id": user.id, "exp": user_expiry, "iat": datetime.now(timezone.utc)},
         key=settings.JWT_SECRET
     )
     if not original_session_id:
@@ -343,10 +337,14 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
                 "id": user.id,
                 "name": user.name,
                 "email": user.email
-            }
+            },
+            "access_exp": user_expiry,
+            "refresh_exp": refresh_jwt_expiry
+            
         })
     )
-    return HTMLResponse(f"""
+    #TODO: Switch this over to the file
+    return HTMLResponse("""
     <html>
         <head>
             <title>Authentication Successful</title>
@@ -424,13 +422,13 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
             </script>
         </body>
     </html>
-    """)
+    """)  # noqa: F541
 # ...existing code...
     # return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 #TODO: Update these params
 @app.post("/auth/refresh") # To get a new JWT with a valid refresh jwt
-def refresh_jwt(request: Request, refresh_jwt: str, db: Session = Depends(get_db)):
+def refresh_jwt(token_data: RefreshTokensRequest, db: Session = Depends(get_db)):
     jwt_user = db.query(User).filter(
         (User.refresh_jwt == refresh_jwt)
     ).first()
@@ -445,17 +443,25 @@ def refresh_jwt(request: Request, refresh_jwt: str, db: Session = Depends(get_db
     if expiry_timestamp is None or expiry_timestamp < now:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     else:
+        refresh_expiry = datetime.now(timezone.utc) + timedelta(days=30)
         new_refresh_jwt=str(secrets.token_hex(32))
         jwt_user.refresh_jwt=new_refresh_jwt # type: ignore
         jwt_user.refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30) # type: ignore
         db.commit()
         if not settings.JWT_SECRET:
             raise HTTPException(status_code=500, detail="No JWT Secret found")
+        user_expiry=datetime.now(timezone.utc)+timedelta(hours=1)
         user_jwt=jwt.encode(
-            claims={"user_id": jwt_user.id, "exp": datetime.now(timezone.utc)+timedelta(hours=1), "iat": datetime.now(timezone.utc)},
+            claims={"user_id": jwt_user.id, "exp": user_expiry, "iat": datetime.now(timezone.utc)},
             key=settings.JWT_SECRET
         )
-        return {"message": "Refresh JWT generated", "refresh_jwt": new_refresh_jwt, "user_jwt": user_jwt}
+        return {
+            # "message": "Refresh JWT generated", 
+            "refresh_jwt": new_refresh_jwt, 
+            "user_jwt": user_jwt,
+            "refresh_expiry": refresh_expiry,
+            "user_jwt_expiry": user_expiry
+            }
 
 @app.post("/auth/logout") # Log User Out
 def logout_user(refresh_jwt: str, db: Session = Depends(get_db)):
@@ -489,10 +495,10 @@ def check_auth_status(session_id: str):
         if auth_data.get("completed"):
             result = {
                 "status": "completed",
-                "status": "completed",
                 "access_token": auth_data["access_token"],
                 "user_data": auth_data["user_data"],
-                "refresh_token": auth_data.get("refresh_token")
+                "refresh_token": auth_data.get("refresh_token"),
+                
             }
             redis_client.delete(f"pending_auth:{session_id}")  # Clean up
             return result
@@ -504,13 +510,13 @@ def check_auth_status(session_id: str):
 #Challenge related things
 @app.get("/challenges", response_model=typing.List[ChallengeListItemSchema]) # List challenges  
 def list_available_challs(db: Session = Depends(get_db)):
-    ret_challs = db.query(Challenges).filter(Challenges.flagged == False).all()
+    ret_challs = db.query(Challenges).filter(Challenges.flagged == False).all()  # noqa: E712
     return ret_challs
 # When the user access a challenge, the frontend should call /challenges/id and cache it locally
 
 @app.get("/challenges/{chall_id}", response_model=ChallengeDetailSchema) # Get challenge
 def get_chall_by_id(chall_id: int, db: Session = Depends(get_db)):
-    chall = db.query(Challenges).filter(Challenges.id == id, Challenges.flagged == False).first()
+    chall = db.query(Challenges).filter(Challenges.id == id, Challenges.flagged == False).first()  # noqa: E712
     if chall:
         return chall
     else:
@@ -523,7 +529,7 @@ def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_
     # We dont need to evaluate code locally bcs:
     # 1. We already have the user evaluate code
     # 2. It's very hard to secure
-    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()
+    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
     if not chall:
         raise HTTPException(404, detail="No such challenge")
     
@@ -547,7 +553,7 @@ def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_
 # I forgot but we probably should authenticate to prevent mass spam?
 @app.post("/challenges/{chall_id}/like")
 def like_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()
+    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
     if not chall:
         raise HTTPException(404, detail="No such challenge")
     
@@ -569,7 +575,7 @@ def like_challenge(chall_id: int, current_user: User = Depends(get_current_user)
 
 @app.delete("/challenges/{chall_id}/unlike")
 def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()
+    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
     if not chall:
         raise HTTPException(404, detail="No such challenge")
     existing_like = db.query(UserLike).filter(

@@ -42,3 +42,6 @@ class PaginatedChallengeListResponse(BaseModel):
     page_size: int
     total_pages: int
     items: List[ChallengeListItemSchema]
+
+class RefreshTokensRequest(BaseModel):
+    refresh_token: str

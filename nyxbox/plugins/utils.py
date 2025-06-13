@@ -76,22 +76,22 @@ def return_log_path() -> pathlib.Path:
     log_dir.mkdir(exist_ok=True)
     log_path = pathlib.Path.joinpath(log_dir, f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log")
     return log_path
-def make_qr_pixels(data: str) -> Pixels | None:
-    """
-    Generates a QR code for the given data and returns it as a rich_pixels.Pixels object.
-    Returns None if QR code generation fails.
-    """
-    try:
-        qr = qrcode.QRCode(
-            box_size=1, # For pixels, box_size=1 is usually best
-            border=0,   # Small border
-        )
-        qr.add_data(data)
-        qr.make(fit=True)
-        img = qr.make_image(image_factory=PilImage)
-        pil_img = img.get_image()  # Convert PilImage to PIL.Image.Image
-        return Pixels.from_image(pil_img) 
-    except Exception as e:
-        # Optionally log the error e
-        print(f"Error generating QR pixels: {e}")
-        return None
+# def make_qr_pixels(data: str) -> Pixels | None:
+#     """
+#     Generates a QR code for the given data and returns it as a rich_pixels.Pixels object.
+#     Returns None if QR code generation fails.
+#     """
+#     try:
+#         qr = qrcode.QRCode(
+#             box_size=1, # For pixels, box_size=1 is usually best
+#             border=0,   # Small border
+#         )
+#         qr.add_data(data)
+#         qr.make(fit=True)
+#         img = qr.make_image(image_factory=PilImage)
+#         pil_img = img.get_image()  # Convert PilImage to PIL.Image.Image
+#         return Pixels.from_image(pil_img) 
+#     except Exception as e:
+#         # Optionally log the error e
+#         print(f"Error generating QR pixels: {e}")
+#         return None
