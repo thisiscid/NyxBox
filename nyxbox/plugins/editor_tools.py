@@ -590,7 +590,7 @@ using namespace std;
     // Tests will FAIL if you print.
     // Do NOT change the signature of the function!
     return null;
-        }}
+}}
             """
                 self.textarea.language = 'java'
                 self.all_view.update_content(self.challenge)

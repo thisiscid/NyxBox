@@ -99,7 +99,6 @@ class WaitingForAuthScreen(ModalScreen):
                     response["refresh_token"],
                     response["access_exp"],
                     response["refresh_exp"])
-                # self.app.auth_data = {"auth:data"}
                 self.app.pop_screen()
                 self.app.pop_screen()
                 return
@@ -257,7 +256,10 @@ def read_user_data() -> dict:
         auth_dir = pathlib.Path.home() / ".nyxbox"
         if pathlib.Path.is_dir(auth_dir):
             with open(auth_dir / "auth.json", "r") as f:
-                return json.load(f)
+                auth_data=json.load(f)
+                auth_data["access_expiry"] = fromisoformat(auth_data["access_expiry"])
+                auth_data["refresh_expiry"] = fromisoformat(auth_data["access_expiry"])
+
         else:
             return {"error": "Auth directory not found"}
     except Exception as e:
@@ -310,6 +312,9 @@ class ValidateAuth():
             try:
                 with open(auth_file, 'r') as f:
                     auth_data = json.load(f)
+                    auth_data["access_expiry"] = fromisoformat(auth_data["access_expiry"])
+                    auth_data["refresh_expiry"] = fromisoformat(auth_data["refresh_expiry"])
+
             except Exception as e:
                 return {"error": e}
             jwt_payload = auth_data.get("access_token").split(".")[1]
@@ -335,9 +340,9 @@ class ValidateAuth():
                     create_log(return_log_path, severity="error", message=f"Error: {e}")
                 self.app_instance.push_screen(LoginPage())
                 return
-            expiration = auth_data.get("access_exp")
+            expiration = auth_data.get("access_expiry")
             current_time = datetime.now(timezone.utc).timestamp()
-            if expiration <= current_time:
+            if expiration.timestamp() <= current_time:
                 valid_refresh = await self.check_refresh_token(auth_data.get('refresh_token'))
                 if valid_refresh.get("failed", True):
                     self.app_instance.notify(
@@ -358,4 +363,35 @@ class ValidateAuth():
                     self.app_instance.notify(
                     f"{DAEMON_USER} Welcome, {user_data.get('name', 'User')}!", 
                     severity="information")
+                    self.save_tokens(
+                        valid_refresh.get("access_token") or "",
+                        valid_refresh.get("user_data") or user_data,
+                        valid_refresh.get("refresh_jwt") or "",
+                        valid_refresh.get("user_jwt_expiry") or 0,
+                        valid_refresh.get("refresh_expiry") or 0
+                    )
+    
+    def save_tokens(self, access_token: str, user_data: dict, refresh_token: str, access_exp: int, refresh_exp: int):
+        # Save to local storage
+        auth_dir = pathlib.Path.home() / ".nyxbox"
+        auth_dir.mkdir(exist_ok=True)
+        
+        auth_data = {
+            "access_token": access_token,
+            "user_data": user_data,
+            "refresh_token": refresh_token,
+            "timestamp": datetime.now().timestamp(),
+            "access_expiry": access_exp,
+            "refresh_expiry": refresh_exp
+        }
+        
+        with open(auth_dir / "auth.json", "w") as f:
+            json.dump(auth_data, f)
+        with open(auth_dir / "user.json", "w") as f:
+            json.dump(user_data, f)
+        self.app_instance.notify(
+            f"{DAEMON_USER} Welcome, {user_data.get('name', 'User')}!", 
+            severity="information")
+        self.app_instance.post_message(AuthComplete(auth_data, user_data))
+
 

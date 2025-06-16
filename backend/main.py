@@ -322,7 +322,7 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         user = User(
             email=user_info['email'],
             name=user_info.get('name') or user_info['login'],  
-                    id=str(user_info['id']),
+            github_id=str(user_info['id']),
             refresh_jwt=refresh_jwt,
             refresh_jwt_expiry=datetime.now(timezone.utc) + timedelta(days=30)
         )
@@ -472,7 +472,17 @@ def refresh_jwt(token_data: RefreshTokensRequest, db: Session = Depends(get_db))
             "refresh_jwt": new_refresh_jwt, 
             "user_jwt": user_jwt,
             "refresh_expiry": refresh_expiry.isoformat(),
-            "user_jwt_expiry": user_expiry.isoformat()
+            "user_jwt_expiry": user_expiry.isoformat(),
+            "user_data": {
+                 "id": jwt_user.id,
+                "email": jwt_user.email,
+                "name": jwt_user.name,
+                "google_id": jwt_user.google_id,
+                "github_id": jwt_user.github_id,
+                "avatar_url": jwt_user.avatar_url,
+                "bio": jwt_user.bio,
+                "created_at": jwt_user.created_at
+            }
             }
 
 @app.post("/auth/logout") # Log User Out
@@ -510,8 +520,8 @@ def check_auth_status(session_id: str):
                 "access_token": auth_data.get("access_token"),
                 "user_data": auth_data.get("user_data"),
                 "refresh_token": auth_data.get("refresh_token"),
-                "access_exp": auth_data.get("user_jwt_expiry"),
-                "refresh_exp": auth_data.get("refresh_jwt_expiry")
+                "access_exp": auth_data.get("access_exp"),
+                "refresh_exp": auth_data.get("refresh_exp")
             }
             redis_client.delete(f"pending_auth:{session_id}")  # Clean up
             return result
