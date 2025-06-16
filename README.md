@@ -44,6 +44,7 @@ API_BASE_URL = http://localhost:8000
 ```
 JWT_SECRET is just a random combination of letters, you can just random SHA256 hash something potentially (i'm unsure about the max length of JWT_SECRET). Yes, this will involve grabbing your own OAuth secrets and clients.
 
+You will also have to to manually enter the frontend folder where NyxBox has been installed and check utils.py in order to change the link to your server, as the backend currently does not exist.
 ### 2. Run via uvicorn
 Inside of the backend folder, run 
 ```bash

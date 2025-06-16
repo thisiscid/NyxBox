@@ -257,9 +257,9 @@ def read_user_data() -> dict:
         if pathlib.Path.is_dir(auth_dir):
             with open(auth_dir / "auth.json", "r") as f:
                 auth_data=json.load(f)
-                auth_data["access_expiry"] = fromisoformat(auth_data["access_expiry"])
-                auth_data["refresh_expiry"] = fromisoformat(auth_data["access_expiry"])
-
+                auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                auth_data["refresh_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                return auth_data
         else:
             return {"error": "Auth directory not found"}
     except Exception as e:
@@ -312,8 +312,8 @@ class ValidateAuth():
             try:
                 with open(auth_file, 'r') as f:
                     auth_data = json.load(f)
-                    auth_data["access_expiry"] = fromisoformat(auth_data["access_expiry"])
-                    auth_data["refresh_expiry"] = fromisoformat(auth_data["refresh_expiry"])
+                    auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                    auth_data["refresh_expiry"] = datetime.fromisoformat(auth_data["refresh_expiry"])
 
             except Exception as e:
                 return {"error": e}
