@@ -1,11 +1,12 @@
 {
   "name": "two-sum",
-  "id": 1,
   "difficulty": "easy",
   "description": "Given a list of integers and a target value, return the indices of the first pair of numbers that sum to the target. Iterate from left to right and choose the earliest valid pair (i < j). Return the indices as a list of two integers or None (or the equivalent indicator in your language) if no pair sums to the target.",
   "function_name": "two_sum",
   "type": "function",
-  "inputs": ["arr", "target"],
+  "category": "arrays",
+  "params": ["arr", "target"],
+  "constraints": "None",
   "tests": [
     {
       "input": [[1, 4, 10, -3], 14],

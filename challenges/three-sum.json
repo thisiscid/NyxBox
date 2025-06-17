@@ -1,11 +1,12 @@
 {
   "name": "three-sum",
-  "id": 2,
   "difficulty": "medium",
   "description": "Given a list of integers and a target value, return the indices of the first trio of numbers that add up to the target. Search the array from left to right and always choose the earliest valid combination (i < j < k). Return the indices as a list of three integers or None (or the equivalent indicator in your language) if no such trio exists.",
   "function_name": "three_sum",
   "type": "function",
-  "inputs": ["arr","target"],
+  "category": "arrays",
+  "params": ["arr","target"],
+  "constraints": "None",
   "tests": [
     {
       "input": [[1, 4, 2, 10, -3], 15],
