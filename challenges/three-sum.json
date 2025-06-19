@@ -7,6 +7,8 @@
   "category": "arrays",
   "params": ["arr","target"],
   "constraints": "None",
+  "author": "NyxBox",
+  "points": 20,
   "tests": [
     {
       "input": [[1, 4, 2, 10, -3], 15],

@@ -33,3 +33,5 @@ nyxbox = [
   "challenges/*.json",
   "language-support/*.scm"
 ]
+[tool.ruff]
+target-version = "py312"

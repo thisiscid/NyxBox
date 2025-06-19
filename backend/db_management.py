@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session  # noqa: F401
 from database import SessionLocal, engine  # noqa: F401
 from models import Challenges
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical, Horizontal # noqa: F401
+from textual.containers import Container, Vertical, Horizontal, ScrollableContainer # noqa: F401
 from textual.reactive import reactive # noqa: F401
 from textual.screen import Screen, ModalScreen # noqa: F401
 from textual.widgets import Button, Header, Footer, Input, Label, Static, DataTable, TextArea # noqa: F401
@@ -57,16 +57,36 @@ class ChallengeAddScreen(Screen):
                             )
                         return
                     db = SessionLocal()
-                    
-                    new_chall = Challenges(**chall_data)
+                    attribute_names_from_model = Challenges.__mapper__.columns.keys()
+                    filtered_data = {k: v for k, v in chall_data.items() if k in attribute_names_from_model}
+                    new_chall = Challenges(**filtered_data)
                     db.add(new_chall)
                     db.commit()
                     db.close()
-                    
+                    self.app.notify(
+                        message="Successfully updated DB",
+                        severity="information"
+                    )
 
-                        
-
-
+class ChallengeEditScreen(Screen):
+    def __init__(self, chall_id) -> None:
+        super().__init__()
+        self.chall_id = chall_id
+        self.attribute_names_from_model = Challenges.__mapper__.columns.keys()
+        self.db = SessionLocal()
+    def compose(self) -> ComposeResult:
+        self.challenge = self.db.query(Challenges).filter(Challenges.id == self.chall_id).first()
+        with ScrollableContainer():
+            for attribute in self.attribute_names_from_model:
+                value = getattr(self.challenge, attribute, "")
+                yield Input(value=str(value), id=str(attribute))
+        yield Button.success("Update attributes", id="update_attrs")
+    def on_button_pressed(self, event:Button.Pressed):
+        match event.button.id:
+            case "update_attrs":
+                for attribute in self.attribute_names_from_model:
+                    attr_value = self.query_one(f"#{str(attribute)}", Input)
+                                        
 
 
 class ChallengeListScreen(Screen):
@@ -78,6 +98,7 @@ class ChallengeListScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield DataTable(id="challenge_table", cursor_type="row")
+        yield Button(id="add_chall", label="Add challenge")
         yield Footer()
     def load_challenges(self):
         display_table = self.query_one("#challenge_table", DataTable)
@@ -96,6 +117,10 @@ class ChallengeListScreen(Screen):
         for chall in chall_all:
             row = [getattr(chall, attr) for attr in attribute_names_from_model]
             display_table.add_row(*row)
+    def on_button_pressed(self, event: Button.Pressed):
+        match event.button.id:
+            case "add_chall":
+                self.app.push_screen(ChallengeAddScreen())
 
 class DBManagement(App):
     def on_mount(self):
