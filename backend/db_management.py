@@ -4,15 +4,17 @@ import sys # noqa: F401
 import os # noqa: F401
 import json # noqa: F401
 import pathlib
+import datetime
 from config import Settings # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 from database import SessionLocal, engine  # noqa: F401
 from models import Challenges
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal, ScrollableContainer # noqa: F401
-from textual.reactive import reactive # noqa: F401
+from textual.reactive import reactive# noqa: F401
 from textual.screen import Screen, ModalScreen # noqa: F401
-from textual.widgets import Button, Header, Footer, Input, Label, Static, DataTable, TextArea # noqa: F401
+from textual.widget import Widget
+from textual.widgets import ListView, ListItem, Button, Header, Footer, Input, Label, Static, DataTable, TextArea # noqa: F401
 from textual import on # noqa: F401
 
 class ChallengeAddScreen(Screen):
@@ -71,23 +73,46 @@ class ChallengeAddScreen(Screen):
 class ChallengeEditScreen(Screen):
     def __init__(self, chall_id) -> None:
         super().__init__()
+        self.type_mappings = {
+            "INTEGER": int,
+            "STRING": str,
+            "JSON": dict,
+            "DATETIME": datetime.datetime
+        }
+        self.restricted_vals = [
+            "id",
+            "created_at",
+            # "likes",
+            # "solves",
+            # Temporarily commenting these bcs they'll be important for testing
+            "flagged",
+            "submitted_by"
+        ]
         self.chall_id = chall_id
         self.attribute_names_from_model = Challenges.__mapper__.columns.keys()
+        self.types_from_model = {name: type for name, type in Challenges.__mapper__.columns}
         self.db = SessionLocal()
+
     def compose(self) -> ComposeResult:
         self.challenge = self.db.query(Challenges).filter(Challenges.id == self.chall_id).first()
-        with ScrollableContainer():
-            for attribute in self.attribute_names_from_model:
-                value = getattr(self.challenge, attribute, "")
-                yield Input(value=str(value), id=str(attribute))
+        with Horizontal():
+            yield ListView(
+                [ListItem(Label(str(attribute))) for attribute in self.attribute_names_from_model if attribute not in self.restricted_vals]
+            )
+            with Vertical():
+                yield Input(placeholder="Select something!")
+        # with ScrollableContainer():
+        #     for attribute in self.attribute_names_from_model:
+        #         if str(attribute) in self.restricted_vals:
+        #             continue
+        #         value = getattr(self.challenge, attribute, "")
+        #         yield Input(value=str(value), id=str(attribute))
         yield Button.success("Update attributes", id="update_attrs")
     def on_button_pressed(self, event:Button.Pressed):
         match event.button.id:
             case "update_attrs":
                 for attribute in self.attribute_names_from_model:
                     attr_value = self.query_one(f"#{str(attribute)}", Input)
-                                        
-
 
 class ChallengeListScreen(Screen):
     def on_mount(self) -> None:
@@ -125,12 +150,7 @@ class ChallengeListScreen(Screen):
 class DBManagement(App):
     def on_mount(self):
         self.push_screen(ChallengeListScreen())
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with Horizontal(id="chall_list"):
-            yield Label()
-        yield Footer()
-
+        
 def main():
     app = DBManagement()
     app.run()
