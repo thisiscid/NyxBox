@@ -97,7 +97,7 @@ class ChallengeEditScreen(Screen):
         self.challenge = self.db.query(Challenges).filter(Challenges.id == self.chall_id).first()
         with Horizontal():
             yield ListView(
-                [ListItem(Label(str(attribute))) for attribute in self.attribute_names_from_model if attribute not in self.restricted_vals]
+                *[ListItem(Label(str(attribute))) for attribute in self.attribute_names_from_model if attribute not in self.restricted_vals]
             )
             with Vertical():
                 yield Input(placeholder="Select something!")
@@ -122,30 +122,39 @@ class ChallengeListScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield DataTable(id="challenge_table", cursor_type="row")
-        yield Button(id="add_chall", label="Add challenge")
+        with Vertical():
+            yield DataTable(id="challenge_table", cursor_type="row")
+            with Horizontal():
+                yield Button(id="add_chall", label="Add challenge")
+                yield Button(id="edit_chall", label="Edit Challenge")
         yield Footer()
     def load_challenges(self):
         display_table = self.query_one("#challenge_table", DataTable)
         display_table.clear()
-        db = SessionLocal()
-        chall_all = db.query(Challenges).all()
-        try:
-            attribute_names_from_model = Challenges.__mapper__.columns.keys()
-        except AttributeError:
-            print("Error: Could not retrieve column names from Challenges model.")
-            attribute_names_from_model = ["id", "name", "error"] 
-        display_headers = [name.replace("_", " ").title() for name in attribute_names_from_model]
-
-        display_table.clear(columns=True) 
-        display_table.add_columns(*display_headers)
-        for chall in chall_all:
-            row = [getattr(chall, attr) for attr in attribute_names_from_model]
-            display_table.add_row(*row)
+        with SessionLocal() as db:
+            chall_all = db.query(Challenges).all()
+            try:
+                attribute_names_from_model = Challenges.__mapper__.columns.keys()
+            except AttributeError:
+                print("Error: Could not retrieve column names from Challenges model.")
+                attribute_names_from_model = ["id", "name", "error"] 
+            display_headers = [name.replace("_", " ").title() for name in attribute_names_from_model]
+            display_table.clear(columns=True) 
+            display_table.add_columns(*display_headers)
+            for chall in chall_all:
+                row = [getattr(chall, attr) for attr in attribute_names_from_model]
+                display_table.add_row(*row)
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
             case "add_chall":
                 self.app.push_screen(ChallengeAddScreen())
+            case "edit_chall":
+                datatable = self.query_one("#challenge_table", DataTable)
+                current_row = datatable.get_row_at(datatable.cursor_row)
+                chall_name = datatable.get_column
+                with SessionLocal() as db:
+                    chall_id = db.query(Challenges).filter(Challenges.chall_name == chall_name).first().id
+                self.app.push_screen(ChallengeEditScreen(chall_id)) 
 
 class DBManagement(App):
     def on_mount(self):
