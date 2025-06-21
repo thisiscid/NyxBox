@@ -29,7 +29,7 @@ class ChallengeAddScreen(Screen):
         pass
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Input(placeholder="Path to challenge json", id="path_input")
+        yield Input(placeholder="Path to challenge json or folder", id="path_input")
         with Horizontal():
             yield Button.error("Cancel", id="cancel_button")
             yield Button.success("Enter in DB", id="enter_button")
@@ -49,33 +49,70 @@ class ChallengeAddScreen(Screen):
                     )
                     return
                 else:
-                    with open(chall_path, "r") as file:
-                        chall_data = None
-                        try:
-                            chall_data = json.load(file)
-                        except json.JSONDecodeError:
+                    if os.path.isdir(chall_path):
+                        for chall in os.listdir(chall_path):
+                            with open(chall_path / chall, "r") as file:
+                                #TODO: Validate that the given chall doesn't already exist
+                                chall_data = None
+                                try:
+                                    chall_data = json.load(file)
+                                    db = SessionLocal()
+                                    chall_exists = db.query(Challenges).filter(
+                                        or_(
+                                            Challenges.name == chall_data["name"],
+                                            Challenges.description == chall_data["description"]
+                                            )).first()
+                                    if chall_exists:
+                                        self.app.notify(
+                                            message=f"{chall_data["name"]} already exists, not inserting"
+                                        )
+                                        continue
+                                except json.JSONDecodeError:
+                                    self.app.notify(
+                                        message="Invalid JSON",
+                                        severity="error"
+                                    )
+                                    return
+                            if not chall_data:
+                                self.app.notify(
+                                        message="Invalid JSON",
+                                        severity="error"
+                                    )
+                                return
+                            attribute_names_from_model = Challenges.__mapper__.columns.keys()
+                            filtered_data = {k: v for k, v in chall_data.items() if k in attribute_names_from_model}
+                            new_chall = Challenges(**filtered_data)
+                            db.add(new_chall)
+                            db.commit()
+                    else:
+                        with open(chall_path, "r") as file:
+                            chall_data = None
+                            try:
+                                chall_data = json.load(file)
+                            except json.JSONDecodeError:
+                                self.app.notify(
+                                    message="Invalid JSON",
+                                    severity="error"
+                                )
+                                return
+                        if not chall_data:
                             self.app.notify(
-                                message="Invalid JSON",
-                                severity="error"
-                            )
+                                    message="Invalid JSON",
+                                    severity="error"
+                                )
                             return
-                    if not chall_data:
-                        self.app.notify(
-                                message="Invalid JSON",
-                                severity="error"
-                            )
-                        return
-                    db = SessionLocal()
-                    attribute_names_from_model = Challenges.__mapper__.columns.keys()
-                    filtered_data = {k: v for k, v in chall_data.items() if k in attribute_names_from_model}
-                    new_chall = Challenges(**filtered_data)
-                    db.add(new_chall)
-                    db.commit()
+                        db = SessionLocal()
+                        attribute_names_from_model = Challenges.__mapper__.columns.keys()
+                        filtered_data = {k: v for k, v in chall_data.items() if k in attribute_names_from_model}
+                        new_chall = Challenges(**filtered_data)
+                        db.add(new_chall)
+                        db.commit()
                     db.close()
                     self.app.notify(
                         message="Successfully updated DB",
                         severity="information"
                     )
+
 
 class ChallengeEditScreen(Screen):
     def __init__(self, chall_id) -> None:
@@ -146,7 +183,12 @@ class ChallengeEditScreen(Screen):
             if isinstance(selected_item, LabelItem):
                 attr_name = selected_item.label
             input_label = self.query_one("#input_edit", Input)
-            input_label.value = self.query_one()
+            label_value = input_label.value
+            if hasattr(self.chall, attr_name):
+                self.chall.attr_name = label_value
+                return
+            self.app.notify("Attribute doesn't seem to exist?")
+
                 # self.db.commit()
     # def on_list_view_highlighted(self, event:ListView.Highlighted):
     #     # Get the attribute name from the ListItem's Label
