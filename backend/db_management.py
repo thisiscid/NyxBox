@@ -17,6 +17,13 @@ from textual.widget import Widget
 from textual.widgets import ListView, ListItem, Button, Header, Footer, Input, Label, Static, DataTable, TextArea # noqa: F401
 from textual import on # noqa: F401
 
+class LabelItem(ListItem):
+    def __init__(self, label: str) -> None:
+        super().__init__()
+        self.label = label
+    def compose( self ) -> ComposeResult:
+        yield Label(self.label)
+
 class ChallengeAddScreen(Screen):
     def on_mount(self) -> None:
         pass
@@ -90,17 +97,22 @@ class ChallengeEditScreen(Screen):
         ]
         self.chall_id = chall_id
         self.attribute_names_from_model = Challenges.__mapper__.columns.keys()
-        self.types_from_model = {name: type for name, type in Challenges.__mapper__.columns}
+        self.types_from_model = {
+            name: column.type.__class__
+            for name, column in Challenges.__mapper__.columns.items()}        
         self.db = SessionLocal()
+        self.chall=self.db.query(Challenges).filter(Challenges.id == self.chall_id).first()
+        self.last_highlighted_param = None
+
 
     def compose(self) -> ComposeResult:
         self.challenge = self.db.query(Challenges).filter(Challenges.id == self.chall_id).first()
         with Horizontal():
             yield ListView(
-                *[ListItem(Label(str(attribute))) for attribute in self.attribute_names_from_model if attribute not in self.restricted_vals]
+                *[LabelItem(str(attribute)) for attribute in self.attribute_names_from_model if attribute not in self.restricted_vals]
             )
             with Vertical():
-                yield Input(placeholder="Select something!")
+                yield Input(placeholder="Select something!", id="input_edit")
         # with ScrollableContainer():
         #     for attribute in self.attribute_names_from_model:
         #         if str(attribute) in self.restricted_vals:
@@ -111,8 +123,44 @@ class ChallengeEditScreen(Screen):
     def on_button_pressed(self, event:Button.Pressed):
         match event.button.id:
             case "update_attrs":
-                for attribute in self.attribute_names_from_model:
-                    attr_value = self.query_one(f"#{str(attribute)}", Input)
+                if self.chall:
+                    self.notify(f"Updated challenge {self.chall.name}")
+                    self.app.pop_screen()
+                    self.db.commit()
+                    self.db.close()
+                    return
+                else:
+                    self.notify("Chall doesn't seem to exist?")
+                    self.app.pop_screen()
+                    self.db.rollback()
+                    self.db.close()
+                    return
+                # for attribute in self.attribute_names_from_model:
+                #     attr_value = self.query_one(f"#{str(attribute)}", Input)
+    def on_list_view_highlighted(self, event:ListView.Highlighted):
+        # Get the attribute name from the ListItem's Label
+        
+        if event: # Why am I doing this to myself
+            selected_item = event.item
+            attr_name = None
+            if isinstance(selected_item, LabelItem):
+                attr_name = selected_item.label
+            input_label = self.query_one("#input_edit", Input)
+            input_label.value = self.query_one()
+                # self.db.commit()
+    # def on_list_view_highlighted(self, event:ListView.Highlighted):
+    #     # Get the attribute name from the ListItem's Label
+    #     if event:
+    #         selected_item = event.item
+    #         attr_name = None
+    #         if isinstance(selected_item, LabelItem):
+    #             attr_name = selected_item.label
+    #         input_label = self.query_one("#input_edit", Input)
+    #         input_val = input_label.value
+    #         if self.chall and attr_name and hasattr(self.chall, attr_name):
+    #             setattr(self.chall, attr_name, input_val)
+    #             # self.db.commit()
+
 
 class ChallengeListScreen(Screen):
     def on_mount(self) -> None:
@@ -151,9 +199,15 @@ class ChallengeListScreen(Screen):
             case "edit_chall":
                 datatable = self.query_one("#challenge_table", DataTable)
                 current_row = datatable.get_row_at(datatable.cursor_row)
-                chall_name = datatable.get_column
                 with SessionLocal() as db:
-                    chall_id = db.query(Challenges).filter(Challenges.chall_name == chall_name).first().id
+                    chall = db.query(Challenges).filter(Challenges.id == current_row[0]).first()
+                    if chall:
+                        chall_id = chall.id
+                    else:
+                        self.app.notify(
+                            "Uh oh, the chall doesn't seem to exist in the DB?"
+                        )
+                        return
                 self.app.push_screen(ChallengeEditScreen(chall_id)) 
 
 class DBManagement(App):
