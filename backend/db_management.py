@@ -1,5 +1,7 @@
+from __future__ import annotations 
 import textual # noqa: F401
 import sqlalchemy # noqa: F401
+from sqlalchemy.sql.sqltypes import Integer, String, JSON, DateTime
 import sys # noqa: F401
 import os # noqa: F401
 import json # noqa: F401
@@ -7,6 +9,7 @@ import pathlib
 import datetime
 from config import Settings # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
+from sqlalchemy import or_
 from database import SessionLocal, engine  # noqa: F401
 from models import Challenges
 from textual.app import App, ComposeResult
@@ -18,15 +21,20 @@ from textual.widgets import ListView, ListItem, Button, Header, Footer, Input, L
 from textual import on # noqa: F401
 
 class LabelItem(ListItem):
-    def __init__(self, label: str) -> None:
-        super().__init__()
+    def __init__(self, label: str, *, id: str = None) -> None:
+        super().__init__(id=id)
         self.label = label
     def compose( self ) -> ComposeResult:
         yield Label(self.label)
 
 class ChallengeAddScreen(Screen):
+    def __init__(self, main_instance: ChallengeListScreen) -> None:
+        super().__init__()
+        self.main_instance = main_instance
+    
     def on_mount(self) -> None:
         pass
+    
     def compose(self) -> ComposeResult:
         yield Header()
         yield Input(placeholder="Path to challenge json or folder", id="path_input")
@@ -52,7 +60,6 @@ class ChallengeAddScreen(Screen):
                     if os.path.isdir(chall_path):
                         for chall in os.listdir(chall_path):
                             with open(chall_path / chall, "r") as file:
-                                #TODO: Validate that the given chall doesn't already exist
                                 chall_data = None
                                 try:
                                     chall_data = json.load(file)
@@ -64,7 +71,8 @@ class ChallengeAddScreen(Screen):
                                             )).first()
                                     if chall_exists:
                                         self.app.notify(
-                                            message=f"{chall_data["name"]} already exists, not inserting"
+                                            message=f"{chall_data["name"]} already exists, not inserting",
+                                            severity="error"
                                         )
                                         continue
                                 except json.JSONDecodeError:
@@ -112,16 +120,17 @@ class ChallengeAddScreen(Screen):
                         message="Successfully updated DB",
                         severity="information"
                     )
+                    self.main_instance.load_challenges() # Gotta reload the thing so that we can see the challenges
 
 
 class ChallengeEditScreen(Screen):
-    def __init__(self, chall_id) -> None:
+    def __init__(self, chall_id, main_instance: ChallengeListScreen) -> None:
         super().__init__()
         self.type_mappings = {
-            "INTEGER": int,
-            "STRING": str,
-            "JSON": dict,
-            "DATETIME": datetime.datetime
+            Integer: int,
+            String: str,
+            JSON: dict,
+            DateTime: datetime.datetime
         }
         self.restricted_vals = [
             "id",
@@ -139,17 +148,24 @@ class ChallengeEditScreen(Screen):
             for name, column in Challenges.__mapper__.columns.items()}        
         self.db = SessionLocal()
         self.chall=self.db.query(Challenges).filter(Challenges.id == self.chall_id).first()
-        self.last_highlighted_param = None
+        for param in self.attribute_names_from_model:
+            if str(param) in self.restricted_vals:
+                continue
+            else:
+                self.last_highlighted_param = str(param)
+                break
+        self.main_instance = main_instance
 
 
     def compose(self) -> ComposeResult:
         self.challenge = self.db.query(Challenges).filter(Challenges.id == self.chall_id).first()
         with Horizontal():
             yield ListView(
-                *[LabelItem(str(attribute)) for attribute in self.attribute_names_from_model if attribute not in self.restricted_vals]
+                *[LabelItem(str(attribute), id=str(attribute)) for attribute in self.attribute_names_from_model if attribute not in self.restricted_vals],
+                 id="params_list" # Yields a LabelItem (see above) for each parameter
             )
             with Vertical():
-                yield Input(placeholder="Select something!", id="input_edit")
+                yield Input(placeholder="Select something!", id="input_edit") #This is just a placeholder that gets updated on change
         # with ScrollableContainer():
         #     for attribute in self.attribute_names_from_model:
         #         if str(attribute) in self.restricted_vals:
@@ -165,6 +181,7 @@ class ChallengeEditScreen(Screen):
                     self.app.pop_screen()
                     self.db.commit()
                     self.db.close()
+                    self.main_instance.load_cha
                     return
                 else:
                     self.notify("Chall doesn't seem to exist?")
@@ -174,35 +191,47 @@ class ChallengeEditScreen(Screen):
                     return
                 # for attribute in self.attribute_names_from_model:
                 #     attr_value = self.query_one(f"#{str(attribute)}", Input)
-    def on_list_view_highlighted(self, event:ListView.Highlighted):
-        # Get the attribute name from the ListItem's Label
-        
-        if event: # Why am I doing this to myself
-            selected_item = event.item
-            attr_name = None
-            if isinstance(selected_item, LabelItem):
-                attr_name = selected_item.label
-            input_label = self.query_one("#input_edit", Input)
-            label_value = input_label.value
-            if hasattr(self.chall, attr_name):
-                self.chall.attr_name = label_value
+    def on_list_view_highlighted(self, event:ListView.Highlighted): # We actually have to change this so that it updates the last parameter and then gets the new one instead of updating the current one
+        if event:
+            selected_item = event.item # We eventually need to use this to update last_highlighted_param
+            label_value = self.query_one("#input_edit", Input).value
+            if hasattr(self.chall, self.last_highlighted_param):
+                #self.chall.last_highlighted_param = label_value # Need to use setattr here bcs its trying to literally set a param called last_highlighted_param
+                try:
+                    attr_type = self.types_from_model.get(self.last_highlighted_param)
+                    new_attr_type = self.type_mappings.get(attr_type, None)
+                    if new_attr_type:
+                        if new_attr_type is dict:
+                            try:
+                                label_value = json.loads(label_value)
+                            except json.JSONDecodeError:
+                                list_view = self.query_one("#params_list", ListView)
+                                list_view.highlight(self.query_one(f"#{self.last_highlighted_param}", LabelItem))
+                                self.app.notify("Invalid json!", severity="error")
+                                return
+                        elif new_attr_type is datetime.datetime:
+                            try:
+                                label_value=datetime.datetime.fromisoformat(label_value)
+                            except ValueError:
+                                list_view = self.query_one("#params_list", ListView)
+                                list_view.highlight(self.query_one(f"#{self.last_highlighted_param}", LabelItem))
+                                self.app.notify("Invalid time!", severity="error")
+                                return
+                        else:
+                            label_value = new_attr_type(label_value)
+                except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+                    list_view = self.query_one("#params_list", ListView)
+                    list_view.highlight(self.query_one(f"#{self.last_highlighted_param}", LabelItem))
+                    self.app.notify("Attribute doesn't seem to exist?")
+                    # self.last_highlighted_param = selected_item.label
+                    return
+                setattr(self.chall, self.last_highlighted_param, label_value)
+                self.last_highlighted_param = selected_item.id
+                label_value = getattr(self.chall, selected_item.label)
+            else:
+                self.app.notify("Attribute doesn't seem to exist?")
+                self.last_highlighted_param = selected_item.label
                 return
-            self.app.notify("Attribute doesn't seem to exist?")
-
-                # self.db.commit()
-    # def on_list_view_highlighted(self, event:ListView.Highlighted):
-    #     # Get the attribute name from the ListItem's Label
-    #     if event:
-    #         selected_item = event.item
-    #         attr_name = None
-    #         if isinstance(selected_item, LabelItem):
-    #             attr_name = selected_item.label
-    #         input_label = self.query_one("#input_edit", Input)
-    #         input_val = input_label.value
-    #         if self.chall and attr_name and hasattr(self.chall, attr_name):
-    #             setattr(self.chall, attr_name, input_val)
-    #             # self.db.commit()
-
 
 class ChallengeListScreen(Screen):
     def on_mount(self) -> None:
@@ -247,10 +276,11 @@ class ChallengeListScreen(Screen):
                         chall_id = chall.id
                     else:
                         self.app.notify(
-                            "Uh oh, the chall doesn't seem to exist in the DB?"
+                            message="Uh oh, the chall doesn't seem to exist in the DB?",
+                            severity="error"
                         )
                         return
-                self.app.push_screen(ChallengeEditScreen(chall_id)) 
+                self.app.push_screen(ChallengeEditScreen(chall_id, self)) 
 
 class DBManagement(App):
     def on_mount(self):
