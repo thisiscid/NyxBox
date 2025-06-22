@@ -218,9 +218,15 @@ class ChallengeEditScreen(Screen):
             )
             with Vertical():
                 val = getattr(self.chall, self.last_highlighted_param)
+                if val is None:
+                    val = ""
                 if isinstance(val, (dict, list)):
                     val = json.dumps(val, indent=2)
-                yield Input(value=val, id="input_edit") #This is just a placeholder that gets updated on change
+                yield Label(f"Expected type: {self.types_from_model[self.last_highlighted_param]}", id="edit_expected")
+                yield Input(value=val, placeholder="Empty field, input something...", id="input_edit") #This is just a placeholder that gets updated on change
+                self.json_edit_btn = Button("Edit in JSON editor")
+                self.json_edit_btn.display = False
+                yield self.json_edit_btn
         # with ScrollableContainer():
         #     for attribute in self.attribute_names_from_model:
         #         if str(attribute) in self.restricted_vals:
@@ -256,9 +262,12 @@ class ChallengeEditScreen(Screen):
             selected_item = event.item # We eventually need to use this to update last_highlighted_param
             label_value = (self.query_one("#input_edit", Input).value)
             label=self.query_one("#input_edit", Input)
-            if label_value == None or label_value.strip() == "":
+            expected_type = self.query_one("#edit_expected", Label)
+            expected_type.update(f"Expected type: {self.types_from_model[selected_item.id]}")
+            if label_value is None or label_value.strip() == "" or label_value.strip() == "None":
                 new_attr_type = None
                 setattr(self.chall, self.last_highlighted_param, None)
+                self.last_highlighted_param = selected_item.id
                 label.value = ""
                 next_val = getattr(self.chall, selected_item.id)
                 if next_val is None:
@@ -275,10 +284,11 @@ class ChallengeEditScreen(Screen):
                     new_attr_type = self.type_mappings.get(attr_type, None)
                     if new_attr_type:
                         if new_attr_type is dict:
+                            self.json_edit_btn.display=True
                             if isinstance(label_value, str):
                                 try:
                                     label_value = json.loads(label_value)
-                                except json.JSONDecodeError:
+                                except json.JSONDecodeError as e:
                                     list_view = self.query_one("#params_list", ListView)
                                     list_view.index  = next(
                                         i for i, item in enumerate(self.list_view_list)
@@ -288,8 +298,11 @@ class ChallengeEditScreen(Screen):
                                     return
                         if (isinstance(label_value, list) and all(isinstance(d, dict) for d in label_value)) or isinstance(label_value, list):
                             new_attr_type = list
+                            self.json_edit_btn.display=True
                         elif isinstance(label_value, dict):
                             new_attr_type = dict
+                            self.json_edit_btn.display=True
+
                         # else:
                         #     self.app.notify(
                         #         message="The type is wrong?", 
