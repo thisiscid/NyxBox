@@ -1,27 +1,47 @@
-from __future__ import annotations 
-import textual # noqa: F401
-import sqlalchemy # noqa: F401
-from sqlalchemy.sql.sqltypes import Integer, String, JSON, DateTime
-import sys # noqa: F401
-import os # noqa: F401
-import json # noqa: F401
-import pathlib
+from __future__ import annotations
+
 import datetime
-from config import Settings # noqa: F401
-from sqlalchemy.orm import Session  # noqa: F401
-from sqlalchemy import or_
+import json  # noqa: F401
+import os  # noqa: F401
+import pathlib
+import sys  # noqa: F401
+
+import sqlalchemy  # noqa: F401
+import textual  # noqa: F401
+from config import Settings  # noqa: F401
 from database import SessionLocal, engine  # noqa: F401
 from models import Challenges
+from sqlalchemy import or_
+from sqlalchemy.orm import Session  # noqa: F401
+from sqlalchemy.sql.sqltypes import JSON, DateTime, Integer, String
+from textual import on  # noqa: F401
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical, Horizontal, ScrollableContainer # noqa: F401
-from textual.reactive import reactive# noqa: F401
-from textual.screen import Screen, ModalScreen # noqa: F401
+from textual.containers import (  # noqa: F401
+    Container,
+    Horizontal,
+    ScrollableContainer,
+    Vertical,
+)
+from textual.reactive import reactive  # noqa: F401
+from textual.screen import ModalScreen, Screen  # noqa: F401
 from textual.widget import Widget
-from textual.widgets import ListView, ListItem, Button, Header, Footer, Input, Label, Static, DataTable, TextArea, Rule # noqa: F401
-from textual import on # noqa: F401
+from textual.widgets import (  # noqa: F401
+    Button,
+    DataTable,
+    Footer,
+    Header,
+    Input,
+    Label,
+    ListItem,
+    ListView,
+    Rule,
+    Static,
+    TextArea,
+)
+
 
 class LabelItem(ListItem):
-    def __init__(self, label: str, *, id: str = None) -> None:
+    def __init__(self, label: str, *, id: str = "") -> None:
         super().__init__(id=id)
         self.label = label
     def compose( self ) -> ComposeResult:
@@ -54,6 +74,7 @@ class ChallengeAddScreen(Screen):
             case 'enter_button':
                 path_input = self.query_one("#path_input", Input)
                 chall_path = pathlib.Path(path_input.value)
+                db = SessionLocal()
                 if not chall_path.exists():
                     self.app.notify(
                         message="Path does not exist.",
@@ -113,7 +134,7 @@ class ChallengeAddScreen(Screen):
                                     severity="error"
                                 )
                             return
-                        db = SessionLocal()
+                        # db = SessionLocal()
                         attribute_names_from_model = Challenges.__mapper__.columns.keys()
                         filtered_data = {k: v for k, v in chall_data.items() if k in attribute_names_from_model}
                         new_chall = Challenges(**filtered_data)
@@ -134,22 +155,23 @@ class DictEditScreen(Screen):
 
     def compose(self) -> ComposeResult:
         if isinstance(self.json_target, list):
-            with ScrollableContainer():
-                for i, entry in enumerate(self.json_target):
-                    yield Label(f"Dict {i}")
-                    for key, val in entry.items():
-                        with Horizontal():
-                            yield Input(value=str(key), id=f"key_{i}_{key}")
-                            yield Input(value=str(val), id=f"value_{i}_{key}")
-                            yield Rule()
-            yield Button("Save Changes", id="save_dict_edits")
-            yield Button("Discard Changes", id="discard_dict_edits")
+            all_keys = sorted({k for d in self.json_target for k in d})
+            table = DataTable(id="dicts_table")
+            table.cursor_type="cell"
+            table.add_columns(*all_keys)
+            for entry in self.json_target:
+                row = [str(entry.get(k, "")) for k in all_keys]
+                table.add_row(*row)
+            yield table
+            yield Input(placeholder="Empty cell", id="edit_cell")
+            with Horizontal():
+                yield Button("Save Changes", id="save_dict_edits")
+                yield Button("Discard Changes", id="discard_dict_edits")
         elif isinstance(self.json_target, dict):
             with Horizontal():
                 for key, val in self.json_target.items():
                     yield Input(value=str(key), id=f"key_{key}")
                     yield Input(value=str(val), id=f"value_{key}") # Use a different format for the id since later onwards we can just check isinstance again
-                yield Rule()
                 yield Button("Save Changes", id="save_dict_edits")
                 yield Button("Discard Changes", id="discard_dict_edits")
         else:
@@ -167,10 +189,12 @@ class DictEditScreen(Screen):
                             updated_dict[self.query_one(f"#key_{i}_{key}", Input).value] = self.query_one(f"#value_{i}_{key}", Input).value
                         updated_list.append(updated_dict)
                     self.shared_class.new_data = updated_list
+                    self.dismiss(updated_list)
                 elif isinstance(self.json_target, dict):
                     updated_dict = {} 
                     for key, val in self.json_target.items():
                         updated_dict[self.query_one(f"#key_{key}")] = self.query_one(f"#value_{key}")
+                    self.dismiss(updated_dict)
 
 
 class ChallengeEditScreen(Screen):
@@ -217,14 +241,14 @@ class ChallengeEditScreen(Screen):
                  id="params_list" # Yields a LabelItem (see above) for each parameter
             )
             with Vertical():
-                val = getattr(self.chall, self.last_highlighted_param)
+                val = getattr(self.chall, self.last_highlighted_param or "")
                 if val is None:
                     val = ""
                 if isinstance(val, (dict, list)):
                     val = json.dumps(val, indent=2)
                 yield Label(f"Expected type: {self.types_from_model[self.last_highlighted_param]}", id="edit_expected")
                 yield Input(value=val, placeholder="Empty field, input something...", id="input_edit") #This is just a placeholder that gets updated on change
-                self.json_edit_btn = Button("Edit in JSON editor")
+                self.json_edit_btn = Button("Edit in JSON editor", id="json_edit")
                 self.json_edit_btn.display = False
                 yield self.json_edit_btn
         # with ScrollableContainer():
@@ -235,7 +259,7 @@ class ChallengeEditScreen(Screen):
         #         yield Input(value=str(value), id=str(attribute))
         yield Button.success("Update attributes", id="update_attrs")
         yield Button.error("Discard changes", id="discard_edit")
-    def on_button_pressed(self, event:Button.Pressed):
+    async def on_button_pressed(self, event:Button.Pressed):
         match event.button.id:
             case "update_attrs":
                 if self.chall:
@@ -257,27 +281,31 @@ class ChallengeEditScreen(Screen):
                 self.app.pop_screen()
                 # for attribute in self.attribute_names_from_model:
                 #     attr_value = self.query_one(f"#{str(attribute)}", Input)
+            case "json_edit":
+                await self.app.push_screen(DictEditScreen((json.loads(self.query_one("#input_edit", Input).value)), UpdatedDict(json.loads(self.query_one("#input_edit", Input).value))))
     def on_list_view_highlighted(self, event:ListView.Highlighted): # We actually have to change this so that it updates the last parameter and then gets the new one instead of updating the current one
         if event:
+            self.json_edit_btn.display = False
             selected_item = event.item # We eventually need to use this to update last_highlighted_param
             label_value = (self.query_one("#input_edit", Input).value)
             label=self.query_one("#input_edit", Input)
             expected_type = self.query_one("#edit_expected", Label)
-            expected_type.update(f"Expected type: {self.types_from_model[selected_item.id]}")
+            expected_type.update(f"Expected type: {self.types_from_model[selected_item.id]}") # type: ignore
             if label_value is None or label_value.strip() == "" or label_value.strip() == "None":
                 new_attr_type = None
-                setattr(self.chall, self.last_highlighted_param, None)
-                self.last_highlighted_param = selected_item.id
+                setattr(self.chall, self.last_highlighted_param or "", None)
+                self.last_highlighted_param = selected_item.id # type: ignore
                 label.value = ""
-                next_val = getattr(self.chall, selected_item.id)
+                next_val = getattr(self.chall, selected_item.id) # type: ignore
                 if next_val is None:
                     label.value = ""
                 elif isinstance(next_val, (dict, list)):
                     label.value = json.dumps(next_val, indent=2)
+                    self.json_edit_btn.display = True
                 else:
                     label.value = str(next_val)
                 return
-            if hasattr(self.chall, self.last_highlighted_param):
+            if hasattr(self.chall, self.last_highlighted_param): # type: ignore
                 #self.chall.last_highlighted_param = label_value # Need to use setattr here bcs its trying to literally set a param called last_highlighted_param
                 try:
                     attr_type = self.types_from_model.get(self.last_highlighted_param)
@@ -288,7 +316,7 @@ class ChallengeEditScreen(Screen):
                             if isinstance(label_value, str):
                                 try:
                                     label_value = json.loads(label_value)
-                                except json.JSONDecodeError as e:
+                                except json.JSONDecodeError:
                                     list_view = self.query_one("#params_list", ListView)
                                     list_view.index  = next(
                                         i for i, item in enumerate(self.list_view_list)
@@ -319,26 +347,26 @@ class ChallengeEditScreen(Screen):
                                 self.app.notify("Invalid time!", severity="error")
                                 return
                         else:
-                            label_value = new_attr_type(label_value)
+                            label_value = new_attr_type(label_value) # type: ignore
                 except (ValueError, KeyError, TypeError):
                     list_view = self.query_one("#params_list", ListView)
                     list_view.index  = next(
                         i for i, item in enumerate(self.list_view_list)
                         if item.id == self.last_highlighted_param
                     )
-                    self.app.notify("Attribute doesn't seem to exist?")
+                    self.app.notify("Attribute doesn't seem to exist or conversion failed", severity="error")
                     # self.last_highlighted_param = selected_item.label
                     return
-                setattr(self.chall, self.last_highlighted_param, label_value)
-                self.last_highlighted_param = selected_item.id
-                val = getattr(self.chall, selected_item.id)
+                setattr(self.chall, self.last_highlighted_param, label_value) # type: ignore
+                self.last_highlighted_param = selected_item.id # type: ignore
+                val = getattr(self.chall, selected_item.id) # type: ignore
                 if isinstance(val, (dict, list)):
                     label.value = json.dumps(val, indent=2)
                 else:
                     label.value = str(val)
             else:
                 self.app.notify("Attribute doesn't seem to exist?")
-                self.last_highlighted_param = selected_item.id
+                self.last_highlighted_param = selected_item.id # type: ignore
                 return
 
 class ChallengeListScreen(Screen):
@@ -374,7 +402,7 @@ class ChallengeListScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
             case "add_chall":
-                self.app.push_screen(ChallengeAddScreen())
+                self.app.push_screen(ChallengeAddScreen(self)) # type: ignore
             case "edit_chall":
                 datatable = self.query_one("#challenge_table", DataTable)
                 current_row = datatable.get_row_at(datatable.cursor_row)
