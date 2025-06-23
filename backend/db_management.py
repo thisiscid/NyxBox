@@ -7,7 +7,7 @@ import pathlib
 import sys  # noqa: F401
 
 # Third party libs
-import sqlalchemy  # noqa: F401
+from sqlalchemy import delete # noqa: F401
 from textual import work
 from config import Settings  # noqa: F401
 from database import SessionLocal, engine  # noqa: F401
@@ -203,16 +203,14 @@ class DictEditScreen(Screen):
                         cell_val = table.get_cell(row.key, column.key)
                         if cell_val == "" or cell_val is None:
                             continue
-                        updated_dict[column.key] = cell_val
+                        updated_dict[str(column.label)] = cell_val
                     updated_list.append(updated_dict)
                 self.shared_class.new_data = updated_list
                 result = updated_list[0] if self.single else updated_list
                 self.shared_class.new_data = result
                 self.dismiss(result)
-            case "discard_edit_dicts":
+            case "discard_dict_edits":
                 self.dismiss(None)
-
-
 
 class ChallengeEditScreen(Screen):
     def __init__(self, chall_id, main_instance: ChallengeListScreen) -> None:
@@ -285,7 +283,7 @@ class ChallengeEditScreen(Screen):
         if result is not None:
             self.query_one("#input_edit", Input).value = json.dumps(result)
             setattr(self.chall, self.last_highlighted_param, result) # type: ignore
-            
+
     async def on_button_pressed(self, event:Button.Pressed):
         match event.button.id:
             case "update_attrs":
@@ -309,7 +307,7 @@ class ChallengeEditScreen(Screen):
                 # for attribute in self.attribute_names_from_model:
                 #     attr_value = self.query_one(f"#{str(attribute)}", Input)
             case "json_edit":
-                open_json_editor()
+                self.open_json_editor()
 
     def on_list_view_highlighted(self, event:ListView.Highlighted): # We actually have to change this so that it updates the last parameter and then gets the new one instead of updating the current one
         if event:
@@ -403,6 +401,7 @@ class ChallengeListScreen(Screen):
         # display_table = self.query_one("#challenge_table", DataTable)
         # db = SessionLocal()
         self.load_challenges()
+        self.second_pass = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -410,7 +409,8 @@ class ChallengeListScreen(Screen):
             yield DataTable(id="challenge_table", cursor_type="row")
             with Horizontal():
                 yield Button(id="add_chall", label="Add challenge")
-                yield Button(id="edit_chall", label="Edit Challenge")
+                yield Button(id="edit_chall", label="Edit challenge")
+                yield Button(id="remove_chall", label="Remove challenge")
         yield Footer()
     def load_challenges(self):
         display_table = self.query_one("#challenge_table", DataTable)
@@ -428,6 +428,11 @@ class ChallengeListScreen(Screen):
             for chall in chall_all:
                 row = [getattr(chall, attr) for attr in attribute_names_from_model]
                 display_table.add_row(*row)
+    def unset_second_pass(self):
+        # This is literally only necessary because textual
+        # won't let you run raw python in the set_timer func
+        self.second_pass = False
+
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
             case "add_chall":
@@ -446,7 +451,25 @@ class ChallengeListScreen(Screen):
                         )
                         return
                 self.app.push_screen(ChallengeEditScreen(chall_id, self)) 
-
+            case "remove_chall":
+                table = self.query_one("#challenge_table", DataTable)
+                row = table.get_row_at(table.cursor_row)
+                if self.second_pass:
+                    with SessionLocal() as db:
+                        chall = db.query(Challenges).filter(
+                                row[0] == Challenges.id
+                        ).first()
+                        db.delete(chall)
+                        db.commit()
+                        self.app.notify(f"Challenge {row[1]} with id {row[0]} successfuly deleted!")
+                        self.second_pass = False
+                        self.load_challenges()
+                    # delete_query = delete(Challenges).where(row[0] == Challenges.id)
+                else:
+                    self.notify(f"Are you sure you want to delete {row[1]} with id {row[0]}? Click again if yes.", timeout=3)
+                    self.second_pass = True
+                    self.set_timer(3, self.unset_second_pass())
+    
 class DBManagement(App):
     def on_mount(self):
         self.push_screen(ChallengeListScreen())
