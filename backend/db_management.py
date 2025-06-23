@@ -283,9 +283,19 @@ class ChallengeEditScreen(Screen):
                 #     attr_value = self.query_one(f"#{str(attribute)}", Input)
             case "json_edit":
                 await self.app.push_screen(DictEditScreen((json.loads(self.query_one("#input_edit", Input).value)), UpdatedDict(json.loads(self.query_one("#input_edit", Input).value))))
+    # async def on_input_changed(self, event: Input.Changed) -> None:
+    #     self.json_edit_btn.visible = False
+    #     if self.types_from_model[self.last_highlighted_param] is JSON:
+    #         try:
+    #             json.loads(event.value)
+    #             self.json_edit_btn.visible=True
+    #             return
+    #         except json.JSONDecodeError:
+    #             self.json_edit_btn.visible = False
+
     def on_list_view_highlighted(self, event:ListView.Highlighted): # We actually have to change this so that it updates the last parameter and then gets the new one instead of updating the current one
         if event:
-            self.json_edit_btn.display = False
+            # self.json_edit_btn.display = False
             selected_item = event.item # We eventually need to use this to update last_highlighted_param
             label_value = (self.query_one("#input_edit", Input).value)
             label=self.query_one("#input_edit", Input)
@@ -302,6 +312,7 @@ class ChallengeEditScreen(Screen):
                 elif isinstance(next_val, (dict, list)):
                     label.value = json.dumps(next_val, indent=2)
                     self.json_edit_btn.display = True
+                    self.json_edit_btn.refresh()
                 else:
                     label.value = str(next_val)
                 return

@@ -1,3 +1,6 @@
 redis
 sqlalchemy
 dotenv
+fastapi
+authlib
+python-jose[cryptography]
