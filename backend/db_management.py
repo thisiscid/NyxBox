@@ -302,7 +302,7 @@ class ChallengeEditScreen(Screen):
                 yield Label(f"Expected type: {self.types_from_model[self.last_highlighted_param]}", id="edit_expected")
                 yield Input(value=val, placeholder="Empty field, input something...", id="input_edit") #This is just a placeholder that gets updated on change
                 self.json_edit_btn = Button("Edit in JSON editor", id="json_edit")
-                self.json_edit_btn.display = False
+                self.json_edit_btn.display = True
                 yield self.json_edit_btn
         # with ScrollableContainer():
         #     for attribute in self.attribute_names_from_model:
@@ -315,7 +315,11 @@ class ChallengeEditScreen(Screen):
 
     @work
     async def open_json_editor(self):
-        json_val = json.loads(self.query_one("#input_edit", Input).value)
+        try:
+            json_val = json.loads(self.query_one("#input_edit", Input).value)
+        except json.JSONDecodeError:
+            self.app.notify("Not a JSON field!") # Lits just not going to bother
+            return
         screen = DictEditScreen(json_val, UpdatedDict(json_val))
         result = await self.app.push_screen_wait(screen)
         if result is not None:
@@ -355,6 +359,7 @@ class ChallengeEditScreen(Screen):
             label=self.query_one("#input_edit", Input)
             expected_type = self.query_one("#edit_expected", Label)
             expected_type.update(f"Expected type: {self.types_from_model[selected_item.id]}") # type: ignore
+
             if label_value is None or label_value.strip() == "" or label_value.strip() == "None":
                 new_attr_type = None
                 setattr(self.chall, self.last_highlighted_param or "", None)
@@ -365,11 +370,11 @@ class ChallengeEditScreen(Screen):
                     label.value = ""
                 elif isinstance(next_val, (dict, list)):
                     label.value = json.dumps(next_val, indent=2)
-                    self.json_edit_btn.display = True
+                    # self.json_edit_btn.display = True
                     self.json_edit_btn.refresh()
                 else:
                     label.value = str(next_val)
-                    self.json_edit_btn.display = False
+                    # self.json_edit_btn.display = False
                 return
             if hasattr(self.chall, self.last_highlighted_param): # type: ignore
                 #self.chall.last_highlighted_param = label_value # Need to use setattr here bcs its trying to literally set a param called last_highlighted_param
@@ -378,7 +383,7 @@ class ChallengeEditScreen(Screen):
                     new_attr_type = self.type_mappings.get(attr_type, None)
                     if new_attr_type:
                         if new_attr_type is dict:
-                            self.json_edit_btn.display=True
+                            # self.json_edit_btn.display=True
                             if isinstance(label_value, str):
                                 try:
                                     label_value = json.loads(label_value)
@@ -391,13 +396,14 @@ class ChallengeEditScreen(Screen):
                                     self.app.notify("Invalid JSON!", severity="error")
                                     return
                         else:
-                            self.json_edit_btn.display=False
+                            pass
+                            # self.json_edit_btn.display=False
                         if (isinstance(label_value, list) and all(isinstance(d, dict) for d in label_value)) or isinstance(label_value, list):
                             new_attr_type = list
-                            self.json_edit_btn.display=True
+                            # self.json_edit_btn.display=True
                         elif isinstance(label_value, dict):
                             new_attr_type = dict
-                            self.json_edit_btn.display=True
+                            # self.json_edit_btn.display=True
 
                         # else:
                         #     self.app.notify(

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from database import create_tables, get_db
 from models import User, Challenges, UserSolve, UserLike
@@ -474,3 +475,9 @@ def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_use
 @app.post("/challenges/create")
 def create_challenge(challenge_data: dict, jwt: str, db: Session = Depends(get_db)):
     pass
+
+app.mount(
+    "/static",
+    StaticFiles(directory="static", html=True),
+    name="static-root",
+)
