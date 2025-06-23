@@ -158,6 +158,10 @@ class DictEditScreen(Screen):
         if isinstance(edit_json_target, dict):
             self.single = True
             self.json_target = [edit_json_target]
+        elif isinstance(edit_json_target, list) and not all(isinstance(d, dict) for d in edit_json_target):
+            self.dismiss(None)
+            self.notify("Not JSON, is a list! Manually edit please!")
+            self.app.pop_screen()
         else:
             self.single = False
             self.json_target = edit_json_target
@@ -331,6 +335,7 @@ class ChallengeEditScreen(Screen):
                     self.json_edit_btn.refresh()
                 else:
                     label.value = str(next_val)
+                    self.json_edit_btn.display = False
                 return
             if hasattr(self.chall, self.last_highlighted_param): # type: ignore
                 #self.chall.last_highlighted_param = label_value # Need to use setattr here bcs its trying to literally set a param called last_highlighted_param
@@ -351,6 +356,8 @@ class ChallengeEditScreen(Screen):
                                     )
                                     self.app.notify("Invalid JSON!", severity="error")
                                     return
+                        else:
+                            self.json_edit_btn.display=False
                         if (isinstance(label_value, list) and all(isinstance(d, dict) for d in label_value)) or isinstance(label_value, list):
                             new_attr_type = list
                             self.json_edit_btn.display=True
@@ -388,13 +395,134 @@ class ChallengeEditScreen(Screen):
                 self.last_highlighted_param = selected_item.id # type: ignore
                 val = getattr(self.chall, selected_item.id) # type: ignore
                 if isinstance(val, (dict, list)):
-                    label.value = json.dumps(val, indent=2)
+                    label.value = json.dumps(val)
                 else:
                     label.value = str(val)
             else:
                 self.app.notify("Attribute doesn't seem to exist?")
                 self.last_highlighted_param = selected_item.id # type: ignore
                 return
+
+class ApprovalScreen(Screen): 
+    # This screen is going to be mostly identical to ChallengeListScreen
+    # Except we're gonna steal something from the main app >:3
+    # This is more admin specific so that we can approve user submitted challenges
+
+    def on_mount(self) -> None:
+        # display_table = self.query_one("#challenge_table", DataTable)
+        # db = SessionLocal()
+        self.load_challenges()
+        self.second_pass_approve = None
+        self.second_pass_deny = None
+        self.attempted_row = None
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Vertical():
+            yield DataTable(id="approval_table", cursor_type="row")
+            with Horizontal():
+                yield Button(id="approve_chall_approval", label="Approve challenge")
+                yield Button(id="deny_chall_approval", label="Deny challenge")
+                yield Button.error(id="exit_approval", label="Exit")
+        yield Footer()
+    def load_challenges(self):
+        display_table = self.query_one("#approval_table", DataTable)
+        display_table.clear()
+        with SessionLocal() as db:
+            chall_query = db.query(Challenges).filter(
+                or_(
+                    Challenges.is_approved == 0,
+                    Challenges.flagged == 1,))
+            chall_all = chall_query.all()
+            if len(chall_all) == 0:
+                self.app.pop_screen()
+                self.app.notify("No flagged or non-approved challenges left!")                
+            try:
+                attribute_names_from_model = Challenges.__mapper__.columns.keys()
+            except AttributeError:
+                print("Error: Could not retrieve column names from Challenges model.")
+                self.app.notify("Error: Could not retrieve column names from Challenges model.")
+                attribute_names_from_model = ["id", "name", "error"] 
+            display_headers = [name.replace("_", " ").title() for name in attribute_names_from_model]
+            display_table.clear(columns=True) 
+            display_table.add_columns(*display_headers)
+            for chall in chall_all:
+                row = [getattr(chall, attr) for attr in attribute_names_from_model]
+                display_table.add_row(*row)
+
+    def on_button_pressed(self, event: Button.Pressed):
+        match event.button.id:
+            case "approve_chall_approval":
+                table = self.query_one("#approval_table", DataTable)
+                row = table.get_row_at(table.cursor_row)
+                if self.second_pass_approve and self.attempted_row != row:
+                    with SessionLocal() as db:
+                        chall = db.query(Challenges).filter(
+                            Challenges.id == row[0], Challenges.is_approved != 1, Challenges.name == row[1]
+                        ).first()
+                        chall.is_approved = 1 #type: ignore
+                        chall.is_reviewed = 1 #type: ignore
+                        db.commit()
+                        # db.close()
+                    self.app.notify(f"Challenge {row[1]}, id {row[0]} has been approved.")
+                else:
+                    self.attempted_row = row
+                    self.app.notify(f"Are you sure you want to approve {row[1]}, id {row[0]}? Click again if yes")
+                    self.second_pass_approve = True
+            case "deny_chall_approval":
+                table = self.query_one("#approval_table", DataTable)
+                row = table.get_row_at(table.cursor_row)
+                if self.second_pass_deny and self.attempted_row != row:
+                    with SessionLocal() as db:
+                        chall = db.query(Challenges).filter(
+                            Challenges.id == row[0], Challenges.name == row[1]
+                        ).first()
+                        # chall.is_approved = 1 We shouldn't need this line since is_approved should alr be 0
+                        chall.is_reviewed = 1 #type: ignore
+                        db.commit()
+                        # db.close()
+                    self.app.notify(f"Challenge {row[1]}, id {row[0]} has been denied.")
+                else:
+                    self.attempted_row = row
+                    self.app.notify(f"Are you sure you want to deny {row[1]}, id {row[0]}? Click again if yes")
+                    self.second_pass_deny = True
+            case "exit_approval":
+                self.app.pop_screen()
+        # match event.button.id:
+        #     case "add_chall":
+        #         self.app.push_screen(ChallengeAddScreen(self)) # type: ignore
+        #     case "edit_chall":
+        #         datatable = self.query_one("#challenge_table", DataTable)
+        #         current_row = datatable.get_row_at(datatable.cursor_row)
+        #         with SessionLocal() as db:
+        #             chall = db.query(Challenges).filter(Challenges.id == current_row[0]).first()
+        #             if chall:
+        #                 chall_id = chall.id
+        #             else:
+        #                 self.app.notify(
+        #                     message="Uh oh, the chall doesn't seem to exist in the DB?",
+        #                     severity="error"
+        #                 )
+        #                 return
+        #         # self.app.push_screen(ChallengeEditScreen(chall_id, self)) 
+        #     case "remove_chall":
+        #         table = self.query_one("#challenge_table", DataTable)
+        #         row = table.get_row_at(table.cursor_row)
+        #         if self.second_pass:
+        #             with SessionLocal() as db:
+        #                 chall = db.query(Challenges).filter(
+        #                         row[0] == Challenges.id
+        #                 ).first()
+        #                 db.delete(chall)
+        #                 db.commit()
+        #                 self.app.notify(f"Challenge {row[1]} with id {row[0]} successfuly deleted!")
+        #                 self.second_pass = False
+        #                 self.load_challenges()
+        #             # delete_query = delete(Challenges).where(row[0] == Challenges.id)
+        #         else:
+        #             self.notify(f"Are you sure you want to delete {row[1]} with id {row[0]}? Click again if yes.", timeout=3)
+        #             self.second_pass = True
+        #             self.set_timer(3, self.unset_second_pass())
 
 class ChallengeListScreen(Screen):
     def on_mount(self) -> None:
@@ -421,6 +549,7 @@ class ChallengeListScreen(Screen):
                 attribute_names_from_model = Challenges.__mapper__.columns.keys()
             except AttributeError:
                 print("Error: Could not retrieve column names from Challenges model.")
+                self.app.notify("Error: Could not retrieve column names from Challenges model.")
                 attribute_names_from_model = ["id", "name", "error"] 
             display_headers = [name.replace("_", " ").title() for name in attribute_names_from_model]
             display_table.clear(columns=True) 
@@ -428,6 +557,7 @@ class ChallengeListScreen(Screen):
             for chall in chall_all:
                 row = [getattr(chall, attr) for attr in attribute_names_from_model]
                 display_table.add_row(*row)
+
     def unset_second_pass(self):
         # This is literally only necessary because textual
         # won't let you run raw python in the set_timer func

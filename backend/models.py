@@ -50,6 +50,7 @@ class Challenges(Base):
     notes = Column(String, nullable=True)
     hints = Column(JSON, nullable=True)
     is_active = Column(Integer, default=1)  # 1 for active, 0 for hidden/archived
+    is_reviewed = Column(Integer, default=0) # To let the user know if is_approved is false because it hasn't been reviewed or if it was because it got denied
     is_approved = Column(Integer, default=0) # 0 for approved, 1 for not approved
     submitted_by = Column(Integer, sqlalchemy.ForeignKey("users.id"), nullable=True)  # User ID of submitter
     is_featured = Column(Integer, default=0)  # 1 for featured, 0 for not
