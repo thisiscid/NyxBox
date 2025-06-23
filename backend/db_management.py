@@ -1,13 +1,14 @@
 from __future__ import annotations
-
+# Built in libs
 import datetime
 import json  # noqa: F401
 import os  # noqa: F401
 import pathlib
 import sys  # noqa: F401
 
+# Third party libs
 import sqlalchemy  # noqa: F401
-import textual  # noqa: F401
+from textual import work
 from config import Settings  # noqa: F401
 from database import SessionLocal, engine  # noqa: F401
 from models import Challenges
@@ -152,7 +153,8 @@ class DictEditScreen(Screen):
         super().__init__()
         self.json_target = edit_json_target
         self.shared_class = shared_class
-        # Do we have to unpack it later? If yes, we set self.single to True (since we have to take the dict out of the list)
+        # Do we have to unpack it later? 
+        # If yes, we set self.single to True (since we have to take the dict out of the list)
         if isinstance(edit_json_target, dict):
             self.single = True
             self.json_target = [edit_json_target]
@@ -175,21 +177,12 @@ class DictEditScreen(Screen):
             with Horizontal():
                 yield Button("Save Changes", id="save_dict_edits")
                 yield Button("Discard Changes", id="discard_dict_edits")
-        # elif isinstance(self.json_target, dict): #TODO: Change this to use the same format as the above
-        #     all_keys = sorted()
-        #     table= DataTable(id="dicts_table")
-        #     table.cursor_type="cell"
-        #     with Horizontal():
-        #         for key, val in self.json_target.items():
-        #             yield Input(value=str(key), id=f"key_{key}")
-        #             yield Input(value=str(val), id=f"value_{key}") # Use a different format for the id since later onwards we can just check isinstance again
-        #         yield Button("Save Changes", id="save_dict_edits")
-        #         yield Button("Discard Changes", id="discard_dict_edits")
         else:
             self.dismiss(None)
             self.app.notify(message="Invalid type!", severity="error")
 
-    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted): # legit don't even know what class event is supposed to be so lets hope and pray textual did it right
+    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted): 
+        # legit don't even know what class event is supposed to be so lets hope and pray textual did it right
         update_input = self.query_one("#edit_cell", Input)
         update_input.value = str(event.value)
         self.current_row = event.cell_key
@@ -198,29 +191,26 @@ class DictEditScreen(Screen):
         data_table = self.query_one("#dicts_table", DataTable)
         data_table.update_cell(*self.current_row, event.value, update_width = True)
         self.refresh()
-        # data_input=self.query_one("#edit_cell", Input)
-        # data_input.value = event
 
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
             case "save_dict_edits":
-                if isinstance(self.json_target, list):
-                    updated_list = []
-                    for i, entry in enumerate(self.json_target):
-                        updated_dict = {}
-                        for key, val in entry.items(): #TODO: Update this to query cells instead of querying nonexistant inputs
-                            updated_dict[self.query_one(f"#key_{i}_{key}", Input).value] = self.query_one(f"#value_{i}_{key}", Input).value
-                        updated_list.append(updated_dict)
-                    self.shared_class.new_data = updated_list
-                    # self.dismiss(updated_list)
-                    result = updated_list[0] if self.single else updated_list
-                    self.shared_class.new_data = result
-                    self.dismiss(result)
-                # elif isinstance(self.json_target, dict):
-                #     updated_dict = {} 
-                #     for key, val in self.json_target.items():
-                #         updated_dict[self.query_one(f"#key_{key}")] = self.query_one(f"#value_{key}")
-                #     self.dismiss(updated_dict)
+                table=self.query_one("#dicts_table", DataTable)
+                updated_list = []
+                for row in table.ordered_rows:
+                    updated_dict = {}
+                    for column in table.ordered_columns:
+                        cell_val = table.get_cell(row.key, column.key)
+                        if cell_val == "" or cell_val is None:
+                            continue
+                        updated_dict[column.key] = cell_val
+                    updated_list.append(updated_dict)
+                self.shared_class.new_data = updated_list
+                result = updated_list[0] if self.single else updated_list
+                self.shared_class.new_data = result
+                self.dismiss(result)
+            case "discard_edit_dicts":
+                self.dismiss(None)
 
 
 
@@ -286,6 +276,16 @@ class ChallengeEditScreen(Screen):
         #         yield Input(value=str(value), id=str(attribute))
         yield Button.success("Update attributes", id="update_attrs")
         yield Button.error("Discard changes", id="discard_edit")
+
+    @work
+    async def open_json_editor(self):
+        json_val = json.loads(self.query_one("#input_edit", Input).value)
+        screen = DictEditScreen(json_val, UpdatedDict(json_val))
+        result = await self.app.push_screen_wait(screen)
+        if result is not None:
+            self.query_one("#input_edit", Input).value = json.dumps(result)
+            setattr(self.chall, self.last_highlighted_param, result) # type: ignore
+            
     async def on_button_pressed(self, event:Button.Pressed):
         match event.button.id:
             case "update_attrs":
@@ -309,16 +309,7 @@ class ChallengeEditScreen(Screen):
                 # for attribute in self.attribute_names_from_model:
                 #     attr_value = self.query_one(f"#{str(attribute)}", Input)
             case "json_edit":
-                await self.app.push_screen(DictEditScreen((json.loads(self.query_one("#input_edit", Input).value)), UpdatedDict(json.loads(self.query_one("#input_edit", Input).value))))
-    # async def on_input_changed(self, event: Input.Changed) -> None:
-    #     self.json_edit_btn.visible = False
-    #     if self.types_from_model[self.last_highlighted_param] is JSON:
-    #         try:
-    #             json.loads(event.value)
-    #             self.json_edit_btn.visible=True
-    #             return
-    #         except json.JSONDecodeError:
-    #             self.json_edit_btn.visible = False
+                open_json_editor()
 
     def on_list_view_highlighted(self, event:ListView.Highlighted): # We actually have to change this so that it updates the last parameter and then gets the new one instead of updating the current one
         if event:
