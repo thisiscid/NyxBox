@@ -152,6 +152,14 @@ class DictEditScreen(Screen):
         super().__init__()
         self.json_target = edit_json_target
         self.shared_class = shared_class
+        # Do we have to unpack it later? If yes, we set self.single to True (since we have to take the dict out of the list)
+        if isinstance(edit_json_target, dict):
+            self.single = True
+            self.json_target = [edit_json_target]
+        else:
+            self.single = False
+            self.json_target = edit_json_target
+        
 
     def compose(self) -> ComposeResult:
         if isinstance(self.json_target, list):
@@ -167,16 +175,31 @@ class DictEditScreen(Screen):
             with Horizontal():
                 yield Button("Save Changes", id="save_dict_edits")
                 yield Button("Discard Changes", id="discard_dict_edits")
-        elif isinstance(self.json_target, dict):
-            with Horizontal():
-                for key, val in self.json_target.items():
-                    yield Input(value=str(key), id=f"key_{key}")
-                    yield Input(value=str(val), id=f"value_{key}") # Use a different format for the id since later onwards we can just check isinstance again
-                yield Button("Save Changes", id="save_dict_edits")
-                yield Button("Discard Changes", id="discard_dict_edits")
+        # elif isinstance(self.json_target, dict): #TODO: Change this to use the same format as the above
+        #     all_keys = sorted()
+        #     table= DataTable(id="dicts_table")
+        #     table.cursor_type="cell"
+        #     with Horizontal():
+        #         for key, val in self.json_target.items():
+        #             yield Input(value=str(key), id=f"key_{key}")
+        #             yield Input(value=str(val), id=f"value_{key}") # Use a different format for the id since later onwards we can just check isinstance again
+        #         yield Button("Save Changes", id="save_dict_edits")
+        #         yield Button("Discard Changes", id="discard_dict_edits")
         else:
             self.dismiss(None)
             self.app.notify(message="Invalid type!", severity="error")
+
+    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted): # legit don't even know what class event is supposed to be so lets hope and pray textual did it right
+        update_input = self.query_one("#edit_cell", Input)
+        update_input.value = str(event.value)
+        self.current_row = event.cell_key
+
+    def on_input_submitted(self, event: Input.Submitted):
+        data_table = self.query_one("#dicts_table", DataTable)
+        data_table.update_cell(*self.current_row, event.value, update_width = True)
+        self.refresh()
+        # data_input=self.query_one("#edit_cell", Input)
+        # data_input.value = event
 
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
@@ -185,16 +208,20 @@ class DictEditScreen(Screen):
                     updated_list = []
                     for i, entry in enumerate(self.json_target):
                         updated_dict = {}
-                        for key, val in entry.items():
+                        for key, val in entry.items(): #TODO: Update this to query cells instead of querying nonexistant inputs
                             updated_dict[self.query_one(f"#key_{i}_{key}", Input).value] = self.query_one(f"#value_{i}_{key}", Input).value
                         updated_list.append(updated_dict)
                     self.shared_class.new_data = updated_list
-                    self.dismiss(updated_list)
-                elif isinstance(self.json_target, dict):
-                    updated_dict = {} 
-                    for key, val in self.json_target.items():
-                        updated_dict[self.query_one(f"#key_{key}")] = self.query_one(f"#value_{key}")
-                    self.dismiss(updated_dict)
+                    # self.dismiss(updated_list)
+                    result = updated_list[0] if self.single else updated_list
+                    self.shared_class.new_data = result
+                    self.dismiss(result)
+                # elif isinstance(self.json_target, dict):
+                #     updated_dict = {} 
+                #     for key, val in self.json_target.items():
+                #         updated_dict[self.query_one(f"#key_{key}")] = self.query_one(f"#value_{key}")
+                #     self.dismiss(updated_dict)
+
 
 
 class ChallengeEditScreen(Screen):
