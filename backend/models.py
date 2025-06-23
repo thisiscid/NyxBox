@@ -49,7 +49,11 @@ class Challenges(Base):
     constraints = Column(String, nullable=False)
     notes = Column(String, nullable=True)
     hints = Column(JSON, nullable=True)
-    is_active = Column(Integer, default=1)  # 1 for active, 0 for hidden/archived
+    
+    # The below likely won't get used for a good while until I implement more endpoints
+
+    is_active = Column(Integer, default=0)  # 1 for active, 0 for hidden/archived
+    # Above should always be true until approved! 
     is_reviewed = Column(Integer, default=0) # To let the user know if is_approved is false because it hasn't been reviewed or if it was because it got denied
     is_approved = Column(Integer, default=0) # 0 for approved, 1 for not approved
     submitted_by = Column(Integer, sqlalchemy.ForeignKey("users.id"), nullable=True)  # User ID of submitter

@@ -3,6 +3,10 @@ img {
 }
 
 body {
+    background-image: url(background.jpg);
+    background-repeat: no-repeat;
+    background-size: cover;
+    /* background-position: center; */
     text-align: center;
     font-family: 'Arial';
     font-size: medium;
@@ -17,7 +21,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: magenta;
+    background: rgb(233, 228, 213);
     border: solid;
     border-radius: 25px;
     box-shadow: 10px 10px 20px;

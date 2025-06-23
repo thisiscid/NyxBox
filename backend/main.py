@@ -155,98 +155,24 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
     f"pending_auth:{original_session_id}",
     180,
     json.dumps({
-        "completed": True,
-        "access_token": user_jwt,
-        "refresh_token": refresh_jwt,
-        "user_data": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email
-        },
-        "access_exp": user_jwt_expiry.isoformat(),
-        "refresh_exp": refresh_jwt_expiry.isoformat()
-    })
-)
+            "completed": True,
+            "access_token": user_jwt,
+            "refresh_token": refresh_jwt,
+            "user_data": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email
+            },
+            "access_exp": user_jwt_expiry.isoformat(),
+            "refresh_exp": refresh_jwt_expiry.isoformat()
+        })
+    )
+    
     #TODO: Switch this over to the file
-    return HTMLResponse(f"""
-    <html>
-        <head>
-            <title>Authentication Successful</title>
-            <style>
-                body {{
-                    display: flex;
-                    justify-content: center; /* Horizontally center the .terminal-window */
-                    align-items: center;    /* Vertically center the .terminal-window */
-                    min-height: 100vh;
-                    margin: 0;
-                    background-color: #282c34; /* A slightly different page background */
-                    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
-                    color: #d0d0d0; /* Default light text color for the page */
-                }}
-                .terminal-window {{
-                    background-color: #1e1e1e; /* Dark terminal background */
-                    border: 1px solid #000;
-                    border-radius: 6px;
-                    padding: 25px;
-                    width: 90%;
-                    max-width: 650px;
-                    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-                    /* The content inside will be block, text-align left handles the rest */
-                }}
-                .terminal-window .checkmark {{
-                    font-size: 2.5em; /* Adjusted size */
-                    color: #98c379;
-                    margin-bottom: 15px;
-                    text-align: left; /* Checkmark also to the left */
-                }}
-                .terminal-window h1 {{
-                    color: #61afef;
-                    margin-top: 0;
-                    margin-bottom: 15px;
-                    font-size: 1.4em;
-                    text-align: left;
-                }}
-                .terminal-window p {{
-                    font-size: 1em;
-                    line-height: 1.6;
-                    text-align: left;
-                    margin-bottom: 10px;
-                }}
-                .terminal-window p.small-text {{
-                    font-size: 0.85em;
-                    color: #888; /* Dimmer color for the auto-close message */
-                    text-align: left;
-                }}
-                .daemon-user-nyx {{
-                    color: #B3507D;
-                    font-weight: bold;
-                }}
-                .daemon-user-hackclub {{
-                    color: #A3C9F9;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="terminal-window">
-                <div class="checkmark">✓</div>
-                <h1>
-                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
-                    Authentication Successful!
-                </h1>
-                <p>
-                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
-                    You can now close this window and return to NyxBox.
-                </p>
-                <p class="small-text">(This window should close automatically shortly.)</p>
-            </div>
-            <script>
-                setTimeout(function() {{
-                    window.close();
-                }}, 4000); // Slightly longer delay
-            </script>
-        </body>
-    </html>
-    """)  # noqa: F541
+    html_path = os.path.join(os.path.dirname(__file__), "static", "auth_complete.html")
+    with open(html_path, "r") as f:
+        html_content = f.read()
+    return HTMLResponse(html_content)  # noqa: F541
     # return {"message": "Google login successful", "jwt": user_jwt, "refresh": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 @app.get("/auth/github") # Start Github OAuth flow
@@ -356,85 +282,10 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
         })
     )
     #TODO: Switch this over to the file
-    return HTMLResponse("""
-    <html>
-        <head>
-            <title>Authentication Successful</title>
-            <style>
-                body {{
-                    display: flex;
-                    justify-content: center; /* Horizontally center the .terminal-window */
-                    align-items: center;    /* Vertically center the .terminal-window */
-                    min-height: 100vh;
-                    margin: 0;
-                    background-color: #282c34; /* A slightly different page background */
-                    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
-                    color: #d0d0d0; /* Default light text color for the page */
-                }}
-                .terminal-window {{
-                    background-color: #1e1e1e; /* Dark terminal background */
-                    border: 1px solid #000;
-                    border-radius: 6px;
-                    padding: 25px;
-                    width: 90%;
-                    max-width: 650px;
-                    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-                    /* The content inside will be block, text-align left handles the rest */
-                }}
-                .terminal-window .checkmark {{
-                    font-size: 2.5em; /* Adjusted size */
-                    color: #98c379;
-                    margin-bottom: 15px;
-                    text-align: left; /* Checkmark also to the left */
-                }}
-                .terminal-window h1 {{
-                    color: #61afef;
-                    margin-top: 0;
-                    margin-bottom: 15px;
-                    font-size: 1.4em;
-                    text-align: left;
-                }}
-                .terminal-window p {{
-                    font-size: 1em;
-                    line-height: 1.6;
-                    text-align: left;
-                    margin-bottom: 10px;
-                }}
-                .terminal-window p.small-text {{
-                    font-size: 0.85em;
-                    color: #888; /* Dimmer color for the auto-close message */
-                    text-align: left;
-                }}
-                .daemon-user-nyx {{
-                    color: #B3507D;
-                    font-weight: bold;
-                }}
-                .daemon-user-hackclub {{
-                    color: #A3C9F9;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="terminal-window">
-                <div class="checkmark">✓</div>
-                <h1>
-                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
-                    Authentication Successful!
-                </h1>
-                <p>
-                    <span class="daemon-user-nyx">nyx</span>@<span class="daemon-user-hackclub">hackclub</span>:~&#36; 
-                    You can now close this window and return to NyxBox.
-                </p>
-                <p class="small-text">(This window should close automatically shortly.)</p>
-            </div>
-            <script>
-                setTimeout(function() {{
-                    window.close();
-                }}, 4000); // Slightly longer delay
-            </script>
-        </body>
-    </html>
-    """)  # noqa: F541
+    html_path = os.path.join(os.path.dirname(__file__), "static", "auth_complete.html")
+    with open(html_path, "r") as f:
+        html_content = f.read()
+    return HTMLResponse(html_content)  # noqa: F541
 # ...existing code...
     # return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 

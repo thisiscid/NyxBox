@@ -1,20 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang=""en>
     <head> 
         <link rel="stylesheet" href="style.css" />
+        <meta charset="utf-8" />
+        <title>NyxBox - Auth Complete</title>
     </head>
     <body> 
         <div class="floating_thing">
-            <div class="floating_text">
-                <h1>Authentication Complete!</h1> 
+            <div class="floating_text" role="alert">
+                <h1 tabindex="-1">Authentication Complete!</h1> 
                 <p>
                     Orpheus says "go back to the app now!"
                 </p>
+                <sub aria-hidden="true">credit: hc for bg and orpheus</sub>
             </div>
-            <img
+            <img 
                 src="dinosaur_waving.png"
                 id="orpheus_img"
+                alt=""
+                aria-hidden="true"
             />
         </div>
+        <script>
+                setTimeout(function() {{
+                    window.close();
+                }}, 4000); 
+        </script>
     </body>
 </html>

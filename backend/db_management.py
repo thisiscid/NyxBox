@@ -1,10 +1,11 @@
-from __future__ import annotations
 # Built in libs
+from __future__ import annotations
 import datetime
 import json  # noqa: F401
 import os  # noqa: F401
 import pathlib
 import sys  # noqa: F401
+import random
 
 # Third party libs
 from sqlalchemy import delete # noqa: F401
@@ -40,7 +41,8 @@ from textual.widgets import (  # noqa: F401
     TextArea,
 )
 
-
+# Misc stuff
+DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 class LabelItem(ListItem):
     def __init__(self, label: str, *, id: str = "") -> None:
         super().__init__(id=id)
@@ -51,7 +53,39 @@ class LabelItem(ListItem):
 class UpdatedDict(): # Call this class, pass it into DictEditScreen, have it modify
     def __init__(self, dict_or_list: "dict | list"):
         self.new_data = dict_or_list
-
+        
+class UserChallView(Static):
+    def on_mount(self):
+        self.styles.align_horizontal = "center"
+        NO_CHALL_TEXT=[
+            f"{DAEMON_USER} Hm, what an interesting app. Why don't you try pressing something? Maybe 'v'?",
+            f"{DAEMON_USER} This better be good since you woke me up. Maybe vend a challenge and see what happens?",
+            f"{DAEMON_USER} Welcome Hack Clubbers! (and welcome to everyone else ig). Try vending a challenge!",
+            f"{DAEMON_USER} I'm bored...vend a challenge please?"]
+        self.update(random.choice(NO_CHALL_TEXT))
+    def update_chall(self, chall: dict):
+        # Format the profile info
+        CHALL_TEXT=[
+            f"{DAEMON_USER} Here's your challenge. I hope it's not too hard~",
+            f"{DAEMON_USER} Another day, another challenge. You've got this!",
+            f"{DAEMON_USER} Let's do this and hopefully learn something. Also, don't fail!",
+            f"{DAEMON_USER} Good luck!"
+            ]
+        if chall.get('difficulty', "N/A").lower() in ["medium", "hard"]:
+            CHALL_TEXT=[
+            f"{DAEMON_USER} This one might be tough.",
+            f"{DAEMON_USER} It's okay to fail! (unless you're a hack clubber of course (im joking!))",
+            f"{DAEMON_USER} Bringing on the heat? Let's do it.",
+            f"{DAEMON_USER} Good luck! You'll need it."
+            ]
+        formatted = (
+            random.choice(CHALL_TEXT)+"\n"
+            f"Name: {chall.get('name', 'N/A')}\n"
+            f"Difficulty: {chall.get('difficulty', 'N/A')}\n"
+            f"Description: {chall.get('description', 'N/A')}"
+        )
+        self.update(formatted)
+#Screens where we actually manipulate the db
 class ChallengeAddScreen(Screen):
     def __init__(self, main_instance: ChallengeListScreen) -> None:
         super().__init__()
@@ -405,8 +439,12 @@ class ChallengeEditScreen(Screen):
 
 class ApprovalScreen(Screen): 
     # This screen is going to be mostly identical to ChallengeListScreen
-    # Except we're gonna steal something from the main app >:3
+    # Except we're gonna steal something from the main app >:3 (aka the frontend/tui app/client/idek)
     # This is more admin specific so that we can approve user submitted challenges
+
+    def __init__(self, main_instance: ChallengeListScreen) -> None:
+        super().__init__()
+        self.main_instance = main_instance
 
     def on_mount(self) -> None:
         # display_table = self.query_one("#challenge_table", DataTable)
@@ -415,6 +453,7 @@ class ApprovalScreen(Screen):
         self.second_pass_approve = None
         self.second_pass_deny = None
         self.attempted_row = None
+        # self.main_instance
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -424,7 +463,9 @@ class ApprovalScreen(Screen):
                 yield Button(id="approve_chall_approval", label="Approve challenge")
                 yield Button(id="deny_chall_approval", label="Deny challenge")
                 yield Button.error(id="exit_approval", label="Exit")
+            yield UserChallView(id="user_chall_view_approve")
         yield Footer()
+
     def load_challenges(self):
         display_table = self.query_one("#approval_table", DataTable)
         display_table.clear()
@@ -450,86 +491,72 @@ class ApprovalScreen(Screen):
                 row = [getattr(chall, attr) for attr in attribute_names_from_model]
                 display_table.add_row(*row)
 
+    def unset_param(self, param):
+        param = False
+
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted):
+        table = self.query_one("#approval_table", DataTable)
+        chall_info_display = self.query_one("#user_chall_view_approve", UserChallView)
+        # chall = event.row_key
+        chall = table.get_row(event.row_key)
+        chall_dict = {"name": chall[1], "difficulty": chall[7], "description": chall[2]}
+        chall_info_display.update_chall(chall_dict)
+        # update_input = self.query_one("#edit_cell", Input)
+        # update_input.value = str(event.value)
+
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
             case "approve_chall_approval":
                 table = self.query_one("#approval_table", DataTable)
                 row = table.get_row_at(table.cursor_row)
-                if self.second_pass_approve and self.attempted_row != row:
+                if self.second_pass_approve and self.attempted_row == row:
                     with SessionLocal() as db:
                         chall = db.query(Challenges).filter(
                             Challenges.id == row[0], Challenges.is_approved != 1, Challenges.name == row[1]
                         ).first()
+                        chall.is_active = 1 #type: ignore
                         chall.is_approved = 1 #type: ignore
                         chall.is_reviewed = 1 #type: ignore
                         db.commit()
                         # db.close()
                     self.app.notify(f"Challenge {row[1]}, id {row[0]} has been approved.")
+                    self.load_challenges()
                 else:
                     self.attempted_row = row
                     self.app.notify(f"Are you sure you want to approve {row[1]}, id {row[0]}? Click again if yes")
                     self.second_pass_approve = True
+                    self.set_timer(3, self.unset_param(self.second_pass_approve))
             case "deny_chall_approval":
                 table = self.query_one("#approval_table", DataTable)
                 row = table.get_row_at(table.cursor_row)
-                if self.second_pass_deny and self.attempted_row != row:
+                if self.second_pass_deny and self.attempted_row == row:
                     with SessionLocal() as db:
                         chall = db.query(Challenges).filter(
                             Challenges.id == row[0], Challenges.name == row[1]
                         ).first()
-                        # chall.is_approved = 1 We shouldn't need this line since is_approved should alr be 0
+                        chall.is_approved = 0 #type:ignore just in case it wasn't alr 0
                         chall.is_reviewed = 1 #type: ignore
+                        chall.is_active = 0 #type: ignore js in case :3
                         db.commit()
                         # db.close()
                     self.app.notify(f"Challenge {row[1]}, id {row[0]} has been denied.")
+                    self.load_challenges()
                 else:
                     self.attempted_row = row
                     self.app.notify(f"Are you sure you want to deny {row[1]}, id {row[0]}? Click again if yes")
                     self.second_pass_deny = True
+                    self.set_timer(3, self.unset_param(self.second_pass_approve))
             case "exit_approval":
                 self.app.pop_screen()
-        # match event.button.id:
-        #     case "add_chall":
-        #         self.app.push_screen(ChallengeAddScreen(self)) # type: ignore
-        #     case "edit_chall":
-        #         datatable = self.query_one("#challenge_table", DataTable)
-        #         current_row = datatable.get_row_at(datatable.cursor_row)
-        #         with SessionLocal() as db:
-        #             chall = db.query(Challenges).filter(Challenges.id == current_row[0]).first()
-        #             if chall:
-        #                 chall_id = chall.id
-        #             else:
-        #                 self.app.notify(
-        #                     message="Uh oh, the chall doesn't seem to exist in the DB?",
-        #                     severity="error"
-        #                 )
-        #                 return
-        #         # self.app.push_screen(ChallengeEditScreen(chall_id, self)) 
-        #     case "remove_chall":
-        #         table = self.query_one("#challenge_table", DataTable)
-        #         row = table.get_row_at(table.cursor_row)
-        #         if self.second_pass:
-        #             with SessionLocal() as db:
-        #                 chall = db.query(Challenges).filter(
-        #                         row[0] == Challenges.id
-        #                 ).first()
-        #                 db.delete(chall)
-        #                 db.commit()
-        #                 self.app.notify(f"Challenge {row[1]} with id {row[0]} successfuly deleted!")
-        #                 self.second_pass = False
-        #                 self.load_challenges()
-        #             # delete_query = delete(Challenges).where(row[0] == Challenges.id)
-        #         else:
-        #             self.notify(f"Are you sure you want to delete {row[1]} with id {row[0]}? Click again if yes.", timeout=3)
-        #             self.second_pass = True
-        #             self.set_timer(3, self.unset_second_pass())
+                self.main_instance.load_challenges()
+                
 
 class ChallengeListScreen(Screen):
     def on_mount(self) -> None:
         # display_table = self.query_one("#challenge_table", DataTable)
         # db = SessionLocal()
         self.load_challenges()
-        self.second_pass = None
+        self.second_pass = False
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -539,6 +566,7 @@ class ChallengeListScreen(Screen):
                 yield Button(id="add_chall", label="Add challenge")
                 yield Button(id="edit_chall", label="Edit challenge")
                 yield Button(id="remove_chall", label="Remove challenge")
+                yield Button(id="approve_chall", label="Approve Challenges")
         yield Footer()
     def load_challenges(self):
         display_table = self.query_one("#challenge_table", DataTable)
@@ -581,6 +609,7 @@ class ChallengeListScreen(Screen):
                         )
                         return
                 self.app.push_screen(ChallengeEditScreen(chall_id, self)) 
+
             case "remove_chall":
                 table = self.query_one("#challenge_table", DataTable)
                 row = table.get_row_at(table.cursor_row)
@@ -598,7 +627,9 @@ class ChallengeListScreen(Screen):
                 else:
                     self.notify(f"Are you sure you want to delete {row[1]} with id {row[0]}? Click again if yes.", timeout=3)
                     self.second_pass = True
-                    self.set_timer(3, self.unset_second_pass())
+                    self.set_timer(10, self.unset_second_pass)
+            case "approve_chall":
+                self.app.push_screen(ApprovalScreen(self))
     
 class DBManagement(App):
     def on_mount(self):
