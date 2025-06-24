@@ -35,20 +35,28 @@ ALLOWED_PATHS = ["/",
                  "/auth/github/callback",
                  "/redirect",
                  ]
+
+RATE_LIMIT = 5
+TIME_WINDOW = 60
+
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-# Filters out user agents EXCEPT if the user is accessing a static page
+# Filters out user agents EXCEPT if the user is accessing a static page that they need to access for authsla
 class UserAgentFilter(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if path.startswith("/static/") or path in ALLOWED_PATHS:
-            return await call_next(request)
+        ip = request.client.host # type: ignore
+        val = int(await redis_client.get(f"ip:{ip}"))
+        await redis_client.setex(f"ip:{ip}", 60, val+1 if val else 1)
         user_agent = request.headers.get("User-Agent", "").strip()
         if not user_agent.startswith(ALLOWED_UA_PREFIX):
             return JSONResponse(status_code=403, content={"detail": "Invalid User-Agent"})
+        if val+1 >= RATE_LIMIT:
+            return JSONResponse(status_code=403, content={"detail": "Hit rate limit"})
+        if path.startswith("/static/") or path in ALLOWED_PATHS:
+            return await call_next(request)
         return await call_next(request)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
@@ -57,6 +65,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         if not settings.JWT_SECRET:
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured on server")
@@ -429,7 +438,6 @@ def get_chall_by_id(chall_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, detail="No such challenge")
 
 # @app.get("/challenges/{id}/approve") This might not be needed? We can make an interface to approve it locally
-
 @app.post("/challenges/{chall_id}/submit") # Submit solution
 def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # We dont need to evaluate code locally bcs:
