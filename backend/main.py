@@ -1,22 +1,27 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse, HTMLResponse
+# Built Ins
+import hashlib
+import json
+import os
+import secrets
+import typing
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+# Third partys
+import redis
+from authlib.integrations.requests_client import OAuth2Session
+from config import settings
+from database import create_tables, get_db
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
-from database import create_tables, get_db
-from models import User, Challenges, UserSolve, UserLike
-from contextlib import asynccontextmanager
-import typing
-from authlib.integrations.requests_client import OAuth2Session
 from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
-from config import settings
-import os
-from typing import Optional
-import secrets
-import redis
-import json
-from schemas import ChallengeListItemSchema, ChallengeDetailSchema, RefreshTokensRequest
+from models import Challenges, User, UserLike, UserSolve
+from schemas import ChallengeDetailSchema, ChallengeListItemSchema, RefreshTokensRequest
+from sqlalchemy.orm import Session
+
 
 # oauth_state = {}
 # pending_auth: dict[str, dict] = {}
@@ -24,7 +29,7 @@ from schemas import ChallengeListItemSchema, ChallengeDetailSchema, RefreshToken
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token") 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
@@ -291,6 +296,7 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
     # return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 #TODO: Update these params
+#I think thats done
 @app.post("/auth/refresh") # To get a new JWT with a valid refresh jwt
 def refresh_jwt(token_data: RefreshTokensRequest, db: Session = Depends(get_db)):
     jwt_user = db.query(User).filter(
@@ -346,6 +352,10 @@ def logout_user(refresh_jwt: str, db: Session = Depends(get_db)):
     user.refresh_jwt_expiry = None # type: ignore
     db.commit()
     return {"message": "Logged out successfully"}
+
+@app.get("/auth/guest")
+def provide_pow_for_guest():
+    pass
 
 # Change to use JWT
 @app.get("/auth/me") # Get user info

@@ -247,6 +247,11 @@ class LoginPage(ModalScreen):
                         self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
                 else:
                     self.app.push_screen(WaitingForAuthScreen(self.session_id))
+            case 'guest_button':
+                # We should create dummy information that CAN be used to retrieve info from the server
+                # However, we should also make sure that account expires? 
+                # implement the endpoint first acc
+                pass
     def action_quit(self):
         self.app.exit()
 
@@ -288,6 +293,7 @@ class ValidateAuth():
         # self.token = token
         self.app_instance = app_instance
         self.root_path = root_path
+
     async def check_refresh_token(self, refresh_token) -> dict:
         refresh_url = SERVER_URL + "/auth/refresh"
         async with httpx.AsyncClient() as client:
@@ -411,4 +417,8 @@ class ValidateAuth():
             severity="information")
         self.app_instance.post_message(AuthComplete(auth_data, user_data))
 
+# not technically authentication related but its config so yknow what we ball
+class GetConfig():
+    def __init__(self, root_path):
+        self.root_path = root_path
 

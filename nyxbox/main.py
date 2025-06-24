@@ -224,6 +224,7 @@ class NyxBox(App):
         self.current_challenge = None
         self.nyx_path = pathlib.Path.home() / ".nyxbox"
         try: #TODO: Implement checking for 1. if JWT expired, 2. if refresh token is expired, 3. force reauth if both of those two are met
+            # I think the above is done
             auth_validator = ValidateAuth(self, self.nyx_path)
             self.run_worker(auth_validator.perform_auth_check(), exclusive=True)
             # if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / "auth.json"):
@@ -244,14 +245,45 @@ class NyxBox(App):
             if log:
                 self.notify(
                     title="Uh oh!",
-                    message=f"{DAEMON_USER} [b]Encountered critical error: {log}[/b]",
+                    message=f"{DAEMON_USER} [b]Encountered critical error reading auth files: {log}[/b]",
+                    severity="information",
+                    timeout=5,
+                    markup=True
+                )
+            else:
+                self.notify(
+                    title="Uh oh!",
+                    message=f"{DAEMON_USER} [b]Encountered critical error reading auth files: {e}[/b]",
+                    severity="information",
+                    timeout=5,
+                    markup=True
+                )
+            self.app.push_screen(LoginPage())
+        try: 
+            if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / ".config"):
+                config_path = pathlib.Path.home() / ".nyxbox" / ".config"
+                with open(config_path, 'r') as config_file:
+                    self.config_items = config_file.readlines()
+        except Exception as e:
+            log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+            if log:
+                self.notify(
+                    title="Uh oh!",
+                    message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {log}[/b]",
+                    severity="information",
+                    timeout=5,
+                    markup=True
+                )
+            else:
+                self.notify(
+                    title="Uh oh!",
+                    message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {e}[/b]",
                     severity="information",
                     timeout=5,
                     markup=True
                 )
             self.app.push_screen(LoginPage())
     
-
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Header()

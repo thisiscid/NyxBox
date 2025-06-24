@@ -4,7 +4,7 @@ version = "0.1.2"
 description = "Exercisim inspired coding challenges, right in your terminal!"
 authors = [{ name="Rainger", email="tilt-hazard-swept@duck.com" }]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.13"
 dependencies = [
     "textual>=3.2.0",
     "rich>=13.7.0",
@@ -18,7 +18,9 @@ dependencies = [
     "textual[syntax]",
     "qrcode",
     "rich-pixels",
-    "Pillow"
+    "pillow",
+    "requests",
+    "httpx"
 ]
 
 [project.scripts]
@@ -33,5 +35,6 @@ nyxbox = [
   "challenges/*.json",
   "language-support/*.scm"
 ]
+
 [tool.ruff]
 target-version = "py312"
