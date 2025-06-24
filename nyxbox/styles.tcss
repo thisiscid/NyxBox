@@ -11,6 +11,14 @@ VendingMachine {
   padding: 2;
 }
 
+UserChallView {
+  border: round #9999FF;
+  height: 70%;
+  padding: 5;
+  /*border-title: test*/
+  /*radius: ascii;*/
+}
+
 /* Header styling */
 Header {
   dock: top;
@@ -22,6 +30,7 @@ Header {
 Footer {
   dock: bottom;
 }
+
 Vertical {
   margin: 0 0;
   padding: 0 0
@@ -29,9 +38,11 @@ Vertical {
 /* Challenge view styling */
 #challengeview {
   width: 70%;
+  height: 70%;
   padding: 0;
   margin: 2;
   align: center middle;
+  content-align: center middle;
 }
 
 /* Text area for solution writing */
@@ -46,10 +57,13 @@ Vertical {
 
 /* Container for button groups */
 #button_panel {
-  width: 50%;
-  height: auto;
+  width: 30;
+  padding: 0;
+  height: 70%;
   align: center middle;
-  margin: 1;
+  content-align: center middle;
+  margin: 2;
+  border: round #9999FF;
 }
 
 /* Styling for buttons */
@@ -120,6 +134,7 @@ ModalScreen {
   content-align: center middle; 
   align: center middle
 }
+
 #editor_buttons {
   height: 3;
   align: center top;

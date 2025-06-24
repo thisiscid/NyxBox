@@ -216,3 +216,6 @@ backend/admin_tools.py
 #Redis stuff
 *.rdb
 dump.rdb
+dump.rdb
+*/*.rdb
+*/*/*.rdb

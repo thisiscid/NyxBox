@@ -255,6 +255,23 @@ def read_user_data() -> dict:
     try:
         auth_dir = pathlib.Path.home() / ".nyxbox"
         if pathlib.Path.is_dir(auth_dir):
+            with open(auth_dir / "user.json", "r") as f:
+                # auth_data=json.load(f)
+                # auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                # auth_data["refresh_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                # return auth_data
+                user_data = json.load(f)
+                return user_data
+        else:
+            return {"error": "Auth directory not found"}
+    except Exception as e:
+        create_log(auth_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+        return {"error": e}
+
+def read_auth_data() -> dict:
+    auth_dir = pathlib.Path.home() / ".nyxbox"
+    try:
+        if pathlib.Path.is_dir(auth_dir):
             with open(auth_dir / "auth.json", "r") as f:
                 auth_data=json.load(f)
                 auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
@@ -263,7 +280,7 @@ def read_user_data() -> dict:
         else:
             return {"error": "Auth directory not found"}
     except Exception as e:
-        create_log(auth_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log", severity = "error", message=e)
+        create_log(auth_dir / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
         return {"error": e}
 
 class ValidateAuth():

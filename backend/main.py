@@ -476,6 +476,12 @@ def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_use
 def create_challenge(challenge_data: dict, jwt: str, db: Session = Depends(get_db)):
     pass
 
+@app.get("/")
+def return_index_page():
+    with open("static/index.html") as f:
+        html_data = f.read()
+    return HTMLResponse(html_data)
+
 app.mount(
     "/static",
     StaticFiles(directory="static", html=True),

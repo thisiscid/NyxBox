@@ -4,6 +4,7 @@ import random
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 class UserChallView(Static):
     def on_mount(self):
+        self.border_title = "vending slot :3"
         self.styles.align_horizontal = "center"
         NO_CHALL_TEXT=[
             f"{DAEMON_USER} Hm, what an interesting app. Why don't you try pressing something? Maybe 'v'?",
