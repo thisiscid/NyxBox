@@ -7,7 +7,10 @@ from qrcode.image.pil import PilImage
 from rich_pixels import Pixels
 from io import BytesIO
 from qrcode.constants import ERROR_CORRECT_L
+from importlib.metadata import version, PackageNotFoundError
 
+NYXBOX_VERSION = version("nyxbox")
+USER_AGENT = f"NyxBoxClient/{NYXBOX_VERSION}"
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 SERVER_URL="http://localhost:8000"
 def escape_brackets(s):

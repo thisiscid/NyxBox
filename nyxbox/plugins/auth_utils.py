@@ -15,7 +15,8 @@ from qrcode.image.pil import PilImage
 import qrcode
 from rich_pixels import Pixels
 import os
-from .utils import create_log, return_log_path, DAEMON_USER, SERVER_URL
+from .utils import create_log, return_log_path, DAEMON_USER, SERVER_URL, USER_AGENT
+
 # Screens used to actually auth a user
 def make_qr_pixels(data: str) -> Pixels | None:
     """
@@ -90,7 +91,7 @@ class WaitingForAuthScreen(ModalScreen):
         if not self.polling:
             return
         try:
-            response = requests.get(f"{SERVER_URL}/auth/check-status/{self.session_id}").json()
+            response = requests.get(f"{SERVER_URL}/auth/check-status/{self.session_id}", headers={ "User-Agent": USER_AGENT }).json()
             if response["status"] == "completed":
                 self.polling = False
                 self.save_tokens(
@@ -142,8 +143,7 @@ class WaitingForAuthScreen(ModalScreen):
             f"{DAEMON_USER} Welcome, {user_data.get('name', 'User')}!", 
             severity="information")
         self.app.post_message(AuthComplete(auth_data, user_data))
-    
-#TODO: Remember to send a session id! Check your API for what you need to send!
+
 class LoginPage(ModalScreen):
     BINDINGS = [
         ("ctrl+q", "quit", "Quit")]
@@ -191,7 +191,7 @@ class LoginPage(ModalScreen):
                     self.is_login = False
             case 'google_button':
                 try:
-                    data=requests.get(f"{SERVER_URL}/auth/google?session_id={self.session_id}").json()
+                    data=requests.get(f"{SERVER_URL}/auth/google?session_id={self.session_id}", headers={ "User-Agent": USER_AGENT }).json()
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",
@@ -220,7 +220,7 @@ class LoginPage(ModalScreen):
                     self.app.push_screen(WaitingForAuthScreen(self.session_id))
             case 'github_button':
                 try:
-                    data=requests.get(f"{SERVER_URL}/auth/github?session_id={self.session_id}").json()
+                    data=requests.get(f"{SERVER_URL}/auth/github?session_id={self.session_id}", headers={ "User-Agent": USER_AGENT }).json()
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",
@@ -298,7 +298,7 @@ class ValidateAuth():
         refresh_url = SERVER_URL + "/auth/refresh"
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(refresh_url, json={'refresh_token': refresh_token})
+                response = await client.post(refresh_url, json={'refresh_token': refresh_token}, headers={ "User-Agent": USER_AGENT })
             except Exception as e:
                 return {"access_token": None,
                 "jwt": None,

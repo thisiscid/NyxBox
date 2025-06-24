@@ -1,4 +1,4 @@
-# Built Ins
+# Built in libs
 import hashlib
 import json
 import os
@@ -8,15 +8,16 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-# Third partys
+# Third party libs
 import redis
 from authlib.integrations.requests_client import OAuth2Session
 from config import settings
 from database import create_tables, get_db
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from jose import JWTError, jwt
 from models import Challenges, User, UserLike, UserSolve
 from schemas import ChallengeDetailSchema, ChallengeListItemSchema, RefreshTokensRequest
@@ -25,11 +26,30 @@ from sqlalchemy.orm import Session
 
 # oauth_state = {}
 # pending_auth: dict[str, dict] = {}
-
+ALLOWED_UA_PREFIX = "NyxBoxClient"
+ALLOWED_PATHS = ["/", 
+                 "/favicon.ico", 
+                 "/auth/google", 
+                 "/auth/google/callback", 
+                 "/auth/github",
+                 "/auth/github/callback",
+                 "/redirect",
+                 ]
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+# Filters out user agents EXCEPT if the user is accessing a static page
+class UserAgentFilter(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/static/") or path in ALLOWED_PATHS:
+            return await call_next(request)
+        user_agent = request.headers.get("User-Agent", "").strip()
+        if not user_agent.startswith(ALLOWED_UA_PREFIX):
+            return JSONResponse(status_code=403, content={"detail": "Invalid User-Agent"})
+        return await call_next(request)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
@@ -60,6 +80,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="NyxBox API", lifespan=lifespan)
+app.add_middleware(UserAgentFilter)
 
 @app.get('/redirect')
 def redirect_user(token: str):
