@@ -9,7 +9,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 # Third party libs
-import redis
+# import redis
+import redis.asyncio as redis
 from authlib.integrations.requests_client import OAuth2Session
 from config import settings
 from database import create_tables, get_db
@@ -47,16 +48,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 class UserAgentFilter(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        ip = request.client.host # type: ignore
-        val = int(await redis_client.get(f"ip:{ip}"))
-        await redis_client.setex(f"ip:{ip}", 60, val+1 if val else 1)
+        ip = request.client.host  # type: ignore
         user_agent = request.headers.get("User-Agent", "").strip()
-        if not user_agent.startswith(ALLOWED_UA_PREFIX):
-            return JSONResponse(status_code=403, content={"detail": "Invalid User-Agent"})
-        if val+1 >= RATE_LIMIT:
-            return JSONResponse(status_code=403, content={"detail": "Hit rate limit"})
         if path.startswith("/static/") or path in ALLOWED_PATHS:
             return await call_next(request)
+        if not user_agent.startswith(ALLOWED_UA_PREFIX):
+            return JSONResponse(status_code=403, content={"detail": "Invalid User-Agent"})
+        key = f"ip:{ip}"
+        count = await redis_client.incr(key)
+        if count == 1:
+            await redis_client.expire(key, 60)
+        if count >= RATE_LIMIT:
+            return JSONResponse(status_code=403, content={"detail": "Hit rate limit"})
         return await call_next(request)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
@@ -92,9 +95,9 @@ app = FastAPI(title="NyxBox API", lifespan=lifespan)
 app.add_middleware(UserAgentFilter)
 
 @app.get('/redirect')
-def redirect_user(token: str):
+async def redirect_user(token: str):
     try:
-        url_data = redis_client.get(f"redirect_url:{token}")
+        url_data = await redis_client.get(f"redirect_url:{token}")
         if url_data:
             return RedirectResponse(url_data) #type: ignore
         else:
@@ -104,7 +107,7 @@ def redirect_user(token: str):
 
 # Account related things
 @app.get("/auth/google") # Start Google OAuth flow
-def begin_google_oauth(session_id: str):
+async def begin_google_oauth(session_id: str):
     # global oauth_state
     # redirect_uri = f"{settings.GOOGLE_REDIRECT_URI}?session_id={session_id}"
     random_state_value = secrets.token_urlsafe(32)
@@ -115,14 +118,14 @@ def begin_google_oauth(session_id: str):
     auth_url, _ = oauth.create_authorization_url(
         'https://accounts.google.com/o/oauth2/v2/auth',
         state=random_state_value)
-    redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
+    await redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
     redirect_token = secrets.token_urlsafe(12)
-    redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
+    await redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
     redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
     return {"auth_url": redirect_url}
 
 @app.get("/auth/google/callback")
-def redirect_google_oauth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db), session_id: str = ""): 
+async def redirect_google_oauth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db), session_id: str = ""): 
     oauth = OAuth2Session(
         client_id=settings.GOOGLE_CLIENT_ID,
         redirect_uri=settings.GOOGLE_REDIRECT_URI,
@@ -139,9 +142,9 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
-    original_session_id = redis_client.get(f"oauth_state:{state}")
+    original_session_id = await redis_client.get(f"oauth_state:{state}")
     if original_session_id:
-        redis_client.delete(f"oauth_state:{state}")    
+        await redis_client.delete(f"oauth_state:{state}")    
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")
     if not original_session_id:
@@ -187,7 +190,7 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
     )
     if not original_session_id:
         raise HTTPException(status_code=400, detail="Invalid or expired state")
-    redis_client.setex(
+    await redis_client.setex(
     f"pending_auth:{original_session_id}",
     180,
     json.dumps({
@@ -212,7 +215,7 @@ def redirect_google_oauth(request: Request, code: str, state: Optional[str] = No
     # return {"message": "Google login successful", "jwt": user_jwt, "refresh": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
 @app.get("/auth/github") # Start Github OAuth flow
-def begin_github_auth(session_id: str):
+async def begin_github_auth(session_id: str):
     # global oauth_state
     random_state_value = secrets.token_urlsafe(32)
     oauth = OAuth2Session(
@@ -222,23 +225,23 @@ def begin_github_auth(session_id: str):
     auth_url, state = oauth.create_authorization_url(
         'https://github.com/login/oauth/authorize',
         state=random_state_value)
-    redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
+    await redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
     redirect_token = secrets.token_urlsafe(12)
-    redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
+    await redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
     redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
     return {"auth_url": redirect_url}
 
 @app.get("/auth/github/callback")
-def redirect_github_auth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db)): 
+async def redirect_github_auth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db)): 
     # global oauth_state
     oauth = OAuth2Session(
         client_id=settings.GITHUB_CLIENT_ID,
         redirect_uri=settings.GITHUB_REDIRECT_URI,
         state=state 
     )
-    original_session_id = redis_client.get(f"oauth_state:{state}")
+    original_session_id = await redis_client.get(f"oauth_state:{state}")
     if original_session_id:
-        redis_client.delete(f"oauth_state:{state}") 
+        await redis_client.delete(f"oauth_state:{state}") 
 
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")
@@ -300,7 +303,7 @@ def redirect_github_auth(request: Request, code: str, state: Optional[str] = Non
     )
     if not original_session_id:
         raise HTTPException(status_code=400, detail="Invalid or expired state")
-    redis_client.setex(
+    await redis_client.setex(
         f"pending_auth:{original_session_id}",
         180,
         json.dumps({
@@ -384,10 +387,18 @@ def logout_user(refresh_jwt: str, db: Session = Depends(get_db)):
     return {"message": "Logged out successfully"}
 
 @app.get("/auth/guest")
-def provide_pow_for_guest():
-    pass
+async def provide_pow_for_guest(request: Request): # GET a PoW in order to access guest credentials
+    nonce = secrets.token_hex(16)
+    await redis_client.setex(f"nonce:{request.client.host}",  # type: ignore
+                             60, 
+                             json.dumps({"nonce": nonce, "difficulty": 6, "timestamp": datetime.now(timezone.utc)}))
+    return JSONResponse({"nonce": nonce, "difficulty": 6, "timestamp": datetime.timestamp})
 
-# Change to use JWT
+@app.post("/auth/guest")
+async def check_and_provide_guest_cred(request: Request):
+    pass
+    
+
 @app.get("/auth/me") # Get user info
 async def user_info(current_user: User = Depends(get_current_user)): # Changed signature
     return {
@@ -402,8 +413,8 @@ async def user_info(current_user: User = Depends(get_current_user)): # Changed s
     }
 
 @app.get("/auth/check-status/{session_id}")
-def check_auth_status(session_id: str):
-    auth_data_raw = redis_client.get(f"pending_auth:{session_id}")
+async def check_auth_status(session_id: str):
+    auth_data_raw = await redis_client.get(f"pending_auth:{session_id}")
     if auth_data_raw:
         auth_data = json.loads(typing.cast(str, auth_data_raw))
         if auth_data.get("completed"):
@@ -415,7 +426,7 @@ def check_auth_status(session_id: str):
                 "access_exp": auth_data.get("access_exp"),
                 "refresh_exp": auth_data.get("refresh_exp")
             }
-            redis_client.delete(f"pending_auth:{session_id}")  # Clean up
+            await redis_client.delete(f"pending_auth:{session_id}")  # Clean up
             return result
         else:
             return {"status": "pending"}

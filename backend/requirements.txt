@@ -6,3 +6,4 @@ authlib
 python-jose[cryptography]
 starlette
 slowapi
+aioredis
