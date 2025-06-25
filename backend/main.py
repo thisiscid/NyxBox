@@ -68,7 +68,7 @@ class UserAgentFilter(BaseHTTPMiddleware):
             return JSONResponse(status_code=403, content={"detail": "Hit rate limit"})
         return await call_next(request)
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User | dict:
     credentials_exception = HTTPException(
         status_code=401,
         detail="Could not validate credentials",
@@ -85,7 +85,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
             raise credentials_exception
     except JWTError: # Handles expired tokens, invalid signatures, etc.
         raise credentials_exception
-    
+    if payload.get("is_guest", False):
+        return payload
     user = db.query(User).filter(User.id == user_id_from_payload).first()
     if user is None:
         raise credentials_exception
@@ -397,8 +398,8 @@ async def provide_pow_for_guest(request: Request): # GET a PoW in order to acces
     nonce = secrets.token_hex(16)
     challenge = {
         "nonce": nonce, 
-        "difficulty": 6, 
-        "timestamp": datetime.now(timezone.utc).isoformat()}
+        "difficulty": 6
+        }
     await redis_client.setex(f"nonce:{request.client.host}",  # type: ignore
                              60, 
                              json.dumps(challenge))
@@ -406,39 +407,53 @@ async def provide_pow_for_guest(request: Request): # GET a PoW in order to acces
 
 @app.post("/auth/guest")
 async def check_and_provide_guest_cred(request: Request, submission: PowSubmission):
+    ip = request.client.host # type: ignore
     nonce = str(submission.nonce)
     solution = str(submission.solution)
-    cached_challenge = json.loads(await redis_client.get(f"nonce:{request.client.host}")) # type: ignore
-    if nonce != cached_challenge["nonce"]:
-        raise HTTPException(403, detail="Invalid PoW")
-    if cached_challenge:
-        hash_input = (nonce + solution).encode()
-        digest = hashlib.sha256(hash_input).digest()
-        bit_str = ''.join(f"{byte:08b}" for byte in digest)
-        leading_zeros = len(bit_str) - len(bit_str.lstrip('0'))
-        if leading_zeros >= cached_challenge["difficulty"]:
-            #TODO: Implement JWT stuff here
-            jwt_params = {
-                "user_id": f"guest:{secrets.token_urlsafe(8)}",
-                "exp": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
-                "iat": datetime.now(timezone.utc).isoformat(),
-                "is_guest": True
-            }
-            if settings.JWT_SECRET:
-                jwt_response=jwt.encode(claims=jwt_params, key=settings.JWT_SECRET) # type: ignore
-            else:
-                raise HTTPException(500, detail="JWT_SECRET not configured")
-            await redis_client.setex(f"guest_access:{request.client.host}", timedelta(hours=2), jwt_response) # type: ignore
-            return JSONResponse({"jwt": jwt_response, "exp": jwt_params.get("exp", None)})
+
+    raw = await redis_client.get(f"nonce:{ip}")
+    if not raw:
+        raise HTTPException(403, detail="No active PoW challenge; please retry")
+    try:
+        cached_challenge = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(500, detail="Server error reading PoW challenge")
+    hash_input = (nonce + solution).encode()
+    digest = hashlib.sha256(hash_input).digest()
+    bit_str = ''.join(f"{byte:08b}" for byte in digest)
+    leading_zeros = len(bit_str) - len(bit_str.lstrip('0'))
+    if leading_zeros >= cached_challenge["difficulty"]:
+        #TODO: Implement JWT stuff here
+        guest_id = f"guest:{secrets.token_urlsafe(8)}"
+        jwt_params = {
+            "user_id": guest_id,
+            "iat": int(datetime.now(timezone.utc).timestamp()),
+            "exp": int((datetime.now(timezone.utc) + timedelta(hours=2)).timestamp()),
+            "is_guest": True # This is used to tell the client/backend "Hey! This is a guest user, limit their access"
+        }
+        if settings.JWT_SECRET:
+            jwt_response=jwt.encode(claims=jwt_params, key=settings.JWT_SECRET) # type: ignore
         else:
-            raise HTTPException(403, detail="Invalid PoW")
+            raise HTTPException(500, detail="JWT_SECRET not configured")
+        # await redis_client.setex(f"guest_access:{request.client.host}", timedelta(hours=2), jwt_response) # type: ignore
+        await redis_client.delete(f"nonce:{ip}")
+        return JSONResponse({
+            "access_token": jwt_response,
+            "guest_id":     guest_id,
+            "access_exp":   jwt_params["exp"] 
+        })
+
     else:
-        raise HTTPException(403, detail="Invalid request")
+        raise HTTPException(403, detail="Invalid PoW")
+
 
     
 
 @app.get("/auth/me") # Get user info
 async def user_info(current_user: User = Depends(get_current_user)): # Changed signature
+    if isinstance(current_user, dict):
+        if current_user.get("is_guest", False):
+            raise HTTPException(403, detail="Invalid token")
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -492,6 +507,11 @@ def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_
     # We dont need to evaluate code locally bcs:
     # 1. We already have the user evaluate code
     # 2. It's very hard to secure
+    if isinstance(current_user, dict):
+        if current_user.get("is_guest", False):
+            raise HTTPException(403, detail="Invalid token")
+    # if current_user.get("is_guest", False): This will likely fail trying to invoke a dict method on a non-dict class if it is returned
+    #     raise HTTPException(403, detail="Invalid token")
     chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
     if not chall:
         raise HTTPException(404, detail="No such challenge")
@@ -516,6 +536,9 @@ def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_
 # I forgot but we probably should authenticate to prevent mass spam?
 @app.post("/challenges/{chall_id}/like")
 def like_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if isinstance(current_user, dict):
+        if current_user.get("is_guest", False):
+            raise HTTPException(403, detail="Invalid token")
     chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
     if not chall:
         raise HTTPException(404, detail="No such challenge")
@@ -538,6 +561,9 @@ def like_challenge(chall_id: int, current_user: User = Depends(get_current_user)
 
 @app.delete("/challenges/{chall_id}/unlike")
 def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if isinstance(current_user, dict):
+        if current_user.get("is_guest", False):
+            raise HTTPException(403, detail="Invalid token")
     chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
     if not chall:
         raise HTTPException(404, detail="No such challenge")

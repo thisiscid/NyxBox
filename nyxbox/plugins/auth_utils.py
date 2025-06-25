@@ -299,6 +299,11 @@ class LoginPage(ModalScreen):
                     #     f.write(f"ERROR: {e}\n")
                     return 
                 jwt_response = result["jwt"]
+                # We should have special handling. Why don't we write it to a special file?
+                auth_dir = pathlib.Path.home() / ".nyxbox"
+                auth_dir.mkdir(exist_ok=True)
+                with open(auth_dir / "guest.json", "w") as file:
+                    json.dump({"access_token": jwt_response}, file)
                 # self.app.guest = True
 
     def action_quit(self):
