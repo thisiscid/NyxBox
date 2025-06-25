@@ -87,4 +87,3 @@ class Submission(Base):
     code = Column(String)
     result = Column(String)  # e.g., "passed", "failed"
     submitted_at = Column(DateTime, default=datetime.now(timezone.utc))
-

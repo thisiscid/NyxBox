@@ -23,6 +23,7 @@ from jose import JWTError, jwt
 from models import Challenges, User, UserLike, UserSolve
 from schemas import ChallengeDetailSchema, ChallengeListItemSchema, RefreshTokensRequest
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 
 # oauth_state = {}
@@ -43,6 +44,11 @@ TIME_WINDOW = 60
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+#Pydantic stuff
+class PowSubmission(BaseModel):
+    nonce: str
+    solution: int
 
 # Filters out user agents EXCEPT if the user is accessing a static page that they need to access for authsla
 class UserAgentFilter(BaseHTTPMiddleware):
@@ -389,14 +395,46 @@ def logout_user(refresh_jwt: str, db: Session = Depends(get_db)):
 @app.get("/auth/guest")
 async def provide_pow_for_guest(request: Request): # GET a PoW in order to access guest credentials
     nonce = secrets.token_hex(16)
+    challenge = {
+        "nonce": nonce, 
+        "difficulty": 6, 
+        "timestamp": datetime.now(timezone.utc).isoformat()}
     await redis_client.setex(f"nonce:{request.client.host}",  # type: ignore
                              60, 
-                             json.dumps({"nonce": nonce, "difficulty": 6, "timestamp": datetime.now(timezone.utc)}))
-    return JSONResponse({"nonce": nonce, "difficulty": 6, "timestamp": datetime.timestamp})
+                             json.dumps(challenge))
+    return JSONResponse(challenge)
 
 @app.post("/auth/guest")
-async def check_and_provide_guest_cred(request: Request):
-    pass
+async def check_and_provide_guest_cred(request: Request, submission: PowSubmission):
+    nonce = str(submission.nonce)
+    solution = str(submission.solution)
+    cached_challenge = json.loads(await redis_client.get(f"nonce:{request.client.host}")) # type: ignore
+    if nonce != cached_challenge["nonce"]:
+        raise HTTPException(403, detail="Invalid PoW")
+    if cached_challenge:
+        hash_input = (nonce + solution).encode()
+        digest = hashlib.sha256(hash_input).digest()
+        bit_str = ''.join(f"{byte:08b}" for byte in digest)
+        leading_zeros = len(bit_str) - len(bit_str.lstrip('0'))
+        if leading_zeros >= cached_challenge["difficulty"]:
+            #TODO: Implement JWT stuff here
+            jwt_params = {
+                "user_id": f"guest:{secrets.token_urlsafe(8)}",
+                "exp": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+                "iat": datetime.now(timezone.utc).isoformat(),
+                "is_guest": True
+            }
+            if settings.JWT_SECRET:
+                jwt_response=jwt.encode(claims=jwt_params, key=settings.JWT_SECRET) # type: ignore
+            else:
+                raise HTTPException(500, detail="JWT_SECRET not configured")
+            await redis_client.setex(f"guest_access:{request.client.host}", timedelta(hours=2), jwt_response) # type: ignore
+            return JSONResponse({"jwt": jwt_response, "exp": jwt_params.get("exp", None)})
+        else:
+            raise HTTPException(403, detail="Invalid PoW")
+    else:
+        raise HTTPException(403, detail="Invalid request")
+
     
 
 @app.get("/auth/me") # Get user info

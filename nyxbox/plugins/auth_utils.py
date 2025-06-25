@@ -16,6 +16,7 @@ import qrcode
 from rich_pixels import Pixels
 import os
 from .utils import create_log, return_log_path, DAEMON_USER, SERVER_URL, USER_AGENT
+import hashlib
 
 # Screens used to actually auth a user
 def make_qr_pixels(data: str) -> Pixels | None:
@@ -150,6 +151,8 @@ class LoginPage(ModalScreen):
     def on_mount(self):
         self.is_login = False
         self.session_id = secrets.token_hex(16)
+        self.brute_forcing = True
+    
     def compose(self) -> ComposeResult:
         with Vertical(id="login_screen"):
             yield Label(f"{DAEMON_USER} Heya, welcome back!\n{DAEMON_USER} Click a button to sign in \n(preferably with the same account as last time!)", id="log_quit_text")
@@ -251,7 +254,53 @@ class LoginPage(ModalScreen):
                 # We should create dummy information that CAN be used to retrieve info from the server
                 # However, we should also make sure that account expires? 
                 # implement the endpoint first acc
-                pass
+                try:
+                    data=requests.get(f"{SERVER_URL}/auth/guest", headers={"User-Agent": USER_AGENT}).json()
+                except Exception as e:
+                    self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds!",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    )
+                    log_dir = pathlib.Path.home() / ".nyxbox"
+                    log_dir.mkdir(exist_ok=True)
+                    create_log(return_log_path(), severity = "error", message=e)
+                    # log_path = log_dir / "login.log"
+                    # with log_path.open("a") as f:
+                    #     f.write(f"ERROR: {e}\n")
+                    return
+                i=0
+                while self.brute_forcing:
+                    attempt=hashlib.sha256((data["nonce"] + str(i)).encode()).digest()
+                    bit_str = ''.join(f"{byte:08b}" for byte in attempt)
+                    leading_zeros = len(bit_str) - len(bit_str.lstrip('0'))
+                    if leading_zeros < data["difficulty"]:
+                        i+=1
+                    else:
+                        self.brute_forcing = False
+                        break
+                try:
+                    result=requests.post(f"{SERVER_URL}/auth/guest", json={"nonce": data["nonce"], "solution": i}, headers={"User-Agent": USER_AGENT}).json()
+                except Exception as e:
+                    self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds!",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    )
+                    log_dir = pathlib.Path.home() / ".nyxbox"
+                    log_dir.mkdir(exist_ok=True)
+                    create_log(return_log_path(), severity = "error", message=e)
+                    # log_path = log_dir / "login.log"
+                    # with log_path.open("a") as f:
+                    #     f.write(f"ERROR: {e}\n")
+                    return 
+                jwt_response = result["jwt"]
+                # self.app.guest = True
+
     def action_quit(self):
         self.app.exit()
 

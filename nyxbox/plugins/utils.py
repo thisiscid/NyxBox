@@ -80,6 +80,7 @@ def return_log_path() -> pathlib.Path:
     log_dir.mkdir(exist_ok=True)
     log_path = pathlib.Path.joinpath(log_dir, f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log")
     return log_path
+
 def make_qr_pixels(data: str) -> Pixels | None:
     """
     Generates a QR code for the given data and returns it as a rich_pixels.Pixels object.
