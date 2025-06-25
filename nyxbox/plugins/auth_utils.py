@@ -245,6 +245,10 @@ class LoginPage(ModalScreen):
                             timeout=5,
                             markup=True
                         )
+                        log_dir = pathlib.Path.home() / ".nyxbox"
+                        log_dir.mkdir(exist_ok=True)
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        return
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",
@@ -277,14 +281,19 @@ class LoginPage(ModalScreen):
                 # implement the endpoint first acc
                 try:
                     data=requests.get(f"{SERVER_URL}/auth/guest", headers={"User-Agent": USER_AGENT}).json()
-                    if data.get("detail") is not None:
+                    if data.get("detail", None):
                         self.notify(
-                        title="Uh oh, something went wrong!",
-                        message=f"{DAEMON_USER} [b]There was a backend error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds or contact Rainger on slack!",
-                        severity="error",
-                        timeout=5,
-                        markup=True
-                    )
+                            title="Uh oh, something went wrong!",
+                            message=f"{DAEMON_USER} [b]There was a backend error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds or contact Rainger on slack!",
+                            severity="error",
+                            timeout=5,
+                            markup=True
+                        )
+                        log_dir = pathlib.Path.home() / ".nyxbox"
+                        log_dir.mkdir(exist_ok=True)
+                        # log_path = log_dir / "login.log"
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        return
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",

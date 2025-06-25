@@ -341,6 +341,119 @@ async def redirect_github_auth(request: Request, code: str, state: Optional[str]
 # ...existing code...
     # return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 
+#TODO: Change these to use slack oauth
+@app.get("/auth/slack") # Start Slack OAuth flow
+async def begin_slack_auth(session_id: str):
+    # global oauth_state
+    random_state_value = secrets.token_urlsafe(32)
+    oauth = OAuth2Session(
+        client_id=settings.GITHUB_CLIENT_ID,
+        redirect_uri=settings.GITHUB_REDIRECT_URI,
+        scope=['user:email', 'user:user'])
+    auth_url, state = oauth.create_authorization_url(
+        'https://github.com/login/oauth/authorize',
+        state=random_state_value)
+    await redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
+    redirect_token = secrets.token_urlsafe(12)
+    await redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
+    redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
+    return {"auth_url": redirect_url}
+
+@app.get("/auth/slack/callback")
+async def redirect_slack_auth(request: Request, code: str, state: Optional[str] = None, db: Session = Depends(get_db)): 
+    oauth = OAuth2Session(
+        client_id=settings.GITHUB_CLIENT_ID,
+        redirect_uri=settings.GITHUB_REDIRECT_URI,
+        state=state 
+    )
+    original_session_id = await redis_client.get(f"oauth_state:{state}")
+    if original_session_id:
+        await redis_client.delete(f"oauth_state:{state}") 
+
+    if not state:
+        raise HTTPException(status_code=400, detail="State parameter missing from callback")
+    if not original_session_id:
+        raise HTTPException(status_code=400, 
+        detail="Invalid or expired state")
+    try:
+        # DO NOT REMOVE, THIS ACTUALLY DOES SOMETHING
+        token = oauth.fetch_token(  # noqa: F841
+            'https://github.com/login/oauth/access_token',
+            client_secret=settings.GITHUB_CLIENT_SECRET,
+            authorization_response=str(request.url)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch token: {str(e)}")
+    #Get user info from Github
+    try:
+        user_info_resp = oauth.get('https://api.github.com/user')
+        user_info_resp.raise_for_status() 
+        user_info = user_info_resp.json()
+        email_resp = oauth.get('https://api.github.com/user/emails')
+        email_resp.raise_for_status()
+        emails = email_resp.json()
+        primary_email = next((email['email'] for email in emails if email['primary']), None)
+        user_info['email'] = primary_email
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch user info: {str(e)}")
+    refresh_jwt=str(secrets.token_hex(32))
+    refresh_jwt_expiry = datetime.now(timezone.utc) + timedelta(days=30)
+    existing_user = db.query(User).filter(
+        (User.github_id == str(user_info['id'])) | 
+        (User.email == user_info['email'])
+    ).first()
+    if existing_user:
+        if existing_user.github_id is None:
+            setattr(existing_user, 'github_id', str(user_info['id']))
+            db.commit()
+        user = existing_user
+        user.refresh_jwt=refresh_jwt # type: ignore
+        user.refresh_jwt_expiry = refresh_jwt_expiry # type: ignore
+        db.commit()
+    else:
+        user = User(
+            email=user_info['email'],
+            name=user_info.get('name') or user_info['login'],  
+            github_id=str(user_info['id']),
+            refresh_jwt=refresh_jwt,
+            refresh_jwt_expiry=datetime.now(timezone.utc) + timedelta(days=30)
+        )
+        db.add(user)       # Add to database
+        db.commit()        # Save changes
+        db.refresh(user)
+    if not settings.JWT_SECRET:
+        raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
+    user_expiry = datetime.now(timezone.utc)+timedelta(hours=1)
+    user_jwt=jwt.encode(
+        claims={"user_id": user.id, "exp": user_expiry, "iat": datetime.now(timezone.utc)},
+        key=settings.JWT_SECRET
+    )
+    if not original_session_id:
+        raise HTTPException(status_code=400, detail="Invalid or expired state")
+    await redis_client.setex(
+        f"pending_auth:{original_session_id}",
+        180,
+        json.dumps({
+            "completed": True,
+            "access_token": user_jwt,
+            "refresh_token": refresh_jwt,
+            "user_data": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email
+            },
+            "access_exp": user_expiry.isoformat(),
+            "refresh_exp": refresh_jwt_expiry.isoformat()
+            
+        })
+    )
+    #TODO: Switch this over to the file
+    html_path = os.path.join(os.path.dirname(__file__), "static", "auth_complete.html")
+    with open(html_path, "r") as f:
+        html_content = f.read()
+    return HTMLResponse(html_content)  # noqa: F541
+# ...existing code...
+    # return {"message": "Github login successful", "jwt": user_jwt, "refresh_jwt": refresh_jwt, "id": user.id, "name": user.name, "email": user.email}
 #TODO: Update these params
 #I think thats done
 @app.post("/auth/refresh") # To get a new JWT with a valid refresh jwt
