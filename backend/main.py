@@ -7,10 +7,12 @@ import typing
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import requests
 
 # Third party libs
 # import redis
 import redis.asyncio as redis
+from redis.exceptions import RedisError # We're going to implement a function that allows funcs to retrieve safely
 from authlib.integrations.requests_client import OAuth2Session
 from config import settings
 from database import create_tables, get_db
@@ -38,12 +40,13 @@ ALLOWED_PATHS = ["/",
                  "/redirect",
                  ]
 
-RATE_LIMIT = 5
+RATE_LIMIT = 15
 TIME_WINDOW = 60
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+        
 
 #Pydantic stuff
 class PowSubmission(BaseModel):
@@ -54,10 +57,10 @@ class PowSubmission(BaseModel):
 class UserAgentFilter(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        ip = request.client.host  # type: ignore
-        user_agent = request.headers.get("User-Agent", "").strip()
         if path.startswith("/static/") or path in ALLOWED_PATHS:
             return await call_next(request)
+        ip = request.client.host  # type: ignore
+        user_agent = request.headers.get("User-Agent", "").strip()
         if not user_agent.startswith(ALLOWED_UA_PREFIX):
             return JSONResponse(status_code=403, content={"detail": "Invalid User-Agent"})
         key = f"ip:{ip}"
@@ -595,6 +598,29 @@ def return_index_page():
     with open("static/index.html") as f:
         html_data = f.read()
     return HTMLResponse(html_data)
+
+@app.exception_handler(RedisError) # Error handling for RedisError
+async def redis_unavailable(request, exc):
+    requests.post(json={"text":"check redis! sm went wrong"}, headers=["Content-type: application/json"], url=settings.SLACK_WEBHOOK_URL) # type:ignore
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Service temporarily unavailable"},
+    )
+
+# Misc Functions
+@app.exception_handler(Exception)
+def test_except_func(*args):
+    requests.post(json={"text":"yo something has gone really wrong with redis"}, headers={"Content-type": "application/json"}, url=settings.SLACK_WEBHOOK_URL) # type:ignore
+
+# def create_log(path, severity, message):
+#     with open(path, 'a') as f:
+#         if severity == "error":
+#             f.write(f"{datetime.now().isoformat()} ERROR: {message}\n")
+#             requests.post(json={"text":"Hello, World!"}, headers=["Content-type: application/json"], url=settings.SLACK_WEBHOOK_URL) # type:ignore
+#         elif severity == "warning":
+#             f.write(f"{datetime.now().isoformat()} WARNING: {message}\n")
+#         else:
+#             f.write(f"{datetime.now().isoformat()} INFO: {message}\n")
 
 app.mount(
     "/static",
