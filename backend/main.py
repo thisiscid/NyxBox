@@ -28,6 +28,7 @@ from schemas import ChallengeDetailSchema, ChallengeListItemSchema, RefreshToken
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import httpx
+# import slack
 
 
 # oauth_state = {}
@@ -601,36 +602,55 @@ def return_index_page():
         html_data = f.read()
     return HTMLResponse(html_data)
 
-#TODO: Make this actually send via dms instead of via the private channel because if we expose user info thats not muy bien...
-@app.exception_handler(RedisError) # Error handling for RedisError
-async def redis_unavailable(request, exc):
-    requests.post(json={"text":"check redis! sm went wrong"}, headers=["Content-type: application/json"], url=settings.SLACK_WEBHOOK_URL) # type:ignore
-    return JSONResponse(
-        status_code=503,
-        content={"detail": "Service temporarily unavailable"},
-    )
+# #TODO: Make this actually send via dms instead of via the private channel because if we expose user info thats not muy bien...
+# @app.exception_handler(RedisError) # Error handling for RedisError
+# async def redis_unavailable(request, exc):
+#     requests.post(json={"text":"check redis! sm went wrong"}, headers=["Content-type: application/json"], url=settings.SLACK_WEBHOOK_URL) # type:ignore
+#     return JSONResponse(
+#         status_code=503,
+#         content={"detail": "Service temporarily unavailable"},
+#     ) This should actually already be caught by the general exception handler
 
 # Misc Functions
 @app.exception_handler(Exception)
 async def all_exception_handler(request: Request, exc: Exception):    
-    # We ought to make this better
-    # requests.post(json={"text": f"A critical error occured! Details: "})
     hostname = socket.gethostname()
-    ip_address = socket.gethostbyname(hostname)
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
+        ip_address = socket.gethostbyname(hostname)
+    except socket.gaierror:
+        ip_address = "127.0.0.1"
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+        except Exception:
+            ip = "127.0.0.1"
+    try:
+        client = request.client
+        if request.client:
+            inbound_ip = request.client.host
+        else:
+            inbound_ip = "N/A"
     except Exception:
-        ip = '127.0.0.1'
-    finally:
-        s.close()
+        inbound_ip = "N/A"
     async with httpx.AsyncClient() as client:
         await client.post(
-            url=settings.SLACK_WEBHOOK_URL, #type:ignore
-            json={"text": f"A critical error occurred in the app!\nHost: {ip_address}:{hostname}\nOutgoing IP: {ip}\nError: {exc}"},
+            url=settings.SLACK_DMS_WEBHOOK_URL, # type: ignore
+            json={"text": f"A critical error occurred in the app!\nHost: {ip_address}:{hostname}\nOutgoing IP: {ip}\nCalled by: {inbound_ip}\nInvoked on endpoint: {request.url}\nInvoked by: {type(exc).__name__}.{type(exc).__module__}\nError: {exc}"},
             headers={"Content-type": "application/json"}
         )
+        await client.post(
+            url=settings.SLACK_CHANNEL_WEBHOOK_URL, # type: ignore
+            json={"text": "A critical error occurred in the app! Check DMs"},
+            headers={"Content-type": "application/json"}
+        )
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+        # await client.post(
+        #     url=settings.SLACK_CHANNEL_WEBHOOK_URL, # type: ignore
+        #     json={"text": f"A critical error has occured on NyxBox at {hostname}"},
+        #     headers={"Content-type": "application/json"}
+        # )
+    # raise exc
     # await httpx.post(json={"text": f"A critical error occured in the app!\nHost: {ip_address}:{hostname}\nOutgoing IP: {ip}\nError: {exc}"}, headers={"Content-type": "application/json"}, url=settings.SLACK_WEBHOOK_URL) # type:ignore
 
 # def create_log(path, severity, message):

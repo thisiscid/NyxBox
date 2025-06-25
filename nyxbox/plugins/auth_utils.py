@@ -195,10 +195,23 @@ class LoginPage(ModalScreen):
             case 'google_button':
                 try:
                     data=requests.get(f"{SERVER_URL}/auth/google?session_id={self.session_id}", headers={ "User-Agent": USER_AGENT }).json()
+                    if data.get("detail", None):
+                        self.notify(
+                            title="Uh oh, something went wrong!",
+                            message=f"{DAEMON_USER} [b]There was a backend error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds or contact Rainger on slack!",
+                            severity="error",
+                            timeout=5,
+                            markup=True
+                        )
+                        log_dir = pathlib.Path.home() / ".nyxbox"
+                        log_dir.mkdir(exist_ok=True)
+                        # log_path = log_dir / "login.log"
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        return
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",
-                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds!",
                         severity="error",
                         timeout=5,
                         markup=True
@@ -224,10 +237,18 @@ class LoginPage(ModalScreen):
             case 'github_button':
                 try:
                     data=requests.get(f"{SERVER_URL}/auth/github?session_id={self.session_id}", headers={ "User-Agent": USER_AGENT }).json()
+                    if data.get("detail", None):
+                        self.notify(
+                            title="Uh oh, something went wrong!",
+                            message=f"{DAEMON_USER} [b]There was a backend error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds or contact Rainger on slack!",
+                            severity="error",
+                            timeout=5,
+                            markup=True
+                        )
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",
-                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to login.log in ~/.nyxbox[/b]. Try again in a few seconds!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds!",
                         severity="error",
                         timeout=5,
                         markup=True
@@ -256,6 +277,14 @@ class LoginPage(ModalScreen):
                 # implement the endpoint first acc
                 try:
                     data=requests.get(f"{SERVER_URL}/auth/guest", headers={"User-Agent": USER_AGENT}).json()
+                    if data.get("detail") is not None:
+                        self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was a backend error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds or contact Rainger on slack!",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    )
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",

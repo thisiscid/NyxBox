@@ -8,3 +8,4 @@ starlette
 slowapi
 aioredis
 httpx
+slack_sdk

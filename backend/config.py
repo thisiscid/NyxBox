@@ -13,6 +13,7 @@ class Settings:
     JWT_SECRET = os.getenv("JWT_SECRET")
     DATABASE_URL = os.getenv("DATABASE_URL")
     API_BASE_URL = os.getenv("API_BASE_URL")
-    SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
+    SLACK_CHANNEL_WEBHOOK_URL = os.getenv("SLACK_CHANNEL_WEBHOOK_URL")
+    SLACK_DMS_WEBHOOK_URL = os.getenv("SLACK_DMS_WEBHOOK_URL")
 
 settings = Settings()
