@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import requests
+import socket
 
 # Third party libs
 # import redis
@@ -26,6 +27,7 @@ from models import Challenges, User, UserLike, UserSolve
 from schemas import ChallengeDetailSchema, ChallengeListItemSchema, RefreshTokensRequest
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import httpx
 
 
 # oauth_state = {}
@@ -599,6 +601,7 @@ def return_index_page():
         html_data = f.read()
     return HTMLResponse(html_data)
 
+#TODO: Make this actually send via dms instead of via the private channel because if we expose user info thats not muy bien...
 @app.exception_handler(RedisError) # Error handling for RedisError
 async def redis_unavailable(request, exc):
     requests.post(json={"text":"check redis! sm went wrong"}, headers=["Content-type: application/json"], url=settings.SLACK_WEBHOOK_URL) # type:ignore
@@ -609,8 +612,26 @@ async def redis_unavailable(request, exc):
 
 # Misc Functions
 @app.exception_handler(Exception)
-def test_except_func(*args):
-    requests.post(json={"text":"yo something has gone really wrong with redis"}, headers={"Content-type": "application/json"}, url=settings.SLACK_WEBHOOK_URL) # type:ignore
+async def all_exception_handler(request: Request, exc: Exception):    
+    # We ought to make this better
+    # requests.post(json={"text": f"A critical error occured! Details: "})
+    hostname = socket.gethostname()
+    ip_address = socket.gethostbyname(hostname)
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            url=settings.SLACK_WEBHOOK_URL, #type:ignore
+            json={"text": f"A critical error occurred in the app!\nHost: {ip_address}:{hostname}\nOutgoing IP: {ip}\nError: {exc}"},
+            headers={"Content-type": "application/json"}
+        )
+    # await httpx.post(json={"text": f"A critical error occured in the app!\nHost: {ip_address}:{hostname}\nOutgoing IP: {ip}\nError: {exc}"}, headers={"Content-type": "application/json"}, url=settings.SLACK_WEBHOOK_URL) # type:ignore
 
 # def create_log(path, severity, message):
 #     with open(path, 'a') as f:
