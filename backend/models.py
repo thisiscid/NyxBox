@@ -19,6 +19,7 @@ class User(Base):
     name = Column(String, nullable=False)
     google_id = Column(String, unique=True)
     github_id = Column(String, unique=True)
+    slack_id = Column(String, unique=True)
     avatar_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     refresh_jwt = Column(String, unique=True)
