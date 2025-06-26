@@ -47,11 +47,9 @@ ALLOWED_PATHS = ["/",
 
 RATE_LIMIT = 15
 TIME_WINDOW = 60
-
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-        
 
 #Pydantic stuff
 class PowSubmission(BaseModel):
@@ -350,17 +348,17 @@ async def begin_slack_auth(session_id: str):
         client_id=settings.SLACK_CLIENT_ID,
         client_secret=settings.SLACK_CLIENT_SECRET,
         redirect_uri=settings.SLACK_REDIRECT_URI,
-        state=random_state_value,
+        state=session_id,
         scope=["openid","email","profile"],
         token_endpoint_auth_method="client_secret_post",
     )
     auth_url, state = oauth.create_authorization_url(
         'https://slack.com/openid/connect/authorize',
-        state=random_state_value)
+        state=session_id)
     await redis_client.setex(f"oauth_state:{random_state_value}", 120, session_id)
-    redirect_token = secrets.token_urlsafe(12)
-    await redis_client.setex(f"redirect_url:{redirect_token}", 180, auth_url)
-    redirect_url = f"{settings.API_BASE_URL}/redirect?token={redirect_token}"
+    # redirect_token = secrets.token_urlsafe(12)
+    await redis_client.setex(f"redirect_url:{session_id}", 180, auth_url)
+    redirect_url = f"{settings.API_BASE_URL}/redirect?token={session_id}"
     return {"auth_url": redirect_url}
 
 @app.get("/auth/slack/callback")
@@ -370,9 +368,10 @@ async def redirect_slack_auth(request: Request, code: str, state: Optional[str] 
         redirect_uri=settings.SLACK_REDIRECT_URI,
         state=state 
     )
-    original_session_id = await redis_client.get(f"oauth_state:{state}")
+    # original_session_id = await redis_client.get(f"oauth_state:{state}")
+    original_session_id = state
     if original_session_id:
-        await redis_client.delete(f"oauth_state:{state}") 
+        await redis_client.delete(f"oauth_state:{original_session_id}") 
 
     if not state:
         raise HTTPException(status_code=400, detail="State parameter missing from callback")

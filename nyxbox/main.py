@@ -404,12 +404,12 @@ def main():
     if "--version" in sys.argv:
         print(f"NyxBox {nyxbox_version}")
         return
-    elif "--test-login" in sys.argv: # TODO: REMOVE FOR PROD
-        try:
-            os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "auth.json"))
-            os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "user.json"))
-        except Exception as e:
-            print(f"{datetime.today().strftime('%Y-%m-%d')} ERROR: {str(e)}")
+    # elif "--test-login" in sys.argv:
+    #     try:
+    #         os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "auth.json"))
+    #         os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "user.json"))
+    #     except Exception as e:
+    #         print(f"{datetime.today().strftime('%Y-%m-%d')} ERROR: {str(e)}")
     app = NyxBox()
     app.run()
 
