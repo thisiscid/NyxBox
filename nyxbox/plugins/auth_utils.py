@@ -280,6 +280,47 @@ class LoginPage(ModalScreen):
                         self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
                 else:
                     self.app.push_screen(WaitingForAuthScreen(self.session_id))
+            case 'slack_button':
+                try:
+                    data=requests.get(f"{SERVER_URL}/auth/slack?session_id={self.session_id}", headers={ "User-Agent": USER_AGENT }).json()
+                    if data.get("detail", None):
+                        self.notify(
+                            title="Uh oh, something went wrong!",
+                            message=f"{DAEMON_USER} [b]There was a backend error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds or contact Rainger on slack!",
+                            severity="error",
+                            timeout=5,
+                            markup=True
+                        )
+                        log_dir = pathlib.Path.home() / ".nyxbox"
+                        log_dir.mkdir(exist_ok=True)
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        return
+                except Exception as e:
+                    self.notify(
+                        title="Uh oh, something went wrong!",
+                        message=f"{DAEMON_USER} [b]There was an error! Error has been written to nyxbox-{datetime.today().strftime('%Y-%m-%d')}.log in ~/.nyxbox[/b]. Try again in a few seconds!",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    )
+                    log_dir = pathlib.Path.home() / ".nyxbox"
+                    log_dir.mkdir(exist_ok=True)
+                    create_log(return_log_path(), severity = "error", message=e)
+                    # log_path = log_dir / "login.log"
+                    # with log_path.open("a") as f:
+                    #     f.write(f"ERROR: {e}\n")
+                    return
+                slack_link = data.get("auth_url")
+                state=webbrowser.open(slack_link)
+                if not state or os.environ.get("CODESPACES"): # Simplified condition
+                    qr_pixels_obj = make_qr_pixels(slack_link)
+                    if qr_pixels_obj:
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, True, qr_pixels_obj)) # type: ignore
+                    else:
+                        self.notify(title="QR Error", message="Could not generate QR code.", severity="error")
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
+                else:
+                    self.app.push_screen(WaitingForAuthScreen(self.session_id))
             case 'guest_button':
                 # We should create dummy information that CAN be used to retrieve info from the server
                 # However, we should also make sure that account expires? 
@@ -314,6 +355,8 @@ class LoginPage(ModalScreen):
                     # with log_path.open("a") as f:
                     #     f.write(f"ERROR: {e}\n")
                     return
+                # PoW stuff (probably the worst way I could've done it, maybe concurrency? idk)
+                #TODO: Concurrency
                 i=0
                 while self.brute_forcing:
                     attempt=hashlib.sha256((data["nonce"] + str(i)).encode()).digest()
