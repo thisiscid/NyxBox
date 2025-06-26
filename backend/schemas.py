@@ -18,17 +18,22 @@ class ChallengeListItemSchema(BaseModel):
     name: str
     difficulty: Optional[str] = None
     description: str
+    function_name: str
+    params: List[str]
+    tests: List[dict]
     tags: Optional[List[str]] = None
     created_at: datetime
     points: Optional[int] = None
     solves: Optional[int] = None
     likes: Optional[int] = None
-    author: Optional[ChallengeAuthorSchema] = None # Will be null if not implemented
+    # author: Optional[ChallengeAuthorSchema] = None # Will be null if not implemented
 
     class Config:
         from_attributes = True
 
 # Probably unneded
+# This actually sucks, we are just going to return everything in a list
+# We shouldn't need to get per challenge, just return the challenges at once
 class ChallengeDetailSchema(ChallengeListItemSchema): # Inherits from ListItem
     # description: Optional[str] = None
     updated_at: datetime

@@ -8,7 +8,6 @@ import re
 import requests
 import secrets
 import webbrowser
-# import qrcode
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
@@ -24,6 +23,8 @@ from textual.message import Message
 from importlib.resources import files
 from importlib.metadata import version, PackageNotFoundError
 from datetime import datetime
+import httpx
+
 #TODO: Make sure the auth flow works since we're importing from a diff file
 try:
     nyxbox_version = version("nyxbox")
@@ -107,7 +108,8 @@ class SearchForProblem(Screen):
         terminal_width = self.app.size.width
         reserved_space = 45
         available_description_space = max(20, terminal_width - reserved_space)
-        
+        #TODO: Change this to be caching the files with a POST 
+        #TODO: Wait, actually, we can implement caching on launch and just pass it to screens as necessary
         for file in files_list:
             file_dict = self.grab_metadata(file)
             name = file_dict.get("name") or ""
@@ -117,17 +119,14 @@ class SearchForProblem(Screen):
                 truncated_description = description[:available_description_space-3] + "..."
             else:
                 truncated_description = description
-#             
             challenges.add_row(name, truncated_description, difficulty)
-            # rows.append((str(name).title(), str(description), str(difficulty)))
         self.refresh()
         
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical():
             yield Input(placeholder="Search...", id="search_bar")
-            # self.challenges = DataTable(id="chall_list")
-            # self.challenges.loading=True
+
             yield DataTable(id="chall_list", cursor_type="row")
             self.challenge_widget = challenge_view.UserChallView()
             self.challenge_widget.id = "challengeview"
@@ -217,30 +216,17 @@ class NyxBox(App):
     CHALLENGE_VIEW_ID = "challengeview"
     EDITOR_ID = "editor"
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         """Initialize variables to be used later and other stuff"""
         self.editor_opened = False
         self.has_vended = False
         self.current_challenge = None
         self.nyx_path = pathlib.Path.home() / ".nyxbox"
         self.guest = False
-        try: #TODO: Implement checking for 1. if JWT expired, 2. if refresh token is expired, 3. force reauth if both of those two are met
-            # I think the above is done
+        self.challs = [] # We just initalize this, we assign later
+        try: # this should pull up the auth info and if it doesn't work we force login
             auth_validator = ValidateAuth(self, self.nyx_path)
             self.run_worker(auth_validator.perform_auth_check(), exclusive=True)
-            # if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / "auth.json"):
-            #     nyx_path = pathlib.Path.home() / ".nyxbox"
-            #     auth_path = nyx_path / "auth.json"
-            #     user_path = nyx_path / "user.json"
-            #     with open(auth_path) as f:
-            #         self.auth_data = json.load(f)
-            #     with open(user_path) as f:
-            #         self.user_data = json.load(f)
-            #     self.notify(
-            #     f"{DAEMON_USER} Welcome, {self.user_data.get('name', 'User')}!", 
-            #     severity="information")
-            # else:
-            #     self.app.push_screen(LoginPage()) 
         except Exception as e:
             log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
             if log:
@@ -284,6 +270,33 @@ class NyxBox(App):
                     markup=True
                 )
             self.app.push_screen(LoginPage())
+        try: # We're going to use this as our "pull and set challenges, then cache"
+            challenge_dir = self.nyx_path / "cache"
+            if pathlib.Path.exists(self.nyx_path / "cache"):
+                for file_path in challenge_dir.iterdir():
+                    if not file_path.is_file():
+                        continue
+                    else:
+                        try:
+                            with open(file_path, 'r') as file:
+                                self.challs.append(json.load(file))
+                        except (json.JSONDecodeError, OSError) as e:
+                            create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=f"Skipping {file_path.name}: {e}")
+            else:
+                challenge_dir.mkdir(parents=True, exist_ok=True)
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.get(f"{SERVER_URL}/challenges", )
+                    pass
+        except Exception as e:
+            self.notify(
+                    title="Uh oh!",
+                    message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {e}[/b]",
+                    severity="information",
+                    timeout=5,
+                    markup=True
+                )
+            create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+
     
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""

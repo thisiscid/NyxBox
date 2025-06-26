@@ -46,6 +46,7 @@ ALLOWED_PATHS = ["/",
                  ]
 
 RATE_LIMIT = 15
+POLLING_RATE_LIMIT = 60 # Client sends 1 req/min so if they send more than that something is probably wrong af
 TIME_WINDOW = 60
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
@@ -70,6 +71,9 @@ class UserAgentFilter(BaseHTTPMiddleware):
         count = await redis_client.incr(key)
         if count == 1:
             await redis_client.expire(key, 60)
+        if path.startswith("/auth/check-status/"):
+            if count >= POLLING_RATE_LIMIT:
+                return JSONResponse(status_code=403, content={"detail": "Hit rate limit"})
         if count >= RATE_LIMIT:
             return JSONResponse(status_code=403, content={"detail": "Hit rate limit"})
         return await call_next(request)
@@ -80,7 +84,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
     try:
         if not settings.JWT_SECRET:
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured on server")
