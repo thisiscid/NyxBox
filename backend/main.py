@@ -514,7 +514,7 @@ async def provide_pow_for_guest(request: Request): # GET a PoW in order to acces
     nonce = secrets.token_hex(16)
     challenge = {
         "nonce": nonce, 
-        "difficulty": 6
+        "difficulty": 18 # Set this higher, takes too fast currently
         }
     await redis_client.setex(f"nonce:{request.client.host}",  # type: ignore
                              60, 
