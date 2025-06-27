@@ -351,9 +351,6 @@ class LoginPage(ModalScreen):
                     log_dir = pathlib.Path.home() / ".nyxbox"
                     log_dir.mkdir(exist_ok=True)
                     create_log(return_log_path(), severity = "error", message=e)
-                    # log_path = log_dir / "login.log"
-                    # with log_path.open("a") as f:
-                    #     f.write(f"ERROR: {e}\n")
                     return
                 # PoW stuff (probably the worst way I could've done it, maybe concurrency? idk)
                 #TODO: Concurrency

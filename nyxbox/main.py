@@ -11,7 +11,7 @@ import webbrowser
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
-from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL
+from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL, USER_AGENT
 from .plugins.auth_utils import read_user_data, read_auth_data, ValidateAuth, LoginPage, AuthComplete
 from rich.text import Text
 from textual import on
@@ -22,7 +22,7 @@ from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from importlib.resources import files
 from importlib.metadata import version, PackageNotFoundError
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import httpx
 
 #TODO: Make sure the auth flow works since we're importing from a diff file
@@ -92,6 +92,11 @@ class ConfirmExit(ModalScreen):
                 self.app.pop_screen()
 
 class SearchForProblem(Screen):
+    def __init__(self, *, challs: list):
+        super().__init__()
+        self.challs = challs
+        # self.notify(f"self.challs = {str(self.challs)}") #TODO: Remove for prod
+
     def on_mount(self) -> None:
         self.added_columns=False
         challenges=self.query_one("#chall_list", DataTable)
@@ -110,17 +115,27 @@ class SearchForProblem(Screen):
         available_description_space = max(20, terminal_width - reserved_space)
         #TODO: Change this to be caching the files with a POST 
         #TODO: Wait, actually, we can implement caching on launch and just pass it to screens as necessary
-        for file in files_list:
-            file_dict = self.grab_metadata(file)
-            name = file_dict.get("name") or ""
-            description = file_dict.get("description") or ""
-            difficulty = file_dict.get("difficulty") or ""
+        for challenge in self.challs:
+            name = challenge.get("name") or ""
+            description = challenge.get("description") or ""
+            difficulty = challenge.get("difficulty") or ""
             if len(description) > available_description_space:
                 truncated_description = description[:available_description_space-3] + "..."
             else:
                 truncated_description = description
             challenges.add_row(name, truncated_description, difficulty)
-        self.refresh()
+        # for file in files_list:
+
+        #     file_dict = self.grab_metadata(file)
+        #     name = file_dict.get("name") or ""
+        #     description = file_dict.get("description") or ""
+        #     difficulty = file_dict.get("difficulty") or ""
+        #     if len(description) > available_description_space:
+        #         truncated_description = description[:available_description_space-3] + "..."
+        #     else:
+        #         truncated_description = description
+        #     challenges.add_row(name, truncated_description, difficulty)
+        # self.refresh()
         
     def compose(self) -> ComposeResult:
         yield Header()
@@ -272,21 +287,66 @@ class NyxBox(App):
             self.app.push_screen(LoginPage())
         try: # We're going to use this as our "pull and set challenges, then cache"
             challenge_dir = self.nyx_path / "cache"
+            cache_info_path = challenge_dir / "cache_info.json"
             if pathlib.Path.exists(self.nyx_path / "cache"):
-                for file_path in challenge_dir.iterdir():
-                    if not file_path.is_file():
-                        continue
-                    else:
-                        try:
-                            with open(file_path, 'r') as file:
-                                self.challs.append(json.load(file))
-                        except (json.JSONDecodeError, OSError) as e:
-                            create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=f"Skipping {file_path.name}: {e}")
-            else:
-                challenge_dir.mkdir(parents=True, exist_ok=True)
+                if pathlib.Path.exists(cache_info_path):
+                    with open(cache_info_path, 'r') as file:
+                        cache_info = json.load(file)
+                        if datetime.now(timezone.utc) <= datetime.fromisoformat(cache_info.get("expiry")):
+                            for file_path in challenge_dir.iterdir():
+                                if not file_path.is_file():
+                                    continue
+                                else:
+                                    try:
+                                        with open(file_path, 'r') as file:
+                                            self.challs.append(json.load(file))
+                                    except (json.JSONDecodeError, OSError) as e:
+                                        create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=f"Skipping {file_path.name}: {e}")
+                            return
+            challenge_dir.mkdir(parents=True, exist_ok=True)
+            data = {}
+            try:
+                for old in challenge_dir.iterdir():
+                    if old.suffix == ".json":
+                        old.unlink()
+            except Exception as e:
+                create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=f"Encountered error removing old cache: {e}")
+            try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    await client.get(f"{SERVER_URL}/challenges", )
-                    pass
+                    resp = await client.get(f"{SERVER_URL}/challenges", headers={"User-Agent": f"NyxBoxClient/{USER_AGENT}"})
+                    resp.raise_for_status()
+                    data = resp.json()
+            except Exception as e:
+                self.notify(
+                        title="Uh oh!",
+                        message=f"{DAEMON_USER} [b]Encountered critical error getting challenge: {e}[/b]",
+                        severity="information",
+                        timeout=5,
+                        markup=True
+                    )
+                create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+                return
+            if data:
+                if isinstance(data, dict):
+                    if data.get("detail", None):
+                        self.notify(
+                            title="Uh oh!",
+                            message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {data.get("detail")}[/b]",
+                            severity="information",
+                            timeout=5,
+                            markup=True
+                        )
+                        create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=data.get("detail"))
+                        return
+                else:
+                    with open(cache_info_path, "w") as file:
+                        cache_info_dict = {"expiry": (datetime.now(timezone.utc)+timedelta(days=1)).isoformat()}
+                        json.dump(cache_info_dict, file)
+                    for challenge in data:
+                        file_path = challenge_dir / f"{challenge.get("name")}.json"
+                        with open(file_path, "w") as file:
+                            json.dump(challenge, file)
+                        self.challs.append(challenge)
         except Exception as e:
             self.notify(
                     title="Uh oh!",
@@ -343,7 +403,7 @@ class NyxBox(App):
         self.push_screen(ConfirmExit())
 
     def action_search_button(self) -> None:
-        self.push_screen(SearchForProblem())
+        self.push_screen(SearchForProblem(challs=self.challs))
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
         self.editor_instance = Editor()
