@@ -569,6 +569,7 @@ async def check_and_provide_guest_cred(request: Request, submission: PowSubmissi
     
 
 @app.get("/auth/me") # Get user info
+#TODO: On frontend, if using offline/guest mode, prevent accessing profile page/input dummy data
 async def user_info(current_user: User = Depends(get_current_user)): # Changed signature
     if isinstance(current_user, dict):
         if current_user.get("is_guest", False):

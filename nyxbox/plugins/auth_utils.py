@@ -321,7 +321,7 @@ class LoginPage(ModalScreen):
                         self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
                 else:
                     self.app.push_screen(WaitingForAuthScreen(self.session_id))
-            case 'guest_button':
+            case 'guest_button': #TODO: is this even needed? Like the endpoint is unauthed
                 # We should create dummy information that CAN be used to retrieve info from the server
                 # However, we should also make sure that account expires? 
                 # implement the endpoint first acc
