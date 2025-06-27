@@ -465,7 +465,7 @@ class NyxBox(App):
     def action_vend_challenge(self) -> None:
         """Output a challenge"""
         self.has_vended = True
-        challenge = challenge_loader.vend_random_chall()
+        challenge = challenge_loader.vend_random_chall(self.challs) # We ought to point this to something else
         self.challenge = challenge
         self.current_challenge = challenge
         self.challenge_widget.update_chall(challenge)
@@ -477,12 +477,6 @@ def main():
     if "--version" in sys.argv:
         print(f"NyxBox {nyxbox_version}")
         return
-    # elif "--test-login" in sys.argv:
-    #     try:
-    #         os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "auth.json"))
-    #         os.remove(pathlib.Path.joinpath(pathlib.Path.home() / ".nyxbox" / "user.json"))
-    #     except Exception as e:
-    #         print(f"{datetime.today().strftime('%Y-%m-%d')} ERROR: {str(e)}")
     app = NyxBox()
     app.run()
 

@@ -352,8 +352,6 @@ class LoginPage(ModalScreen):
                     log_dir.mkdir(exist_ok=True)
                     create_log(return_log_path(), severity = "error", message=e)
                     return
-                # PoW stuff (probably the worst way I could've done it, maybe concurrency? idk)
-                #TODO: Concurrency
                 self.notify(f"Successfully got challenge. Details: {data}")
                 self.brute_forcing = True
                 i=0
@@ -390,7 +388,7 @@ class LoginPage(ModalScreen):
                 # We should have special handling. Why don't we write it to a special file?
                 auth_dir = pathlib.Path.home() / ".nyxbox"
                 auth_dir.mkdir(exist_ok=True)
-                with open(auth_dir / "guest.json", "w") as file:
+                with open(auth_dir / "auth.json", "w") as file:
                     json.dump(result, file)
                 # self.app.guest = True
 
@@ -402,13 +400,12 @@ def read_user_data() -> dict:
     try:
         auth_dir = pathlib.Path.home() / ".nyxbox"
         if pathlib.Path.is_dir(auth_dir):
-            with open(auth_dir / "user.json", "r") as f:
-                # auth_data=json.load(f)
-                # auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
-                # auth_data["refresh_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
-                # return auth_data
-                user_data = json.load(f)
-                return user_data
+            if pathlib.Path.exists(auth_dir / "user.json"):
+                with open(auth_dir / "user.json", "r") as f:
+                    user_data = json.load(f)
+                    return user_data
+            else:
+                return {}
         else:
             return {"error": "Auth directory not found"}
     except Exception as e:
@@ -564,3 +561,26 @@ class GetConfig():
     def __init__(self, root_path):
         self.root_path = root_path
 
+def guest_save_tokens(guest_token: str, guest_id: str, exp: str):
+        # Save to local storage
+        try:
+            auth_dir = pathlib.Path.home() / ".nyxbox"
+            auth_dir.mkdir(exist_ok=True)
+            
+            auth_data = {
+                "access_token": guest_token,
+                "user_data": None,
+                "refresh_token": None,
+                "timestamp": datetime.now().timestamp(),
+                "access_expiry": exp,
+                "refresh_expiry": None
+            }
+            
+            with open(auth_dir / "auth.json", "w") as f:
+                json.dump(auth_data, f)
+            with open(auth_dir / "user.json", "w") as f:
+                json.dump({"id": guest_id, "name": "Guest", "email": None}, f)
+            return True
+        except Exception as e:
+            create_log(return_log_path, severity="error", message=e)
+            return False

@@ -517,7 +517,7 @@ async def provide_pow_for_guest(request: Request): # GET a PoW in order to acces
     nonce = secrets.token_hex(16)
     challenge = {
         "nonce": nonce, 
-        "difficulty": 18 # Set this higher, takes too fast currently
+        "difficulty": 16 # Set this higher, takes too fast currently
         }
     await redis_client.setex(f"nonce:{request.client.host}",  # type: ignore
                              60, 
@@ -622,16 +622,16 @@ def get_chall_by_id(chall_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, detail="No such challenge")
 
 # @app.get("/challenges/{id}/approve") This might not be needed? We can make an interface to approve it locally
+
 @app.post("/challenges/{chall_id}/submit") # Submit solution
 def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # We dont need to evaluate code locally bcs:
     # 1. We already have the user evaluate code
     # 2. It's very hard to secure
+    # 3. So we'll just trust the user bcs fradulent submits are better than evaluating code locally and blowing up the computer
     if isinstance(current_user, dict):
         if current_user.get("is_guest", False):
             raise HTTPException(403, detail="Invalid token")
-    # if current_user.get("is_guest", False): This will likely fail trying to invoke a dict method on a non-dict class if it is returned
-    #     raise HTTPException(403, detail="Invalid token")
     chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
     if not chall:
         raise HTTPException(404, detail="No such challenge")
