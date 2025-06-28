@@ -312,19 +312,17 @@ class LoginPage(ModalScreen):
                     return
                 slack_link = data.get("auth_url")
                 state=webbrowser.open(slack_link)
-                if not state or os.environ.get("CODESPACES"): # Simplified condition
+                if not state or os.environ.get("CODESPACES"):
                     qr_pixels_obj = make_qr_pixels(slack_link)
                     if qr_pixels_obj:
                         self.app.push_screen(WaitingForAuthScreen(self.session_id, True, qr_pixels_obj)) # type: ignore
                     else:
                         self.notify(title="QR Error", message="Could not generate QR code.", severity="error")
-                        self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) # Show without QR
+                        self.app.push_screen(WaitingForAuthScreen(self.session_id, False)) 
                 else:
                     self.app.push_screen(WaitingForAuthScreen(self.session_id))
             case 'guest_button': #TODO: is this even needed? Like the endpoint is unauthed
-                # We should create dummy information that CAN be used to retrieve info from the server
-                # However, we should also make sure that account expires? 
-                # implement the endpoint first acc
+                # Ehhh its okay
                 try:
                     data=requests.get(f"{SERVER_URL}/auth/guest", headers={"User-Agent": USER_AGENT}).json()
                     if data.get("detail", None):
@@ -386,10 +384,13 @@ class LoginPage(ModalScreen):
                     return 
                 # jwt_response = result["jwt"] # What is this even supposed to do
                 # We should have special handling. Why don't we write it to a special file?
+                # Nvm thats stupid
                 auth_dir = pathlib.Path.home() / ".nyxbox"
                 auth_dir.mkdir(exist_ok=True)
-                with open(auth_dir / "auth.json", "w") as file:
-                    json.dump(result, file)
+                guest_save_tokens(result["access_token"], result["guest_id"], result["access_exp"])
+                self.app.pop_screen()
+                # with open(auth_dir / "auth.json", "w") as file:
+                #     json.dump(result, file)
                 # self.app.guest = True
 
     def action_quit(self):
@@ -470,13 +471,29 @@ class ValidateAuth():
             return 
         with open(user_file, 'r') as f:
             user_data = json.load(f)
+        with open(auth_file, 'r') as f:
+            auth_data = json.load(f)
+            if auth_data.get("is_guest", None):
+                try:
+                    os.remove(auth_file)
+                    os.remove(user_file)
+                    self.app_instance.push_screen(LoginPage())
+                except Exception as e:
+                    create_log(return_log_path, severity="error", message=f"Error: {e}")
+                    self.app_instance.notify(
+                        title="Uh oh!",
+                        message=f"{DAEMON_USER} [b]Couldn't remove old guest data![/]",
+                        severity="error",
+                        timeout=5,
+                        markup=True
+                    )
+                    self.app_instance.push_screen(LoginPage())
         if pathlib.Path.exists(auth_file) and pathlib.Path.exists(user_file):
             try:
                 with open(auth_file, 'r') as f:
                     auth_data = json.load(f)
                     auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
                     auth_data["refresh_expiry"] = datetime.fromisoformat(auth_data["refresh_expiry"])
-
             except Exception as e:
                 return {"error": e}
             jwt_payload = auth_data.get("access_token").split(".")[1]
@@ -534,7 +551,6 @@ class ValidateAuth():
                     )
     
     def save_tokens(self, access_token: str, user_data: dict, refresh_token: str, access_exp: int, refresh_exp: int):
-        # Save to local storage
         auth_dir = pathlib.Path.home() / ".nyxbox"
         auth_dir.mkdir(exist_ok=True)
         
@@ -562,7 +578,6 @@ class GetConfig():
         self.root_path = root_path
 
 def guest_save_tokens(guest_token: str, guest_id: str, exp: str):
-        # Save to local storage
         try:
             auth_dir = pathlib.Path.home() / ".nyxbox"
             auth_dir.mkdir(exist_ok=True)
@@ -573,9 +588,9 @@ def guest_save_tokens(guest_token: str, guest_id: str, exp: str):
                 "refresh_token": None,
                 "timestamp": datetime.now().timestamp(),
                 "access_expiry": exp,
-                "refresh_expiry": None
+                "refresh_expiry": None,
+                "is_guest": True,
             }
-            
             with open(auth_dir / "auth.json", "w") as f:
                 json.dump(auth_data, f)
             with open(auth_dir / "user.json", "w") as f:

@@ -63,12 +63,16 @@ class ProfileDetailsScreen(ModalScreen):
                 yield Label(f"{DAEMON_USER} Uh oh, failed to get user data!")
             # Add more fields as needed
             yield Rule()
-            yield Button("Close", id="close_profile")
+            with Horizontal(id="profile_detail_buttons"):
+                yield Button("Close", id="close_profile")
+                yield Button("Log out", id="log_out_profile")
     
     def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
             case "close_profile":
                 self.app.pop_screen()
+            case "log_out_profile":
+                pass
     
 class SearchComplete(Message):
     """Message passed upon the user selecting a challenge in SearchForProblem"""
