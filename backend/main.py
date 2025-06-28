@@ -532,11 +532,11 @@ async def check_and_provide_guest_cred(request: Request, submission: PowSubmissi
 
     raw = await redis_client.get(f"nonce:{ip}")
     if not raw:
-        raise HTTPException(403, detail="No active PoW challenge; please retry")
+        raise HTTPException(403, detail="No active challenge; please retry")
     try:
         cached_challenge = json.loads(raw)
     except json.JSONDecodeError:
-        raise HTTPException(500, detail="Server error reading PoW challenge")
+        raise HTTPException(500, detail="Server error reading challenge")
     hash_input = (nonce + solution).encode()
     digest = hashlib.sha256(hash_input).digest()
     bit_str = ''.join(f"{byte:08b}" for byte in digest)
@@ -548,7 +548,7 @@ async def check_and_provide_guest_cred(request: Request, submission: PowSubmissi
             "user_id": guest_id,
             "iat": int(datetime.now(timezone.utc).timestamp()),
             "exp": int((datetime.now(timezone.utc) + timedelta(hours=2)).timestamp()),
-            "is_guest": True # This is used to tell the client/backend "Hey! This is a guest user, limit their access"
+            "is_guest": True # this is used to tell the client/backend "Hey! This is a guest user, limit their access"
         }
         if settings.JWT_SECRET:
             jwt_response=jwt.encode(claims=jwt_params, key=settings.JWT_SECRET) # type: ignore
@@ -561,29 +561,29 @@ async def check_and_provide_guest_cred(request: Request, submission: PowSubmissi
             "guest_id":     guest_id,
             "access_exp":   jwt_params["exp"] 
         })
-
     else:
-        raise HTTPException(403, detail="Invalid PoW")
+        raise HTTPException(403, detail="Invalid challenge response")
 
 
     
 
 @app.get("/auth/me") # Get user info
 #TODO: On frontend, if using offline/guest mode, prevent accessing profile page/input dummy data
-async def user_info(current_user: User = Depends(get_current_user)): # Changed signature
+async def user_info(current_user: User | dict = Depends(get_current_user)): # Changed signature
     if isinstance(current_user, dict):
         if current_user.get("is_guest", False):
             raise HTTPException(403, detail="Invalid token")
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "name": current_user.name,
-        "google_id": current_user.google_id,
-        "github_id": current_user.github_id,
-        "avatar_url": current_user.avatar_url,
-        "bio": current_user.bio,
-        "created_at": current_user.created_at
-    }
+    else:
+        return {
+            "id": current_user.id,
+            "email": current_user.email,
+            "name": current_user.name,
+            "google_id": current_user.google_id,
+            "github_id": current_user.github_id,
+            "avatar_url": current_user.avatar_url,
+            "bio": current_user.bio,
+            "created_at": current_user.created_at
+        }
 
 @app.get("/auth/check-status/{session_id}")
 async def check_auth_status(session_id: str):
@@ -624,7 +624,7 @@ def get_chall_by_id(chall_id: int, db: Session = Depends(get_db)):
 # @app.get("/challenges/{id}/approve") This might not be needed? We can make an interface to approve it locally
 
 @app.post("/challenges/{chall_id}/submit") # Submit solution
-def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_user: User | dict = Depends(get_current_user)):
     # We dont need to evaluate code locally bcs:
     # 1. We already have the user evaluate code
     # 2. It's very hard to secure
@@ -632,52 +632,51 @@ def submit_solution_by_id(chall_id: int, db: Session = Depends(get_db), current_
     if isinstance(current_user, dict):
         if current_user.get("is_guest", False):
             raise HTTPException(403, detail="Invalid token")
-    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
-    if not chall:
-        raise HTTPException(404, detail="No such challenge")
-    
-    # Check if user already solved this (prevent duplicate counting)
-    existing_solve = db.query(UserSolve).filter(
-        UserSolve.user_id == current_user.id, 
-        UserSolve.challenge_id == chall_id
-    ).first()
-    
-    if not existing_solve:
-        # Create solve record
-        user_solve = UserSolve(user_id=current_user.id, challenge_id=chall_id)
-        db.add(user_solve)
+    else:
+        chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
+        if not chall:
+            raise HTTPException(404, detail="No such challenge")
         
-        # Increment solve count
-        chall.solves = (chall.solves or 0) + 1 # type: ignore
-        db.commit()
-    
-    return {"id": chall_id, "solves": chall.solves, "already_solved": bool(existing_solve)}
+        # Check if user already solved this (prevent duplicate counting)
+        existing_solve = db.query(UserSolve).filter(
+            UserSolve.user_id == current_user.id, 
+            UserSolve.challenge_id == chall_id
+        ).first()
+        
+        if not existing_solve:
+            # Create solve record
+            user_solve = UserSolve(user_id=current_user.id, challenge_id=chall_id)
+            db.add(user_solve)
+            
+            # Increment solve count
+            chall.solves = (chall.solves or 0) + 1 # type: ignore
+            db.commit()
+        
+        return {"id": chall_id, "solves": chall.solves, "already_solved": bool(existing_solve)}
 
 # I forgot but we probably should authenticate to prevent mass spam?
 @app.post("/challenges/{chall_id}/like")
-def like_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def like_challenge(chall_id: int, current_user: User | dict = Depends(get_current_user), db: Session = Depends(get_db)):
     if isinstance(current_user, dict):
         if current_user.get("is_guest", False):
             raise HTTPException(403, detail="Invalid token")
-    chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
-    if not chall:
-        raise HTTPException(404, detail="No such challenge")
-    
-    existing_like = db.query(UserLike).filter(
-        UserLike.user_id == current_user.id,
-        UserLike.challenge_id == chall_id
-    ).first()
-    
-    if existing_like:
-        raise HTTPException(400, detail="Already liked this challenge")
-    
-    user_like = UserLike(user_id=current_user.id, challenge_id=chall_id)
-    db.add(user_like)
-    
-    chall.likes = (chall.likes or 0) + 1 # type: ignore
-    db.commit()
-    
-    return {"id": chall_id, "likes": chall.likes}
+        else:
+            raise HTTPException(500, detail="Recieved invalid format on backend.")
+    else:
+        chall = db.query(Challenges).filter(Challenges.id == chall_id, Challenges.flagged == False).first()  # noqa: E712
+        if not chall:
+            raise HTTPException(404, detail="No such challenge")
+        existing_like = db.query(UserLike).filter(
+            UserLike.user_id == current_user.id,
+            UserLike.challenge_id == chall_id
+        ).first()
+        if existing_like:
+            raise HTTPException(400, detail="Already liked this challenge")
+        user_like = UserLike(user_id=current_user.id, challenge_id=chall_id)
+        db.add(user_like)
+        chall.likes = (chall.likes or 0) + 1 # type: ignore
+        db.commit()
+        return {"id": chall_id, "likes": chall.likes}
 
 @app.delete("/challenges/{chall_id}/unlike")
 def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -691,19 +690,14 @@ def unlike_challenge(chall_id: int, current_user: User = Depends(get_current_use
         UserLike.user_id == current_user.id,
         UserLike.challenge_id == chall_id
     ).first()
-
     if not existing_like:
         raise HTTPException(400, detail="User has not liked challenge")
-    
     if chall.likes == 0 or None: # type: ignore
         raise HTTPException(500, detail="No likes on challenge")
-
     user_like = UserLike(user_id=current_user.id, challenge_id=chall_id)
     db.delete(user_like)
-    
     chall.likes = (chall.likes)-1 # type: ignore
     db.commit()
-
     return {"id": chall_id, "likes": chall.likes}
 
 @app.post("/challenges/create")
@@ -715,15 +709,6 @@ def return_index_page():
     with open("static/index.html") as f:
         html_data = f.read()
     return HTMLResponse(html_data)
-
-# #TODO: Make this actually send via dms instead of via the private channel because if we expose user info thats not muy bien...
-# @app.exception_handler(RedisError) # Error handling for RedisError
-# async def redis_unavailable(request, exc):
-#     requests.post(json={"text":"check redis! sm went wrong"}, headers=["Content-type: application/json"], url=settings.SLACK_WEBHOOK_URL) # type:ignore
-#     return JSONResponse(
-#         status_code=503,
-#         content={"detail": "Service temporarily unavailable"},
-#     ) This should actually already be caught by the general exception handler
 
 # Misc Functions
 @app.exception_handler(Exception)
@@ -759,13 +744,6 @@ async def all_exception_handler(request: Request, exc: Exception):
             headers={"Content-type": "application/json"}
         )
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
-        # await client.post(
-        #     url=settings.SLACK_CHANNEL_WEBHOOK_URL, # type: ignore
-        #     json={"text": f"A critical error has occured on NyxBox at {hostname}"},
-        #     headers={"Content-type": "application/json"}
-        # )
-    # raise exc
-    # await httpx.post(json={"text": f"A critical error occured in the app!\nHost: {ip_address}:{hostname}\nOutgoing IP: {ip}\nError: {exc}"}, headers={"Content-type": "application/json"}, url=settings.SLACK_WEBHOOK_URL) # type:ignore
 
 # def create_log(path, severity, message):
 #     with open(path, 'a') as f:

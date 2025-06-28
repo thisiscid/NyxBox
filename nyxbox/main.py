@@ -40,8 +40,9 @@ class VendAnimation(Static):
 #         self.user_data = user_data
 
 class ProfileDetailsScreen(ModalScreen):
-    def __init__(self) -> None:
+    def __init__(self, app_instance) -> None:
         super().__init__()
+        self.app_instance = app_instance
         self.user_data = read_user_data()
 
     def compose(self) -> ComposeResult:
@@ -67,12 +68,68 @@ class ProfileDetailsScreen(ModalScreen):
                 yield Button("Close", id="close_profile")
                 yield Button("Log out", id="log_out_profile")
     
-    def on_button_pressed(self, event: Button.Pressed):
+    async def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
             case "close_profile":
                 self.app.pop_screen()
             case "log_out_profile":
-                pass
+                auth_path = pathlib.Path.home() / ".nyxbox" / "auth.json"
+                user_path = pathlib.Path.home() / ".nyxbox" / "user.json"
+                with open(auth_path, "r") as file:
+                    auth_data = json.load(file)
+                    if auth_data.get("is_guest", None):
+                        os.remove(auth_path)
+                        os.remove(user_path)
+                        try:
+                            self.app.pop_screen()
+                            self.app.push_screen(LoginPage())
+                            return
+                        except Exception as e:
+                            log=create_log(pathlib.Path.home() / ".nyxbox" / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+                            if log:
+                                self.notify(
+                                    title="Uh oh!",
+                                    message=f"{DAEMON_USER} [b]Encountered critical error logging out: {log}[/b]",
+                                    severity="information",
+                                    timeout=5,
+                                    markup=True
+                                )
+                                self.app.pop_screen()
+                                self.app.push_screen(LoginPage())
+                                return
+                            else:
+                                self.notify(
+                                    title="Uh oh!",
+                                    message=f"{DAEMON_USER} [b]Encountered critical error logging out: {e}[/b]",
+                                    severity="information",
+                                    timeout=5,
+                                    markup=True
+                                )
+                                self.app.pop_screen()
+                                self.app.push_screen(LoginPage())
+                                return
+                async with httpx.AsyncClient() as client:
+                    try:
+                        await client.post(
+                            f"{SERVER_URL}/auth/logout?refresh_jwt={auth_data.get("refresh_token")}",
+                            headers={"User-Agent": f"NyxBoxClient/{nyxbox_version}"}
+                            )
+                        # self.app.notify(str(request_response))
+                        os.remove(auth_path)
+                        os.remove(user_path)
+                        self.app.pop_screen()
+                        self.app.push_screen(LoginPage())
+                    except Exception as e:
+                        self.notify(
+                                    title="Uh oh!",
+                                    message=f"{DAEMON_USER} [b]Encountered critical error logging out: {e}[/b]",
+                                    severity="information",
+                                    timeout=5,
+                                    markup=True
+                                )
+                        self.app.pop_screen()
+                        self.app.push_screen(LoginPage())
+
     
 class SearchComplete(Message):
     """Message passed upon the user selecting a challenge in SearchForProblem"""
@@ -99,7 +156,6 @@ class SearchForProblem(Screen):
     def __init__(self, *, challs: list):
         super().__init__()
         self.challs = challs
-        # self.notify(f"self.challs = {str(self.challs)}") #TODO: Remove for prod
 
     def on_mount(self) -> None:
         self.added_columns=False
@@ -117,8 +173,6 @@ class SearchForProblem(Screen):
         terminal_width = self.app.size.width
         reserved_space = 45
         available_description_space = max(20, terminal_width - reserved_space)
-        #TODO: Change this to be caching the files with a POST 
-        #TODO: Wait, actually, we can implement caching on launch and just pass it to screens as necessary
         for challenge in self.challs:
             name = challenge.get("name") or ""
             description = challenge.get("description") or ""
@@ -128,18 +182,7 @@ class SearchForProblem(Screen):
             else:
                 truncated_description = description
             challenges.add_row(name, truncated_description, difficulty)
-        # for file in files_list:
 
-        #     file_dict = self.grab_metadata(file)
-        #     name = file_dict.get("name") or ""
-        #     description = file_dict.get("description") or ""
-        #     difficulty = file_dict.get("difficulty") or ""
-        #     if len(description) > available_description_space:
-        #         truncated_description = description[:available_description_space-3] + "..."
-        #     else:
-        #         truncated_description = description
-        #     challenges.add_row(name, truncated_description, difficulty)
-        # self.refresh()
         
     def compose(self) -> ComposeResult:
         yield Header()
@@ -256,6 +299,7 @@ class NyxBox(App):
                     timeout=5,
                     markup=True
                 )
+                self.app.push_screen(LoginPage())
             else:
                 self.notify(
                     title="Uh oh!",
@@ -280,6 +324,7 @@ class NyxBox(App):
                     timeout=5,
                     markup=True
                 )
+                self.app.push_screen(LoginPage())
             else:
                 self.notify(
                     title="Uh oh!",
@@ -299,6 +344,8 @@ class NyxBox(App):
                         if datetime.now(timezone.utc) <= datetime.fromisoformat(cache_info.get("expiry")):
                             for file_path in challenge_dir.iterdir():
                                 if not file_path.is_file():
+                                    continue
+                                elif file_path == cache_info_path:
                                     continue
                                 else:
                                     try:
@@ -401,7 +448,7 @@ class NyxBox(App):
         self.editor_opened = False
 
     def action_view_profile(self) -> None:
-        self.push_screen(ProfileDetailsScreen())
+        self.push_screen(ProfileDetailsScreen(self))
 
     def action_quit_app(self) -> None:
         self.push_screen(ConfirmExit())

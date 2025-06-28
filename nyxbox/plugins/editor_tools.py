@@ -426,11 +426,6 @@ class Editor(Screen):
 
     @on(LanguageSelected)
     def load_challenge(self, event: LanguageSelected):
-        """Handle loading a challenge into the editor
-        - Extract function name and parameters
-        - Generate template code
-        - Update the editor content
-        """
         if not self.challenge:
                 self.notify(
                         title="Where'd it go!?",
@@ -443,8 +438,8 @@ class Editor(Screen):
         self.chall_name = self.challenge['name']
         self.func_name = self.challenge['function_name']
             #self.challenge_view.update_chall(challenge)
-        if 'inputs' in self.challenge and isinstance(self.challenge['inputs'], list):
-            params = [p for p in self.challenge['inputs'] if p]
+        if 'params' in self.challenge and isinstance(self.challenge['params'], list):
+            params = [p for p in self.challenge['params'] if p]
             if params:
                 param_str = ", ".join(params)
             else:
