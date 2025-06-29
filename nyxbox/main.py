@@ -111,7 +111,7 @@ class ProfileDetailsScreen(ModalScreen):
                 async with httpx.AsyncClient() as client:
                     try:
                         await client.post(
-                            f"{SERVER_URL}/auth/logout?refresh_jwt={auth_data.get("refresh_token")}",
+                            f"{SERVER_URL}/auth/logout?refresh_jwt={auth_data.get('refresh_token')}",
                             headers={"User-Agent": f"NyxBoxClient/{nyxbox_version}"}
                             )
                         # self.app.notify(str(request_response))
@@ -165,9 +165,9 @@ class SearchForProblem(Screen):
             challenges.add_column("Description")
             challenges.add_column("Difficulty")
         self.added_columns=True
-        challenge_dir = files("nyxbox.challenges")
-        files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
-        self.files_list = files_list
+        # challenge_dir = files("nyxbox.challenges")
+        # files_list = [f for f in challenge_dir.iterdir() if f.is_file()]
+        # self.files_list = files_list
         self.placeholder = ["Start typing to search for a challenge."]
         
         terminal_width = self.app.size.width
@@ -249,8 +249,7 @@ class SearchForProblem(Screen):
         reserved_space = 45
         available_description_space = max(20, terminal_width - reserved_space)
         
-        for file in self.files_list:
-            file_dict = self.grab_metadata(file)
+        for file_dict in self.challs:
             name = file_dict.get("name", "")
             description = file_dict.get("description", "")
             difficulty = file_dict.get("difficulty", "")
@@ -382,7 +381,7 @@ class NyxBox(App):
                     if data.get("detail", None):
                         self.notify(
                             title="Uh oh!",
-                            message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {data.get("detail")}[/b]",
+                            message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {data.get('detail')}[/b]",
                             severity="information",
                             timeout=5,
                             markup=True
@@ -394,7 +393,7 @@ class NyxBox(App):
                         cache_info_dict = {"expiry": (datetime.now(timezone.utc)+timedelta(days=1)).isoformat()}
                         json.dump(cache_info_dict, file)
                     for challenge in data:
-                        file_path = challenge_dir / f"{challenge.get("name")}.json"
+                        file_path = challenge_dir / f"{challenge.get('name')}.json"
                         with open(file_path, "w") as file:
                             json.dump(challenge, file)
                         self.challs.append(challenge)
