@@ -8,7 +8,11 @@
 Nyxbox is a Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, and C++. Meant to help people learn and practice their coding. Also, who's Nyx?
 
 ## What's new?
-Latest - 1.0.0
+Latest - 1.0.1
+1.0.1 - 6/28/25
+- Fixed minor issue potentially causing crashes in clients running python in versions <3.12
+- Fixed issue affecting search where it would error out
+
 1.0.0 - 6/28/25
 - Fully featured app out now!
 - Powered on a backend now (thanks nest (psst hack club))
