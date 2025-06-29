@@ -1,6 +1,6 @@
 [project]
 name = "NyxBox"
-version = "0.1.2"
+version = "1.0.0"
 description = "Exercisim inspired coding challenges, right in your terminal!"
 authors = [{ name="Rainger", email="tilt-hazard-swept@duck.com" }]
 readme = "README.md"
@@ -28,6 +28,10 @@ nyxbox = "nyxbox.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+exclude = ["backend/*", "backend", "*/backend"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["backend/*"]
 
 [tool.setuptools.package-data]
 nyxbox = [

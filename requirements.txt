@@ -1,21 +1,21 @@
 # Core TUI framework
-textual>=3.2.0 # I'm running on textual 3.2.0, this MAY work but I cannot guarantee it for lower versions.
-# check
-# Most requirements will be what I am running locally, may vary since I have a mac
+textual>=3.2.0
+
 # Syntax highlighting
-tree-sitter>=0.24.0 # chekc
-tree-sitter-languages>=1.10.2 # check
-tree-sitter-cpp>=0.23.4 # check
-tree-sitter-javascript>=0.23.1 #check
-tree-sitter-python>=0.23.6# check
-tree-sitter-java>=0.23.5 #check
+tree-sitter>=0.24.0
+tree-sitter-languages>=1.10.2 
+tree-sitter-cpp>=0.23.4 
+tree-sitter-javascript>=0.23.1
+tree-sitter-python>=0.23.6
+tree-sitter-java>=0.23.5
 textual[syntax] # check
-# Auth dependencies
-requests # check
-qrcode # check
-pillow # check
-rich_pixels # check
-httpx # check
+
+requests 
+qrcode 
+pillow
+rich_pixels 
+httpx 
+
 # Optional dependencies
-rich>=13.9.4       # Pretty printing (used by Textual but good to specify)
-typing-extensions>=4.12.2  # For advanced type annotations
+rich>=13.9.4       
+typing-extensions>=4.12.2  

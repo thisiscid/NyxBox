@@ -264,9 +264,9 @@ ResultModal {
 #login_screen {
     align: center middle;
     content-align: center middle;
-    width: 75;
-    min-width: 70;
-    max-width: 80;
+    width: 85;
+    min-width: 80;
+    max-width: 90;
     min-height: 27;
     max-height: 30;
     border: tall #3b82f6;
@@ -286,6 +286,18 @@ ResultModal {
     content-align: center middle;
     margin-bottom: 0;
     width: 100%;
+}
+#slack_button {
+    align: center middle;
+    content-align: center middle;
+    margin-bottom: 0;
+    width: 100%;
+}
+#slack_button Button {
+    width: 22;
+    min-width: 20;
+    max-width: 24;
+    height: 3;
 }
 #sign_up_buttons Button {
     width: 22;
@@ -336,7 +348,7 @@ Rule {
     min-width: 80;
     max-width: 90;
     min-height: 15;
-    max-height: 80;
+    max-height: 50;
     border: tall #3b82f6;
     background: #222;
     padding: 2 4;

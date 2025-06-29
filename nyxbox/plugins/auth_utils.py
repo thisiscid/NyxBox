@@ -162,10 +162,10 @@ class LoginPage(ModalScreen):
                     with Horizontal(id="sign_up_buttons"):
                         yield Button.success("Sign up with Google", id="google_button")
                         yield Button.warning("Sign up with Github", id="github_button")
-                    slack_button = Button.error("Sign in with slack", id="slack_button")
-                    slack_button.styles.align_horizontal = "center"
-                    # slack_button.styles.margin = "auto"  # vertically 1, horizontally centered
-                    yield slack_button
+                        slack_button = Button.error("Sign in with slack", id="slack_button")
+                        slack_button.styles.align_horizontal = "center"
+                        # slack_button.styles.margin = "auto"  # vertically 1, horizontally centered
+                        yield slack_button
                 yield Rule()
                 yield Label(f"{DAEMON_USER} Have an account?", id="have_account")
                 with Vertical(id="login_buttons"):

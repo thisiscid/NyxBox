@@ -10,3 +10,4 @@ slowapi
 aioredis
 httpx
 slack_sdk
+uvicorn

@@ -12,7 +12,8 @@ from importlib.metadata import version, PackageNotFoundError
 NYXBOX_VERSION = version("nyxbox")
 USER_AGENT = f"NyxBoxClient/{NYXBOX_VERSION}"
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
-SERVER_URL="http://localhost:8000"
+SERVER_URL="https://nyxbox.thisisrainy.hackclub.app"
+
 def escape_brackets(s):
         # Escapes [ and ] for Textual markup
         return str(s).replace("[", "\\[").replace("]", "]")
