@@ -5,7 +5,7 @@
 ██  ██ ██    ██     ██ ██  ██   ██ ██    ██  ██ ██  
 ██   ████    ██    ██   ██ ██████   ██████  ██   ██ 
 ```
-Nyxbox is a Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and ~~C (this is never getting added)~~ Meant to help people learn and practice their coding. Also, who's Nyx?
+Nyxbox is a Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, and C++. Meant to help people learn and practice their coding. Also, who's Nyx?
 
 ## What's new?
 Latest - 1.0.0
@@ -13,7 +13,8 @@ Latest - 1.0.0
 - Fully featured app out now!
 - Powered on a backend now (thanks nest (psst hack club))
 - Supports slack and guest sign in as well
-- All the runners work!
+- Execution environments finally work!
+
 ---
 
 ## Features
@@ -21,7 +22,7 @@ Latest - 1.0.0
 - **Vend random coding challenges** from a curated set
 - **Edit and run solutions** in multiple languages!
 - **Hidden tests** for extra challenge (we cant just have you cheating the returns right?)
-- **~~Really bad~~ Really good** daemon charaxter!
+- **~~Really bad~~ Really good** daemon character!
 
 ---
 
@@ -32,7 +33,7 @@ Install nyxbox via pip.
 ```bash
 pip install nyxbox
 ```
-Make sure you have clang++ or g++ installed (for C++), or Node.js (for JavaScript) if planning on using these languages for challenges, as NyxBox uses these to run your challenges written in C++ or JS. Same goes for Java (any JDK should work! Working on adding custom paths so it doesn't matter where you install it)
+Ensure clang++ or g++ is installed for C++, and node for JavaScript support. Same goes for Java (any JDK should work! Working on adding custom paths so it doesn't matter where you install it)
 
 ### 2. Run the App
 ```bash
@@ -71,8 +72,14 @@ GITHUB_REDIRECT_URI=http://localhost:8000/auth/github/callback
 JWT_SECRET=your-jwt-secret-here
 DATABASE_URL=sqlite:///./nyxbox.db
 API_BASE_URL = http://localhost:8000
+SLACK_CLIENT_ID=sample
+SLACK_CLIENT_SECRET=sample_secret
+SLACK_SIGNING_SECRET=sample_sign
+SLACK_REDIRECT_URI=http://localhost:8000
+SLACK_CHANNEL_WEBHOOK_URL=slack_here
+SLACK_DMS_WEBHOOK_URL=slack_here
 ```
-JWT_SECRET is just a random combination of letters, you can just random SHA256 hash something potentially (i'm unsure about the max length of JWT_SECRET). Yes, this will involve grabbing your own OAuth secrets and clients.
+JWT_SECRET should be a long random string (e.g., use `openssl rand -hex 32`).
 
 You will also have to to manually enter the frontend folder where NyxBox has been installed and check utils.py in order to change the link to your server, as the backend currently does not exist.
 

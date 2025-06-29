@@ -1,0 +1,58 @@
+{
+  "name": "two-sum",
+  "difficulty": "easy",
+  "description": "Given a list of integers and a target value, return the indices of the first pair of numbers that sum to the target. Iterate from left to right and choose the earliest valid pair (i < j). Return the indices as a list of two integers or None (or the equivalent indicator in your language) if no pair sums to the target.",
+  "function_name": "two_sum",
+  "type": "function",
+  "category": "arrays",
+  "params": ["arr", "target"],
+  "constraints": "None",
+  "author": "NyxBox",
+  "points": 10,
+  "tests": [
+    {
+      "input": [[1, 4, 10, -3], 14],
+      "expected_output": [1, 2]
+    },
+    {
+      "input": [[2, 7, 11, 15], 9],
+      "expected_output": [0, 1]
+    },
+    {
+      "input": [[3, 2, 4], 6],
+      "expected_output": [1, 2]
+    },
+    {
+      "input": [[5, 5, 5, 5], 10],
+      "expected_output": [0, 1],
+      "hidden": true
+    },
+    {
+      "input": [[-2, 7, 11, 15], 13],
+      "expected_output": [0, 3],
+      "hidden": true
+    },
+    {
+      "input": [[1, 2, 3, 4, 5], 9],
+      "expected_output": [3, 4]
+    },
+    {
+      "input": [[3, 3, 4, 2], 6],
+      "expected_output": [0, 1]
+    },
+    {
+      "input": [[0, 4, 3, 0], 0],
+      "expected_output": [0, 3]
+    },
+    {
+      "input": [[-3, 4, 1, 2], 1],
+      "expected_output": [0, 1],
+      "hidden": true
+    },
+    {
+      "input": [[1, 2, 3], 10],
+      "expected_output": null,
+      "hidden": true
+    }
+  ]
+}
