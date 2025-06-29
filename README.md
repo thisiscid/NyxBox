@@ -8,12 +8,12 @@
 Nyxbox is a Textual-based TUI app for all your challenge solving needs supporting Python, JS, Java, C++, and ~~C (this is never getting added)~~ Meant to help people learn and practice their coding. Also, who's Nyx?
 
 ## What's new?
-Latest - 0.1.2
-0.1.2 - 6/5/25
-- Some search fuctionality! (i'm working on it i promise)
-- Fixed minor errors
-- Fixed README + Getting Started instructions
-
+Latest - 1.0.0
+1.0.0 - 6/28/25
+- Fully featured app out now!
+- Powered on a backend now (thanks nest (psst hack club))
+- Supports slack and guest sign in as well
+- All the runners work!
 ---
 
 ## Features
@@ -21,15 +21,45 @@ Latest - 0.1.2
 - **Vend random coding challenges** from a curated set
 - **Edit and run solutions** in multiple languages!
 - **Hidden tests** for extra challenge (we cant just have you cheating the returns right?)
-- **Fun daemon commentary** (depends on your humor) and themed UI
-- **Extensible**: add your own challenges in JSON
+- **~~Really bad~~ Really good** daemon charaxter!
 
 ---
 
 ## Getting Started
-## Backend
-To run the backend, do the following.
-### 1. Create a .env file
+
+### 1. Install Requirements
+Install nyxbox via pip.
+```bash
+pip install nyxbox
+```
+Make sure you have clang++ or g++ installed (for C++), or Node.js (for JavaScript) if planning on using these languages for challenges, as NyxBox uses these to run your challenges written in C++ or JS. Same goes for Java (any JDK should work! Working on adding custom paths so it doesn't matter where you install it)
+
+### 2. Run the App
+```bash
+nyxbox
+```
+
+## Method 2: Install via git
+
+Clone git repo and cd.
+
+```bash
+git clone https://github.com/thisiscid/NyxBox
+cd NyxBox
+```
+
+Then, run as a module.
+
+```bash
+python3 -m nyxbox.main
+```
+
+## Development
+
+### Backend
+This assumes that you have already cloned the repo (check above)
+
+#### 1. Create a .env file
 A .env file in the folder of the backend must be created. Here's what it should look like.
 ```bash
 GOOGLE_CLIENT_ID=your-google-client.id.here
@@ -45,50 +75,21 @@ API_BASE_URL = http://localhost:8000
 JWT_SECRET is just a random combination of letters, you can just random SHA256 hash something potentially (i'm unsure about the max length of JWT_SECRET). Yes, this will involve grabbing your own OAuth secrets and clients.
 
 You will also have to to manually enter the frontend folder where NyxBox has been installed and check utils.py in order to change the link to your server, as the backend currently does not exist.
-### 2. Run via uvicorn
+
+#### 2. Run via uvicorn
 Inside of the backend folder, run 
 ```bash
 uvicorn main:app
 ```
-Make sure that it is running on port 8000. **Furthermore, set your redirects inside of Google and Github OAuth to localhost:8000/auth/github/callback or localhost:8000/auth/google/callback.**
 
-## Frontend
-### Method 1: Install via pip
-#### 1. Install Requirements
-Install nyxbox via pip.
-```bash
-pip install nyxbox
-```
-Make sure you have clang++ or g++ installed, or Node.js for JavaScript if planning on using these langs, as NyxBox uses these to run your challenges written in C++ or JS. Same goes for Java (any jdk works! working on adding custom paths so it doesn't matter where you install it)
-
-#### 2. Run the App
-```bash
-nyxbox
-```
-### Method 2: Install via git
-
-Clone git repo and cd.
-
-```bash
-git clone https://github.com/thisiscid/NyxBox
-cd NyxBox
-```
-
-Then, run as a module.
-
-```bash
-python3 -m nyxbox.main
-```
-## Adding challenges
-~~Add new challenges in the form of a JSON in the challenges directory. Challenges will not work if they do not follow the style of pre-made challenges.~~
-This is temporarily no longer recommended as I work on a backend. 
+Make sure that it is running on port 8000. **Furthermore, set your redirects inside of Github and Google OAuth to localhost:8000/auth/github/callback or localhost:8000/auth/google/callback.**
 
 ## Notes
 - Python 3.10+ recommended (The dev is running 3.12.1)
-- C++ (clang++ or g++), JS (node.js), and Java (JDKs) runners require system dependencies. If they error out, make sure that you have them installed before adding 
+- C++ (clang++ or g++), JS (node.js), and Java (JDKs) runners require system dependencies. If they error out, make sure that you have them installed before raising an issue.
 - Run in a terminal supporting Unicode and colors like [Ghostty](https://ghostty.org), [Alacritty](https://alacritty.org), or others.
 
 ## Credits
-1. Copilot for helping me debug (and with the html for the authentication stuff, lifesaver bcs I don't know frontend...)
-2. Textual for providing the underlying framework for the TUI
-3. You! For using it! Thank you!
+1. Textual for providing the underlying framework for the TUI
+2. You! For using it! Thank you!
+3. ~~copilot for being terrible and making bad code~~ hack clubbers :3

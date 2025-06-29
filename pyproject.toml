@@ -1,7 +1,7 @@
 [project]
 name = "NyxBox"
 version = "1.0.0"
-description = "Exercisim inspired coding challenges, right in your terminal!"
+description = "LeetCode inspired app in your terminal, powered with Python and built on Textual!"
 authors = [{ name="Rainger", email="tilt-hazard-swept@duck.com" }]
 readme = "README.md"
 requires-python = ">=3.8,<3.13"

@@ -210,9 +210,9 @@ class SearchForProblem(Screen):
                 current_row = datatable.get_row_at(datatable.cursor_row)
                 challenge_name = current_row[0]
                 if current_row:
-                    for file in self.files_list:
+                    for file_dict in self.challs:
                         try:
-                            file_dict = self.grab_metadata(file)
+                            # file_dict = self.grab_metadata(file)
                             if file_dict.get("name") == challenge_name:
                                 self.app.pop_screen()
                                 self.notify(
@@ -231,8 +231,8 @@ class SearchForProblem(Screen):
         if datatable.cursor_row is not None:
             selected_data = datatable.get_row_at(datatable.cursor_row)
             challenge_name = selected_data[0]
-            for file in self.files_list:
-                file_dict = self.grab_metadata(file)
+            for file_dict in self.challs:
+                # file_dict = self.grab_metadata(file)
                 if file_dict.get("name") == challenge_name:
                     self.challenge_widget.update_chall(file_dict)
                     break

@@ -350,7 +350,7 @@ class LoginPage(ModalScreen):
                     log_dir.mkdir(exist_ok=True)
                     create_log(return_log_path(), severity = "error", message=e)
                     return
-                self.notify(f"Successfully got challenge. Details: {data}")
+                # self.notify(f"Successfully got challenge. Details: {data}")
                 self.brute_forcing = True
                 i=0
                 while self.brute_forcing:
@@ -361,12 +361,12 @@ class LoginPage(ModalScreen):
                         i+=1
                     else:
                         self.brute_forcing = False
-                        self.notify(f"Successfully brute forced. Found {i} for {data["nonce"]}. Difficulty={data["difficulty"]}, result={bit_str}")
+                        # self.notify(f"Successfully brute forced. Found {i} for {data["nonce"]}. Difficulty={data["difficulty"]}, result={bit_str}")
                         break
 
                 try:
                     result=requests.post(f"{SERVER_URL}/auth/guest", json={"nonce": data["nonce"], "solution": i}, headers={"User-Agent": USER_AGENT}).json()
-                    self.notify(f"Successfuly brute forced. Server returned {result}")
+                    # self.notify(f"Successfuly brute forced. Server returned {result}")
                 except Exception as e:
                     self.notify(
                         title="Uh oh, something went wrong!",
