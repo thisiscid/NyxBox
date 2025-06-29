@@ -23,6 +23,10 @@ dependencies = [
     "httpx"
 ]
 
+[project.urls]
+"main page" = "https://nyxbox.thisisrainy.hackclub.app"
+"github" = "https://github.com/thisiscid/NyxBox"
+
 [project.scripts]
 nyxbox = "nyxbox.main:main"
 
