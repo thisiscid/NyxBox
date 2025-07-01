@@ -1,0 +1,58 @@
+{
+  "name": "Palindrome Number",
+  "difficulty": "medium",
+  "description": "Given an integer x, return true if x is a palindrome, and false otherwise. For example, 121 would return true as it is 121 when reversed, -121 would return false as it is 121- when reversed.",
+  "function_name": "palindrome_number",
+  "type": "function",
+  "category": "strings",
+  "params": ["nums"],
+  "constraints": "None",
+  "author": "NyxBox",
+  "points": 20,
+  "tests": [
+    {
+      "input": 121,
+      "expected_output": "true"
+    },
+    {
+      "input": -121,
+      "expected_output": "false"
+    },
+    {
+      "input": 16235,
+      "expected_output": "false"
+    },
+    {
+      "input": 23432,
+      "expected_output": "true",
+      "hidden": true
+    },
+    {
+      "input": 1111,
+      "expected_output": "true",
+      "hidden": true
+    },
+    {
+      "input": 623940,
+      "expected_output": "false"
+    },
+    {
+      "input": -623,
+      "expected_output": "false"
+    },
+    {
+      "input": 623,
+      "expected_output": "false"
+    },
+    {
+      "input": 2332,
+      "expected_output": "true",
+      "hidden": true
+    },
+    {
+      "input": 9889,
+      "expected_output": "true",
+      "hidden": true
+    }
+  ]
+}
