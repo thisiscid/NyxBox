@@ -11,46 +11,46 @@
   "points": 20,
   "tests": [
     {
-      "input": 121,
+      "input": [121],
       "expected_output": "true"
     },
     {
-      "input": -121,
+      "input": [-121],
       "expected_output": "false"
     },
     {
-      "input": 16235,
+      "input": [16235],
       "expected_output": "false"
     },
     {
-      "input": 23432,
+      "input": [23432],
       "expected_output": "true",
       "hidden": true
     },
     {
-      "input": 1111,
+      "input": [1111],
       "expected_output": "true",
       "hidden": true
     },
     {
-      "input": 623940,
+      "input": [623940],
       "expected_output": "false"
     },
     {
-      "input": -623,
+      "input": [-623],
       "expected_output": "false"
     },
     {
-      "input": 623,
+      "input": [623],
       "expected_output": "false"
     },
     {
-      "input": 2332,
+      "input": [2332],
       "expected_output": "true",
       "hidden": true
     },
     {
-      "input": 9889,
+      "input": [9889],
       "expected_output": "true",
       "hidden": true
     }
