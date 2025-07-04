@@ -8,6 +8,7 @@ import re
 import requests
 import secrets
 import webbrowser
+import argparse
 from .plugins import challenge_view, challenge_loader
 from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
 from .plugins.code_runners.java_runner import run_java_code
@@ -279,6 +280,8 @@ class NyxBox(App):
 
     async def on_mount(self) -> None:
         """Initialize variables to be used later and other stuff"""
+        # if "--server" in sys.argv:
+        #     self.server = True
         self.editor_opened = False
         self.has_vended = False
         self.current_challenge = None
@@ -524,9 +527,8 @@ class NyxBox(App):
         btn.display = True # IT WORKS!!!! :D
 
 def main():
-    if "--version" in sys.argv:
-        print(f"NyxBox {nyxbox_version}")
-        return
+    parser = argparse.ArgumentParser(description="A simple TCP port scanner built in Python") # We'll use this to pass stuff in from textual-serve
+    parser.add_argument("cookie", help="Cookie that should correspond to a refresh token.")
     app = NyxBox()
     app.run()
 

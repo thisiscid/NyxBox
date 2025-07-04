@@ -1,13 +1,12 @@
 [project]
 name = "NyxBox"
-version = "1.0.2"
+version = "1.0.3"
 description = "LeetCode inspired app in your terminal, powered with Python and built on Textual!"
 authors = [{ name="Rainger", email="tilt-hazard-swept@duck.com" }]
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "textual>=3.2.0",
-    "rich>=13.7.0",
     "tree-sitter>=0.24.0",
     "tree-sitter-languages>=1.10.2",
     "tree-sitter-cpp>=0.23.4",

@@ -211,7 +211,7 @@ class LoginPage(ModalScreen):
                         log_dir = pathlib.Path.home() / ".nyxbox"
                         log_dir.mkdir(exist_ok=True)
                         # log_path = log_dir / "login.log"
-                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get('detail')}")
                         return
                 except Exception as e:
                     self.notify(
@@ -252,7 +252,7 @@ class LoginPage(ModalScreen):
                         )
                         log_dir = pathlib.Path.home() / ".nyxbox"
                         log_dir.mkdir(exist_ok=True)
-                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get('detail')}")
                         return
                 except Exception as e:
                     self.notify(
@@ -293,7 +293,7 @@ class LoginPage(ModalScreen):
                         )
                         log_dir = pathlib.Path.home() / ".nyxbox"
                         log_dir.mkdir(exist_ok=True)
-                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get('detail')}")
                         return
                 except Exception as e:
                     self.notify(
@@ -336,7 +336,7 @@ class LoginPage(ModalScreen):
                         log_dir = pathlib.Path.home() / ".nyxbox"
                         log_dir.mkdir(exist_ok=True)
                         # log_path = log_dir / "login.log"
-                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get("detail")}")
+                        create_log(return_log_path(), severity = "error", message=f"Backend failed, details: {data.get('detail')}")
                         return
                 except Exception as e:
                     self.notify(
@@ -419,8 +419,11 @@ def read_auth_data() -> dict:
         if pathlib.Path.is_dir(auth_dir):
             with open(auth_dir / "auth.json", "r") as f:
                 auth_data=json.load(f)
-                auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
-                auth_data["refresh_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                if auth_data.get("is_guest", False):
+                    auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                else:
+                    auth_data["access_expiry"] = datetime.fromisoformat(auth_data["access_expiry"])
+                    auth_data["refresh_expiry"] = datetime.fromisoformat(auth_data["refresh_expiry"])
                 return auth_data
         else:
             return {"error": "Auth directory not found"}
@@ -433,6 +436,7 @@ class ValidateAuth():
         # self.token = token
         self.app_instance = app_instance
         self.root_path = root_path
+        # self.is_server = is_server
 
     async def check_refresh_token(self, refresh_token) -> dict:
         refresh_url = SERVER_URL + "/auth/refresh"

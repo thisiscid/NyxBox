@@ -90,7 +90,7 @@ class ResultModal(ModalScreen):
         ]
         if self.is_success:
             with Vertical(id="result_container"):
-                yield Label(f"{random.choice(CONGRATULATION_MESSAGE)}\nThere were {len(self.chall.get('tests', []))} tests and you passed them all for {self.chall.get("name")}!", id="message_title")
+                yield Label(f"{random.choice(CONGRATULATION_MESSAGE)}\nThere were {len(self.chall.get('tests', []))} tests and you passed them all for {self.chall.get('name')}!", id="message_title")
                 with Horizontal(id="action_buttons"):
                     yield Button("Exit to Menu", id="exit_to_menu", variant="error")
                     yield Button("Keep Coding", id="keep_coding", variant="primary")
