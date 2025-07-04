@@ -41,10 +41,11 @@ class VendAnimation(Static):
 #         self.user_data = user_data
 
 class ProfileDetailsScreen(ModalScreen):
-    def __init__(self, app_instance) -> None:
+    def __init__(self, app_instance, is_guest) -> None:
         super().__init__()
         self.app_instance = app_instance
         self.user_data = read_user_data()
+        self.is_guest = is_guest
 
     def compose(self) -> ComposeResult:
         with Vertical(id="profile_details_container"):
@@ -54,7 +55,12 @@ class ProfileDetailsScreen(ModalScreen):
                 f"{DAEMON_USER} Maybe theres something juicy in here?",
                 f"{DAEMON_USER} Pulling up your information now!"
             ]
-            if self.user_data and not self.user_data.get('error', None):
+            if self.is_guest:
+                yield Label(random.choice(MESSAGE_CHOICES))
+                yield Rule()
+                yield Label("Name: Guest")
+                yield Label("Email: N/A")
+            elif self.user_data and not self.user_data.get('error', None):
                 # user_info = self.user_data.get('user_data', {})
                 yield Label(random.choice(MESSAGE_CHOICES))
                 yield Rule()
@@ -67,7 +73,8 @@ class ProfileDetailsScreen(ModalScreen):
             yield Rule()
             with Horizontal(id="profile_detail_buttons"):
                 yield Button("Close", id="close_profile")
-                yield Button("Log out", id="log_out_profile")
+                if not self.is_guest:
+                    yield Button("Log out", id="log_out_profile")
     
     async def on_button_pressed(self, event: Button.Pressed):
         match event.button.id:
@@ -288,54 +295,61 @@ class NyxBox(App):
         self.nyx_path = pathlib.Path.home() / ".nyxbox"
         self.guest = False
         self.challs = [] # We just initalize this, we assign later
-        try: # this should pull up the auth info and if it doesn't work we force login
-            auth_validator = ValidateAuth(self, self.nyx_path)
-            self.run_worker(auth_validator.perform_auth_check(), exclusive=True)
-        except Exception as e:
-            log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
-            if log:
-                self.notify(
-                    title="Uh oh!",
-                    message=f"{DAEMON_USER} [b]Encountered critical error reading auth files: {log}[/b]",
-                    severity="information",
-                    timeout=5,
-                    markup=True
-                )
+        if "--web" in sys.argv:
+            self.is_guest = True # This is a lie, its more of a "is_web_user" but honestly i've already done is_guest everywhere
+        else:
+            self.is_guest = False
+        if self.is_guest:
+            pass
+        else:
+            try: # this should pull up the auth info and if it doesn't work we force login
+                auth_validator = ValidateAuth(self, self.nyx_path)
+                self.run_worker(auth_validator.perform_auth_check(), exclusive=True)
+            except Exception as e:
+                log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+                if log:
+                    self.notify(
+                        title="Uh oh!",
+                        message=f"{DAEMON_USER} [b]Encountered critical error reading auth files: {log}[/b]",
+                        severity="information",
+                        timeout=5,
+                        markup=True
+                    )
+                    self.app.push_screen(LoginPage())
+                else:
+                    self.notify(
+                        title="Uh oh!",
+                        message=f"{DAEMON_USER} [b]Encountered critical error reading auth files: {e}[/b]",
+                        severity="information",
+                        timeout=5,
+                        markup=True
+                    )
                 self.app.push_screen(LoginPage())
-            else:
-                self.notify(
-                    title="Uh oh!",
-                    message=f"{DAEMON_USER} [b]Encountered critical error reading auth files: {e}[/b]",
-                    severity="information",
-                    timeout=5,
-                    markup=True
-                )
-            self.app.push_screen(LoginPage())
-        try: 
-            if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / ".config"):
-                config_path = pathlib.Path.home() / ".nyxbox" / ".config"
-                with open(config_path, 'r') as config_file:
-                    self.config_items = config_file.readlines()
-        except Exception as e:
-            log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
-            if log:
-                self.notify(
-                    title="Uh oh!",
-                    message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {log}[/b]",
-                    severity="information",
-                    timeout=5,
-                    markup=True
-                )
-                self.app.push_screen(LoginPage())
-            else:
-                self.notify(
-                    title="Uh oh!",
-                    message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {e}[/b]",
-                    severity="information",
-                    timeout=5,
-                    markup=True
-                )
-            self.app.push_screen(LoginPage())
+        # try: 
+        #     if pathlib.Path.exists(pathlib.Path.home() / ".nyxbox" / ".config"):
+        #         config_path = pathlib.Path.home() / ".nyxbox" / ".config"
+        #         with open(config_path, 'r') as config_file:
+        #             self.config_items = config_file.readlines()
+        # except Exception as e:
+        #     log=create_log(self.nyx_path / f"nyxbox-{datetime.today().strftime('%Y-%m-%d')}", severity = "error", message=e)
+        #     if log:
+        #         self.notify(
+        #             title="Uh oh!",
+        #             message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {log}[/b]",
+        #             severity="information",
+        #             timeout=5,
+        #             markup=True
+        #         )
+        #         self.app.push_screen(LoginPage())
+        #     else:
+        #         self.notify(
+        #             title="Uh oh!",
+        #             message=f"{DAEMON_USER} [b]Encountered critical error reading config files: {e}[/b]",
+        #             severity="information",
+        #             timeout=5,
+        #             markup=True
+        #         )
+        #     self.app.push_screen(LoginPage())
         try: # We're going to use this as our "pull and set challenges, then cache"
             challenge_dir = self.nyx_path / "cache"
             cache_info_path = challenge_dir / "cache_info.json"
@@ -450,7 +464,7 @@ class NyxBox(App):
         self.editor_opened = False
 
     def action_view_profile(self) -> None:
-        self.push_screen(ProfileDetailsScreen(self))
+        self.push_screen(ProfileDetailsScreen(self, self.is_guest))
 
     def action_quit_app(self) -> None:
         self.push_screen(ConfirmExit())
@@ -459,7 +473,7 @@ class NyxBox(App):
         self.push_screen(SearchForProblem(challs=self.challs))
     def action_edit_solution(self) -> None:
         """Allows user to edit a challenge, loads instance then displays"""
-        self.editor_instance = Editor()
+        self.editor_instance = Editor(self.is_guest)
         self.editor_instance.get_and_update_chall(self.current_challenge)
         if not self.has_vended:
             self.notify(
@@ -499,6 +513,8 @@ class NyxBox(App):
     def authentication_complete(self, message: AuthComplete):
         self.auth_data = message.auth_data
         self.user_data = message.user_data
+        if self.user_data.get("is_guest", False):
+            self.is_guest = True
 
     @on(LanguageSelected)
     def handle_language_selection(self, message: LanguageSelected):
@@ -527,8 +543,6 @@ class NyxBox(App):
         btn.display = True # IT WORKS!!!! :D
 
 def main():
-    parser = argparse.ArgumentParser(description="A simple TCP port scanner built in Python") # We'll use this to pass stuff in from textual-serve
-    parser.add_argument("cookie", help="Cookie that should correspond to a refresh token.")
     app = NyxBox()
     app.run()
 

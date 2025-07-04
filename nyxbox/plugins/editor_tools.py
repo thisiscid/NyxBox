@@ -342,6 +342,9 @@ class SelectLanguage(ModalScreen):
             self.app.post_message(LanguageSelected(selected))    
 
 class Editor(Screen):
+    def __init__(self, is_guest):
+        super().__init__()
+        self.is_guest = is_guest
 
     BINDINGS = [
         ("ctrl+s", "save_code", "Save"),
@@ -609,7 +612,7 @@ using namespace std;
         formatted_results=[]
         match self.language:
             case 'py':
-                results=await run_python_code(code, self.challenge)
+                results=await run_python_code(code, self.challenge, is_guest=self.is_guest)
                 self.notify(
                     title="Hey... I started running your code!",
                     message=f"{DAEMON_USER} Wait a sec as I finish!",
@@ -628,7 +631,7 @@ using namespace std;
                 self.all_view.update_content(self.challenge, formatted_results)
 
             case 'js':
-                all_results = await run_js_code(code, self.challenge)
+                all_results = await run_js_code(code, self.challenge, is_guest = self.is_guest)
                 self.notify(
                     title="Hey... I started running your code!",
                     message=f"{DAEMON_USER} Wait a sec as I finish!",
@@ -670,7 +673,7 @@ using namespace std;
         formatted_results=[]
         match self.language:
             case 'py':
-                results=await run_python_code(code, self.challenge, is_submission=True)
+                results=await run_python_code(code, self.challenge, is_submission=True, is_guest=self.is_guest)
                 self.notify(
                     title="Hey... I started running your code!",
                     message=f"{DAEMON_USER} Wait a sec as I finish!",
@@ -687,7 +690,7 @@ using namespace std;
                     markup=True
                     )
             case 'js':
-                all_results = await run_js_code(code, self.challenge, True)
+                all_results = await run_js_code(code, self.challenge, True, is_guest = self.is_guest)
                 self.notify(
                     title="Hey mortal...I finished running your code!",
                     message=f"{DAEMON_USER} Check ur submit tab!",
@@ -722,7 +725,7 @@ using namespace std;
         self.app.push_screen(self.EditorResetConfirm(self))
 
     class CompilationStandardPopup(ModalScreen):
-        def __init__(self, chall, user_code, func_name, test_cases, language, editor, testresultswidget, is_submission=False):
+        def __init__(self, chall, user_code, func_name, test_cases, language, editor, testresultswidget, is_submission=False, is_guest = False):
             super().__init__()
             self.chall = chall
             self.code = user_code
@@ -733,6 +736,7 @@ using namespace std;
             self.editor = editor
             self.editor_class = Editor
             self.is_submission = is_submission
+            self.is_guest = is_guest
         async def on_mount(self) -> None:
             if self.lang == "cpp":
                 result = None
@@ -837,7 +841,7 @@ using namespace std;
             else:
                 if value and isinstance(value, str):
                     if self.lang == "cpp":
-                        results = await run_cpp_code(self.code, self.func_name, self.tests, value)
+                        results = await run_cpp_code(self.code, self.func_name, self.tests, value, self.is_submission, self.is_guest)
                         self.notify(
                             title="Hey... I started running your code!",
                             message=f"{DAEMON_USER} Wait a sec as I finish!",
@@ -872,7 +876,7 @@ using namespace std;
                             self.notify(title="Error", message=f"Selected JDK version '{value}' not found in mapping.", severity="error")
                             return
 
-                        results = await run_java_code(self.code, self.func_name, self.tests, jdk_path, self.is_submission)
+                        results = await run_java_code(self.code, self.func_name, self.tests, jdk_path, self.is_submission, self.is_guest)
                         self.notify(
                             title="Hey... I started running your code!",
                             message=f"{DAEMON_USER} Wait a sec as I finish!",

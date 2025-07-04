@@ -2,13 +2,56 @@ import asyncio
 import tempfile
 import os
 import sys
+import re
+
 TIMEOUT=3
 
-async def run_python_code(code, challenge, is_submission=False):
+async def run_python_code(code, challenge, is_submission=False, is_guest=False):
     all_results = []
-    
+    if is_guest:
+        pattern = r'^\s*(?:import\s+\w+(?:\s+as\s+\w+)?|from\s+[A-Za-z0-9_\.]+\s+import\s+)'
+        if re.search(pattern, code, re.MULTILINE):
+            return [{
+                "input": None,
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": "Imports are not allowed!"
+            }]
     # Create test program
-    test_code = f"""
+    if is_guest:
+        test_code = f"""
+{code}
+
+import sys
+func_name = '{challenge['function_name']}'
+tests = {challenge['tests']}
+is_submission = {is_submission}
+
+import builtins, sys
+
+sys.path[:] = ['']
+_orig_import = builtins.__import__
+def __blocked_import__(name, globals=None, locals=None, fromlist=(), level=0):
+    print("Test 0: FAIL - Importing is not allowed!")
+    exit()
+builtins.__import__ = __blocked_import__
+for i, test_case in enumerate(tests):
+    if not is_submission and test_case.get('hidden', False):
+        continue
+    
+    try:
+        result = {challenge['function_name']}(*test_case['input'])
+        expected = test_case['expected_output']
+        if result == expected:
+            print(f"Test {{i+1}}: PASS")
+        else:
+            print(f"Test {{i+1}}: FAIL - Got: {{result}} Expected: {{expected}}")
+    except Exception as e:
+        print(f"Test {{i+1}}: ERROR - {{str(e)}}")
+"""
+    else:
+        test_code = f"""
 {code}
 
 import sys
@@ -18,8 +61,7 @@ is_submission = {is_submission}
 
 for i, test_case in enumerate(tests):
     if not is_submission and test_case.get('hidden', False):
-        continue
-    
+        continue    
     try:
         result = {challenge['function_name']}(*test_case['input'])
         expected = test_case['expected_output']
@@ -38,7 +80,7 @@ for i, test_case in enumerate(tests):
     
     try:
         process = await asyncio.create_subprocess_exec(
-            sys.executable, tmp_file_name,
+            sys.executable, "-I", "-S", tmp_file_name,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )

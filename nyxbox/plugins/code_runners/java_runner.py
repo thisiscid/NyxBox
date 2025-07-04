@@ -2,11 +2,28 @@ import os
 import json
 import tempfile
 import asyncio
+import re
 
-async def run_java_code(user_code, func_name, test_cases, jdk_path, is_submission=False):
+ALLOWED_JAVA_IMPORT_PREFIXES = [
+    "java.util.",   
+    "java.math.",    
+]
+
+async def run_java_code(user_code, func_name, test_cases, jdk_path, is_submission=False, is_guest=False):
     """
     Run java code against test cases and return results.
-    """    
+    """   
+    if is_guest:
+        imports = re.findall(r'^\s*import\s+([\w\.]+\*?);\s*$', user_code, re.MULTILINE)
+        for imp in imports:
+            if not any(imp.startswith(prefix) for prefix in ALLOWED_JAVA_IMPORT_PREFIXES):
+                return [{
+                "input": None,
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": "Use of import statements is disallowed"
+                }]
     if is_submission:
         filtered_tests = test_cases  # All tests, including hidden
     else:

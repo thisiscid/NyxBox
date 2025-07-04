@@ -5,11 +5,30 @@ import json
 import tempfile
 import asyncio
 import shutil
+import re
 
-async def run_cpp_code(user_code, func_name, test_cases, standard, is_submission=False):
+ALLOWED_CPP_HEADERS = {
+    "vector", "string", "algorithm", "unordered_map",
+    "unordered_set", "map", "set", "queue", "stack",
+    "iostream", 
+}
+
+async def run_cpp_code(user_code, func_name, test_cases, standard, is_submission=False, is_guest = False):
     """
     Run C++ code against test cases and return results.
     """    
+    if is_guest:
+        imports = re.findall(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', user_code, re.MULTILINE)
+        for imp in imports:
+            if not any(imp.startswith(prefix) for prefix in ALLOWED_CPP_HEADERS):
+                return [{
+                "input": None,
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": "Use of import statements is disallowed"
+                }]
+            
     if is_submission:
         filtered_tests = test_cases  # All tests, including hidden
     else:

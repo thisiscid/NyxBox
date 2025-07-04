@@ -2,8 +2,18 @@ import json
 import tempfile
 import asyncio
 import subprocess
-async def run_js_code(code, challenge, is_submission = False) -> list:
+import re
+async def run_js_code(code, challenge, is_submission = False, is_guest = False) -> list:
     all_results=[]
+    if is_guest:
+        if re.search(r'\b(import\s+|require\s*\()', code):
+            return [{
+                "input": None,
+                "output": None,
+                "expected_output": None,
+                "passed": False,
+                "error": "Use of import/require is disallowed"
+            }]
     for test_case in challenge['tests']:
         if test_case.get("hidden", False) and not is_submission:
             continue

@@ -40,10 +40,11 @@ def make_qr_pixels(data: str) -> Pixels | None:
         return None
     
 class AuthComplete(Message):
-    def __init__(self, auth_data, user_data):
+    def __init__(self, auth_data, user_data, is_guest=False):
         super().__init__()
         self.auth_data = auth_data
         self.user_data = user_data
+        self.is_guest = is_guest
 
 class WaitingForAuthScreen(ModalScreen):
     def __init__(self, session_id: str, is_qr: bool = False, qr_image: str = ""):
@@ -537,7 +538,7 @@ class ValidateAuth():
                 )
                     try:
                         os.remove(self.root_path / "auth.json")
-                        os.remove(self.root_path / "auth.json")
+                        os.remove(self.root_path / "user.json")
                     except Exception as e:
                         create_log(return_log_path, severity="error", message=f"Error: {e}")
                     self.app_instance.push_screen(LoginPage())
