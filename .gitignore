@@ -220,3 +220,5 @@ dump.rdb
 */*.rdb
 */*/*.rdb
 dump.rdb
+
+nohup.out
