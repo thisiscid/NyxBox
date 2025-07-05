@@ -9,7 +9,10 @@ from io import BytesIO
 from qrcode.constants import ERROR_CORRECT_L
 from importlib.metadata import version, PackageNotFoundError
 
-NYXBOX_VERSION = version("nyxbox")
+try:
+    NYXBOX_VERSION = version("nyxbox")
+except PackageNotFoundError:
+    NYXBOX_VERSION = "1.0.2"
 USER_AGENT = f"NyxBoxClient/{NYXBOX_VERSION}"
 DAEMON_USER="[#B3507D][bold]nyx[/bold][/#B3507D]@[#A3C9F9]hackclub[/#A3C9F9]:~$"
 SERVER_URL="https://nyxbox.thisisrainy.hackclub.app"
