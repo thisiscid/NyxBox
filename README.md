@@ -31,22 +31,25 @@ Latest - 1.0.1
 ---
 
 ## Getting Started
+### Web version
+A web version is available at [this link](https://nyxbox-client.thisisrainy.hackclub.app)! May be slightly buggy, but should mostly work.
 
-### 1. Install Requirements
-Install nyxbox via pip.
+### Pip version
+#### 1. Install
+Install nyxbox via pip. (If you don't know how to, find an app called terminal, open it, and follow [these instructions](https://pip.pypa.io/en/stable/installation/))
 ```bash
 pip install nyxbox
 ```
 Ensure clang++ or g++ is installed for C++, and node for JavaScript support. Same goes for Java (any JDK should work! Working on adding custom paths so it doesn't matter where you install it)
 
-### 2. Run the App
+#### 2. Run the App
 ```bash
 nyxbox
 ```
 
-## Method 2: Install via git
+### Git version
 
-Clone git repo and cd.
+Clone git repo and cd. (find an app called terminal or something similar on your computer!)
 
 ```bash
 git clone https://github.com/thisiscid/NyxBox
@@ -103,4 +106,4 @@ Make sure that it is running on port 8000. **Furthermore, set your redirects ins
 ## Credits
 1. Textual for providing the underlying framework for the TUI
 2. You! For using it! Thank you!
-3. ~~copilot for being terrible and making bad code~~ hack clubbers :3
+3. hack clubbers :3
