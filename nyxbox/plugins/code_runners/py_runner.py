@@ -36,6 +36,7 @@ def __blocked_import__(name, globals=None, locals=None, fromlist=(), level=0):
     print("Test 0: FAIL - Importing is not allowed!")
     exit()
 builtins.__import__ = __blocked_import__
+
 for i, test_case in enumerate(tests):
     if not is_submission and test_case.get('hidden', False):
         continue

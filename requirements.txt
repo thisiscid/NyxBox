@@ -1,5 +1,6 @@
 # Core TUI framework
 textual>=3.2.0
+textual-serve
 
 # Syntax highlighting
 tree-sitter>=0.24.0
