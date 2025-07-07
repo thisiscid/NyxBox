@@ -1,30 +1,62 @@
-import os
-import random
+import argparse
 import json
+import os
+import pathlib
+import random
+import re
+import secrets
 import sys
 import time
-import pathlib
-import re
-import requests
-import secrets
 import webbrowser
-import argparse
-from .plugins import challenge_view, challenge_loader
-from .plugins.editor_tools import Editor, EditorClosed, LanguageSelected, CustomPathSelected, TestResultsWidget
-from .plugins.code_runners.java_runner import run_java_code
-from .plugins.utils import create_log, make_qr_pixels, DAEMON_USER, SERVER_URL, USER_AGENT
-from .plugins.auth_utils import read_user_data, read_auth_data, ValidateAuth, LoginPage, AuthComplete
+from datetime import datetime, timedelta, timezone
+from importlib.metadata import PackageNotFoundError, version
+from importlib.resources import files
+
+import httpx
+import requests
 from rich.text import Text
 from textual import on
-from textual.screen import Screen, ModalScreen
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Static, TextArea, Label, Button, Digits, Input, ListView, DataTable, Rule
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
-from importlib.resources import files
-from importlib.metadata import version, PackageNotFoundError
-from datetime import datetime, timezone, timedelta
-import httpx
+from textual.screen import ModalScreen, Screen
+from textual.widgets import (
+    Button,
+    DataTable,
+    Digits,
+    Footer,
+    Header,
+    Input,
+    Label,
+    ListView,
+    Rule,
+    Static,
+    TextArea,
+)
+
+from .plugins import challenge_loader, challenge_view
+from .plugins.auth_utils import (
+    AuthComplete,
+    LoginPage,
+    ValidateAuth,
+    read_auth_data,
+    read_user_data,
+)
+from .plugins.code_runners.java_runner import run_java_code
+from .plugins.editor_tools import (
+    CustomPathSelected,
+    Editor,
+    EditorClosed,
+    LanguageSelected,
+    TestResultsWidget,
+)
+from .plugins.utils import (
+    DAEMON_USER,
+    SERVER_URL,
+    USER_AGENT,
+    create_log,
+    make_qr_pixels,
+)
 
 #TODO: Make sure the auth flow works since we're importing from a diff file
 try:
