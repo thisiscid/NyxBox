@@ -273,7 +273,7 @@ class SearchForProblem(Screen):
         if not item_found:
             datatable.add_row("No challenges found matching your search.")
 class NyxBox(App):
-    CSS_PATH = str(files("nyxbox").joinpath("styles.tcss"))
+    CSS_PATH = str(files(__package__).joinpath("styles.tcss"))
     BINDINGS = [("v", "vend_challenge", "Vend a new challenge!"), 
                 ("e", "edit_solution", "Edit solution"), 
                 ("s", "search_button", "Search"), 
